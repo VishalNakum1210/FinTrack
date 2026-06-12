@@ -1,9 +1,7 @@
-import 'package:account/user_pages/main_page.dart';
 import 'package:flutter/material.dart';
-import 'package:account/authantication/registration_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:account/authantication/login_page.dart';
+import 'package:account/splash/splash_page.dart';
 
 
 Future<void> main() async {
@@ -23,7 +21,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: "Account",
       debugShowCheckedModeBanner: false,
-      home: LoginPage(),
+      home: SplashPage(),
     );
   }
 }

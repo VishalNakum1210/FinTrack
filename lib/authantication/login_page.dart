@@ -3,6 +3,7 @@ import 'package:account/user_pages/main_page.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -42,6 +43,7 @@ class _LoginPageState extends State<LoginPage> {
         Map values = event.snapshot.value as Map;
         if (password_user == values["password"]) {
           Fluttertoast.showToast(msg: "Login successfully");
+          await Save_data(values["name"], phone_number, values["email"]);
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => UserMainPage()),
@@ -61,6 +63,13 @@ class _LoginPageState extends State<LoginPage> {
         });
       }
     }
+  }
+
+  Future<void> Save_data(String username, String phone_number, String email) async {
+    SharedPreferences sp = await SharedPreferences.getInstance();
+    await sp.setString("username", username);
+    await sp.setString("phone_number", phone_number);
+    await sp.setString("email", email);
   }
 
   @override
