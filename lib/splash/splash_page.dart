@@ -1,5 +1,5 @@
 import 'package:account/authantication/login_page.dart';
-import 'package:account/user_pages/main_page.dart';
+import 'package:account/nav_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,7 +15,7 @@ class _splash_Page extends State<SplashPage> {
     if (phoneNumber != null && phoneNumber.isNotEmpty) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => UserMainPage()),
+        MaterialPageRoute(builder: (context) => NavPageSelector()),
       );
     } else {
       Navigator.pushReplacement(

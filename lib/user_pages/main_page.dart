@@ -1,4 +1,5 @@
 import 'package:account/authantication/login_page.dart';
+import 'package:account/user_pages/add_spent.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,12 +14,14 @@ class _userMainPage extends State<UserMainPage> {
 
   Future<void> getDetails() async {
     SharedPreferences sp = await SharedPreferences.getInstance();
-    name = await sp.getString("username");
+    setState(() {
+      name = sp.getString("username");
+    });
   }
 
   Future<void> logout() async {
     SharedPreferences sp = await SharedPreferences.getInstance();
-    await sp.remove("phone_number");
+    await sp.clear();
 
     Navigator.pushReplacement(
       context,
@@ -55,76 +58,75 @@ class _userMainPage extends State<UserMainPage> {
         ),
         backgroundColor: Colors.white,
       ),
-      body: Container(
-        height: double.infinity,
-        width: double.infinity,
-        color: Color(0xFF8BC24A),
 
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Container(
-                  width: double.infinity,
-                  height: 200,
-                  margin: EdgeInsets.only(left: 20, right: 20, top: 20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: Colors.white,
-                  ),
-                ),
+      body: SingleChildScrollView(
+        child: Container(
+          // height: double.infinity,
+          // width: double.infinity,
+          color: Color(0xFF8BC24A),
 
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Container(
+                    height: 200,
                     margin: EdgeInsets.only(left: 20, right: 20, top: 20),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
-                      ),
-                      color: const Color.fromARGB(255, 209, 161, 143),
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                    ),
+                  ),
+
+                  Container(
+                    height: 400,
+                    padding: EdgeInsets.only(bottom: 10, top: 10),
+                    margin: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 50),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Color(0xFFE4D5A3),
                     ),
 
-                    // child: Container(
-                    //   width: double.infinity,
-                    //   height: 60,
-                    //   color: Color(0xFF8BC24A),
-                    // ),
+                    child: ListView.builder(
+                      itemCount: 5,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          margin: EdgeInsets.only(left: 10, right: 10, bottom: 10),
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12)
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                child: Container(
+                  height: 60,
+                  width: 60,
+                  padding: EdgeInsets.all(10),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Fluttertoast.showToast(msg: "Clicked");
+                      logout();
+                    },
+                    child: Text("Logout"),
                   ),
                 ),
-              ],
-            ),
-            Positioned(
-              child: Container(
-                height: 60,
-                width: 60,
-                padding: EdgeInsets.all(10),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Fluttertoast.showToast(msg: "Clicked");
-                    logout();
-                  },
-                  child: Text("Logout"),
-                ),
               ),
-            ),
-            Positioned(
-              bottom: 10,
-              right: 10,
-              child: Container(
-                height: 60,
-                width: 60,
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Image.asset("assets/image/GreenPlus.png"),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => AddSpent()));
+        },
+        backgroundColor: Colors.white,
+        child: Image.asset("assets/image/GreenPlus.png", height: 30, width: 30),
       ),
     );
   }
