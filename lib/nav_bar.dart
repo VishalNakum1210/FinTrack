@@ -1,4 +1,5 @@
 import 'package:account/user_pages/main_page.dart';
+import 'package:account/user_pages/profile.dart';
 import 'package:flutter/material.dart';
 
 class NavPageSelector extends StatefulWidget {
@@ -13,7 +14,7 @@ class _navPageSelector extends State<NavPageSelector> {
     UserMainPage(),
     Container(color: Colors.amber),
     Container(color: Colors.red),
-    Container(color: Colors.blue),
+    ProfilePage(),
   ];
 
   @override

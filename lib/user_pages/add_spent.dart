@@ -21,6 +21,8 @@ class _addSpent extends State<AddSpent> {
     "Spent Cash",
     "Spent Online For ADA",
     "Spent Cash For ADA",
+    "Add CASH",
+    "Add Online"
   ];
 
   String selectedMode = "Select Payment mode";

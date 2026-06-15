@@ -76,6 +76,7 @@ class _RegistrationStatePage extends State<RegistrationPage> {
       });
 
       Fluttertoast.showToast(msg: "Registration Successful");
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginPage()));
     } catch (e) {
       Fluttertoast.showToast(msg: "Not Connected $e");
       print(e);
