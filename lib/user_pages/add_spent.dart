@@ -1,4 +1,7 @@
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddSpent extends StatefulWidget {
   @override
@@ -6,6 +9,8 @@ class AddSpent extends StatefulWidget {
 }
 
 class _addSpent extends State<AddSpent> {
+  bool isLoading = false;
+
   TextEditingController Camount = TextEditingController();
   TextEditingController Cdescription = TextEditingController();
 
@@ -35,10 +40,63 @@ class _addSpent extends State<AddSpent> {
     }
   }
 
-  void getAllDetails () {
-    String Amount = Camount.text;
-    String Description = Cdescription.text;
-    print("Amount : $Amount\nDescription : $Description\nSelected payment : $selectedMode\nselected date : ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}");
+  void getAllDetails() async {
+  String amount = Camount.text.trim();
+  String description = Cdescription.text.trim();
+
+  if (amount.isEmpty ||
+      description.isEmpty ||
+      selectedMode == "Select Payment mode") {
+    Fluttertoast.showToast(msg: "Please Enter All Values");
+    return;
+  }
+
+  setState(() {
+    isLoading = true;
+  });
+
+  try {
+    await StoreSpentOnDataBase(
+      amount,
+      description,
+      selectedMode,
+      "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
+    );
+
+    Fluttertoast.showToast(msg: "Expense added successfully");
+
+    Navigator.pop(context, true);
+  } catch (e) {
+    Fluttertoast.showToast(msg: "Failed to save expense");
+  }
+
+  if (mounted) {
+    setState(() {
+      isLoading = false;
+    });
+  }
+}
+
+  Future<void> StoreSpentOnDataBase(
+    String Amount,
+    String Description,
+    String selectedMode,
+    String selected_date,
+  ) async {
+    SharedPreferences sp = await SharedPreferences.getInstance();
+    String phone_number = sp.getString("phone_number")!;
+    DatabaseReference myref = FirebaseDatabase.instance.ref(
+      "Expenses/$phone_number",
+    );
+    String key = myref.push().key!;
+    await myref.child(key).set({
+      "key" : key,
+      "phone_number": phone_number,
+      "Amount": Amount,
+      "Description": Description,
+      "Payment_Mode": selectedMode,
+      "Date": selected_date,
+    });
   }
 
   @override
@@ -208,6 +266,13 @@ class _addSpent extends State<AddSpent> {
               ),
             ),
           ),
+          if(isLoading)
+            Container(
+              color: Colors.black87,
+              child: Center(
+                child: CircularProgressIndicator(color: Color(0xFF8BC24A),),
+              ),
+            )
         ],
       ),
     );

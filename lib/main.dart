@@ -1,5 +1,3 @@
-import 'package:account/nav_bar.dart';
-import 'package:account/user_pages/add_spent.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -23,7 +21,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: "Account",
       debugShowCheckedModeBanner: false,
-      home: AddSpent(),
+      home: SplashPage(),
     );
   }
 }

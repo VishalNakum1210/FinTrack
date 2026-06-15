@@ -44,7 +44,6 @@ class _LoginPageState extends State<LoginPage> {
         if (password_user == values["password"]) {
           Fluttertoast.showToast(msg: "Login successfully");
           await Save_data(values["name"], phone_number, values["email"]);
-          await Check_details();
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => NavPageSelector()),
@@ -71,10 +70,6 @@ class _LoginPageState extends State<LoginPage> {
     await sp.setString("username", username);
     await sp.setString("phone_number", phone_number);
     await sp.setString("email", email);
-  }
-  Future<void> Check_details () async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    Fluttertoast.showToast(msg: "${sp.getString("phone_number")}");
   }
 
   @override

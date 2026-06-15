@@ -1,3 +1,4 @@
+import 'package:account/GetInformation/GetTotalExpenses.dart';
 import 'package:account/authantication/login_page.dart';
 import 'package:account/user_pages/add_spent.dart';
 import 'package:flutter/material.dart';
@@ -10,12 +11,18 @@ class UserMainPage extends StatefulWidget {
 }
 
 class _userMainPage extends State<UserMainPage> {
-  String? name;
+  String? name, totalExpanses;
 
   Future<void> getDetails() async {
     SharedPreferences sp = await SharedPreferences.getInstance();
+
+    String? total = await getTotalExpenses(
+      sp.getString("phone_number")!,
+    );
+
     setState(() {
-      name = sp.getString("username");
+      name = sp.getString("username") ?? "";
+      totalExpanses = total;
     });
   }
 
@@ -43,17 +50,17 @@ class _userMainPage extends State<UserMainPage> {
         title: Row(
           children: [
             Container(
-              margin: EdgeInsets.only(bottom: 5, right: 10),
+              margin: const EdgeInsets.only(bottom: 5, right: 10),
               height: 50,
               width: 50,
-              child: CircleAvatar(
+              child: const CircleAvatar(
                 radius: 25,
                 backgroundImage: AssetImage(
                   "assets/image/AccountApplicationLogo.jpg",
                 ),
               ),
             ),
-            Text("Welcome, $name"),
+            Text("Welcome, ${name ?? ''}"),
           ],
         ),
         backgroundColor: Colors.white,
@@ -61,41 +68,65 @@ class _userMainPage extends State<UserMainPage> {
 
       body: SingleChildScrollView(
         child: Container(
-          // height: double.infinity,
-          // width: double.infinity,
-          color: Color(0xFF8BC24A),
+          color: const Color(0xFF8BC24A),
 
           child: Stack(
             children: [
               Column(
                 children: [
                   Container(
+                    width: double.infinity,
                     height: 200,
-                    margin: EdgeInsets.only(left: 20, right: 20, top: 20),
+                    margin: const EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 20,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
                       color: Colors.white,
+                    ),
+                    child: Center(
+                      child: Text(
+                        "₹ ${totalExpanses ?? '0'}",
+                        style: const TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
 
                   Container(
                     height: 400,
-                    padding: EdgeInsets.only(bottom: 10, top: 10),
-                    margin: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 50),
+                    padding: const EdgeInsets.only(
+                      bottom: 10,
+                      top: 10,
+                    ),
+                    margin: const EdgeInsets.only(
+                      left: 20,
+                      right: 20,
+                      top: 20,
+                      bottom: 50,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
-                      color: Color(0xFFE4D5A3),
+                      color: const Color(0xFFE4D5A3),
                     ),
 
                     child: ListView.builder(
                       itemCount: 5,
                       itemBuilder: (context, index) {
                         return Container(
-                          margin: EdgeInsets.only(left: 10, right: 10, bottom: 10),
+                          margin: const EdgeInsets.only(
+                            left: 10,
+                            right: 10,
+                            bottom: 10,
+                          ),
                           height: 80,
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(12)
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         );
                       },
@@ -103,17 +134,19 @@ class _userMainPage extends State<UserMainPage> {
                   ),
                 ],
               ),
+
               Positioned(
+                bottom: 50,
                 child: Container(
                   height: 60,
-                  width: 60,
-                  padding: EdgeInsets.all(10),
+                  width: 100,
+                  padding: const EdgeInsets.all(10),
                   child: ElevatedButton(
                     onPressed: () {
                       Fluttertoast.showToast(msg: "Clicked");
                       logout();
                     },
-                    child: Text("Logout"),
+                    child: const Text("Logout"),
                   ),
                 ),
               ),
@@ -121,12 +154,26 @@ class _userMainPage extends State<UserMainPage> {
           ),
         ),
       ),
+
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => AddSpent()));
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddSpent(),
+            ),
+          );
+
+          if (result == true) {
+            getDetails();
+          }
         },
         backgroundColor: Colors.white,
-        child: Image.asset("assets/image/GreenPlus.png", height: 30, width: 30),
+        child: Image.asset(
+          "assets/image/GreenPlus.png",
+          height: 30,
+          width: 30,
+        ),
       ),
     );
   }
