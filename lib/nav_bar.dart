@@ -1,3 +1,4 @@
+import 'package:account/user_pages/PassbookPage.dart';
 import 'package:account/user_pages/main_page.dart';
 import 'package:account/user_pages/profile.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ class _navPageSelector extends State<NavPageSelector> {
 
   final List<Widget> pages = [
     UserMainPage(),
-    Container(color: Colors.amber),
+    Passbookpage(),
     Container(color: Colors.red),
     ProfilePage(),
   ];

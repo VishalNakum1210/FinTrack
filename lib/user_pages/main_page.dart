@@ -124,93 +124,98 @@ class _userMainPage extends State<UserMainPage> {
                   ),
                 ),
 
-                Container(
-                  height: 400,
-                  padding: const EdgeInsets.only(bottom: 10, top: 10),
-                  margin: const EdgeInsets.only(
-                    left: 20,
-                    right: 20,
-                    top: 20,
-                    bottom: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: const Color(0xFFE4D5A3),
-                  ),
-
-                  child: (records != null)
-                      ? ListView.builder(
-                          itemCount: records!.length,
-                          itemBuilder: (context, index) {
-                            return Card(
-                              elevation: 3,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.white,
-                                  child: Image.asset(
-                                    (records![index]["Payment_Mode"] ==
-                                                "Add CASH" ||
-                                            records![index]["Payment_Mode"] ==
-                                                "Add Online")
-                                        ? "assets/image/GetPic.png"
-                                        : "assets/image/SpentPic.png",
-                                  ),
+                Expanded(
+                  child: Container(
+                    // height: 410,
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(
+                      left: 10,
+                      right: 10,
+                      top: 20,
+                      bottom: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: const Color(0xFFE4D5A3),
+                    ),
+                    clipBehavior: Clip.hardEdge,
+                    child: (records != null)
+                        ? ListView.builder(
+                            itemCount: records!.length,
+                            itemBuilder: (context, index) {
+                              return Card(
+                                elevation: 3,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
                                 ),
-                                title: Text(
-                                  "Grocery Shopping",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(records![index]["Date"]),
-                                    Text(records![index]["Description"]),
-                                    Text(
-                                      "Payment: ${records![index]["Payment_Mode"]}",
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.white,
+                                    child: Image.asset(
+                                      (records![index]["Payment_Mode"] ==
+                                                  "Add CASH" ||
+                                              records![index]["Payment_Mode"] ==
+                                                  "Add Online")
+                                          ? "assets/image/GetPic.png"
+                                          : "assets/image/SpentPic.png",
                                     ),
-                                  ],
-                                ),
-                                trailing: Text(
-                                  NumberFormat.currency(
-                                    locale: 'en_IN',
-                                    symbol: '₹',
-                                    decimalDigits: 0,
-                                  ).format(
-                                    int.tryParse(records![index]["Amount"]),
                                   ),
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color:
-                                        (records![index]["Payment_Mode"] ==
-                                                "Add CASH" ||
-                                            records![index]["Payment_Mode"] ==
-                                                "Add Online")
-                                        ? Colors.green
-                                        : Colors.red,
+                                  title: Text(
+                                    "Grocery Shopping",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(records![index]["Date"]),
+                                      Text(records![index]["Description"]),
+                                      Text(
+                                        "Payment: ${records![index]["Payment_Mode"]}",
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: Text(
+                                    NumberFormat.currency(
+                                      locale: 'en_IN',
+                                      symbol: '₹',
+                                      decimalDigits: 0,
+                                    ).format(
+                                      int.tryParse(records![index]["Amount"]),
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          (records![index]["Payment_Mode"] ==
+                                                  "Add CASH" ||
+                                              records![index]["Payment_Mode"] ==
+                                                  "Add Online")
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        )
-                      : Container(
-                          height: double.infinity,
-                          width: double.infinity,
-                          child: Center(
-                            child: Text(
-                              "No Data Found",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 30,
-                                color: Colors.green,
+                              );
+                            },
+                          )
+                        : Container(
+                            height: double.infinity,
+                            width: double.infinity,
+                            child: Center(
+                              child: Text(
+                                "No Data Found",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 30,
+                                  color: Colors.green,
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                  ),
                 ),
               ],
             ),

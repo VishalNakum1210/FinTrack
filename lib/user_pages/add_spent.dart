@@ -32,7 +32,7 @@ class _addSpent extends State<AddSpent> {
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime.now(),
     );
 
     if (picked != null) {

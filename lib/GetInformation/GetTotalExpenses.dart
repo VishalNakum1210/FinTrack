@@ -1,17 +1,30 @@
 import 'package:firebase_database/firebase_database.dart';
 
-Future<String> getTotalExpenses (String phone_number) async {
+Future<String> getTotalExpenses(String phone_number, String Specific) async {
   int count = 0;
   Map<dynamic, dynamic> value = {};
 
-  DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone_number");
+  DatabaseReference myref = FirebaseDatabase.instance.ref(
+    "Expenses/$phone_number",
+  );
   DatabaseEvent event = await myref.once();
 
-  if(event.snapshot.value != null){
+  if (event.snapshot.value != null) {
     value = event.snapshot.value as Map;
-    value.forEach((key, data) {
-      count += int.tryParse(data["Amount"].toString()) ?? 0;
-    });
+
+    if ([
+      "All",
+      "Spent Cash",
+      "Spent Online",
+      "Spent Cash For ADA",
+      "Spent Online For ADA",
+    ].contains(Specific)) {
+      value.forEach((key, data) {
+        if ((Specific == "All" && !["Add CASH", "Add Online"].contains(data["Payment_Mode"])) || data["Payment_Mode"] == Specific) {
+          count += int.parse(data["Amount"].toString());
+        }
+      });
+    }
     print(count);
   }
   return count.toString();
