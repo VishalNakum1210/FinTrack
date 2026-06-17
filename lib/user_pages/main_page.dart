@@ -21,7 +21,7 @@ class _userMainPage extends State<UserMainPage> {
     SharedPreferences sp = await SharedPreferences.getInstance();
     String phone_number = sp.getString("phone_number")!;
     allDetails = await getAllInformation(phone_number);
-    records = await allRecords(phone_number, "");
+    records = await allRecords(phone_number, "All");
     setState(() {
       name = sp.getString("username") ?? "";
       isLoading = false;
@@ -161,7 +161,7 @@ class _userMainPage extends State<UserMainPage> {
                                     ),
                                   ),
                                   title: Text(
-                                    "Grocery Shopping",
+                                    records![index]["Category"],
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),

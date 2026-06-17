@@ -18,6 +18,8 @@ Future<String> getTotalExpenses(String phone_number, String Specific) async {
       "Spent Online",
       "Spent Cash For ADA",
       "Spent Online For ADA",
+      "Add CASH",
+      "Add Online"
     ].contains(Specific)) {
       value.forEach((key, data) {
         if ((Specific == "All" && !["Add CASH", "Add Online"].contains(data["Payment_Mode"])) || data["Payment_Mode"] == Specific) {
@@ -25,7 +27,6 @@ Future<String> getTotalExpenses(String phone_number, String Specific) async {
         }
       });
     }
-    print(count);
   }
   return count.toString();
 }

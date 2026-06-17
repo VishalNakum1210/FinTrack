@@ -81,6 +81,9 @@ class _passbookPage extends State<Passbookpage> {
                   categoryChip("Spent Online"),
                   categoryChip("Spent Cash For ADA"),
                   categoryChip("Spent Online For ADA"),
+                  categoryChip("Add CASH"),
+                  categoryChip("Add Online"),
+
                 ],
               ),
             ),
@@ -89,7 +92,7 @@ class _passbookPage extends State<Passbookpage> {
           // Total Amount
           Container(
             margin: const EdgeInsets.all(15),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF8BC24A), Color(0xFF689F38)],
@@ -110,7 +113,7 @@ class _passbookPage extends State<Passbookpage> {
                 Row(
                   children: [
                     Container(
-                      height: 55,
+                      height: 40,
                       width: 55,
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
@@ -123,7 +126,7 @@ class _passbookPage extends State<Passbookpage> {
                             ? Icons.credit_card_rounded  
                             : Icons.payments_rounded,
                         color: Colors.white,
-                        size: 30,
+                        size: 25,
                       ),
                     ),
 
@@ -157,12 +160,12 @@ class _passbookPage extends State<Passbookpage> {
                   ],
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 15),
 
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
-                    vertical: 15,
+                    vertical: 10,
                     horizontal: 15,
                   ),
                   decoration: BoxDecoration(
@@ -182,7 +185,7 @@ class _passbookPage extends State<Passbookpage> {
                         "₹${formatIndianNumber(int.tryParse(totalAmount) ?? 0)}",
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 32,
+                          fontSize: 25,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -231,7 +234,7 @@ class _passbookPage extends State<Passbookpage> {
                             ),
                           ),
                           title: Text(
-                            "Grocery Shopping",
+                            records![index]["Category"],
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Column(

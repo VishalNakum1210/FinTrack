@@ -12,13 +12,13 @@ Future<List<Map<String, dynamic>>?> allRecords(
   if (event.snapshot.value != null) {
     Map Data = event.snapshot.value as Map;
 
-    if (["Spent Cash", "Spent Online", "Spent Cash For ADA", "Spent Online For ADA"].contains(Specific)) {
+    if (["Spent Cash", "Spent Online", "Spent Cash For ADA", "Spent Online For ADA", "Add CASH", "Add Online"].contains(Specific)) {
       Data.forEach((key, value) {
         if (value["Payment_Mode"] == Specific) {
           result.add(Map<String, dynamic>.from(value));
         }
       });
-    } else {
+    } else if (Specific == "All") {
       Data.forEach((key, value) {
         result.add(Map<String, dynamic>.from(value));
       });
@@ -26,6 +26,9 @@ Future<List<Map<String, dynamic>>?> allRecords(
     if(result.isEmpty){
       return null;
     }
+    result.sort((a,b) => 
+      (b["timestamp"] as int).compareTo(a["timestamp"] as int)
+    );
     return result;
   }
   return null;

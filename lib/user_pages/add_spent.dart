@@ -25,7 +25,18 @@ class _addSpent extends State<AddSpent> {
     "Add Online"
   ];
 
+  List<String> Catagory = [
+    "Shopping",
+    "Food",
+    "Transport",
+    "Education",
+    "HealthCare",
+    "Entertainment",
+    "Other"
+  ];
+
   String selectedMode = "Select Payment mode";
+  String selectedCategory = "Select Catagory";
 
   Future<void> pickDate() async {
     DateTime? picked = await showDatePicker(
@@ -63,6 +74,7 @@ class _addSpent extends State<AddSpent> {
       description,
       selectedMode,
       "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
+      selectedCategory
     );
 
     Fluttertoast.showToast(msg: "Expense added successfully");
@@ -84,6 +96,7 @@ class _addSpent extends State<AddSpent> {
     String Description,
     String selectedMode,
     String selected_date,
+    String selectedCategory
   ) async {
     SharedPreferences sp = await SharedPreferences.getInstance();
     String phone_number = sp.getString("phone_number")!;
@@ -98,6 +111,8 @@ class _addSpent extends State<AddSpent> {
       "Description": Description,
       "Payment_Mode": selectedMode,
       "Date": selected_date,
+      "Category" : selectedCategory,
+      "timestamp" : ServerValue.timestamp
     });
   }
 
@@ -129,7 +144,7 @@ class _addSpent extends State<AddSpent> {
           Positioned(
             child: Center(
               child: Container(
-                height: 450,
+                height: 500,
                 margin: EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -210,6 +225,40 @@ class _addSpent extends State<AddSpent> {
                           ),
                         ),
                         onTap: () => pickDate(),
+                      ),
+                    ),
+
+                    Container(
+                      margin: EdgeInsets.only(right: 20, left: 20, top: 20),
+                      child: DropdownMenu(
+                        initialSelection: selectedCategory,
+                        label: Text("Selected Categories"),
+                        dropdownMenuEntries: Catagory.map(
+                          (item) => DropdownMenuEntry(value: item, label: item)
+                        ).toList(),
+
+                        onSelected: (value) {
+                          setState(() {
+                            selectedCategory = value!;
+                          });
+                        },
+
+                          inputDecorationTheme: InputDecorationTheme(
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                              width: 3,
+                              color: Color(0xFF8BC24A),
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                              width: 3,
+                              color: Color(0xFF8BC24A),
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
                       ),
                     ),
 
