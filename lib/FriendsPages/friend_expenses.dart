@@ -1,5 +1,7 @@
 import 'package:account/FriendsPages/addFriends.dart';
+import 'package:account/FriendsPages/specificFriendPage.dart';
 import 'package:account/GetInformation/GetFriendDetails.dart';
+import 'package:account/GetInformation/GetTotalFriendExpenses.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,13 +11,21 @@ class FriendPage extends StatefulWidget {
 }
 
 class _friendPage extends State<FriendPage> {
+  bool isLoading = false;
   List<Map<String, dynamic>>? friendRecord = null;
+  List<String> allExpenses = ["0", "0"];
 
-  void getDetails() async {
+  Future<void> getDetails() async {
+    setState(() {
+      isLoading = true;
+    });
     SharedPreferences sp = await SharedPreferences.getInstance();
     String? phone_number = sp.getString("phone_number");
     friendRecord = (await getFriendDetails(phone_number!));
-    setState(() {});
+    allExpenses = (await getTotalFriendExpenses(phone_number));
+    setState(() {
+      isLoading = false;
+    });
   }
 
   @override
@@ -29,14 +39,13 @@ class _friendPage extends State<FriendPage> {
     Color primaryColor = const Color(0xFF8BC24A);
 
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 195, 224, 196),
+      backgroundColor: const Color.fromARGB(255, 230, 230, 230),
 
       appBar: AppBar(
         elevation: 0,
-        centerTitle: true,
         backgroundColor: primaryColor,
         title: const Text(
-          "Friend Accounts",
+          "Friend Ledger",
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
@@ -65,17 +74,17 @@ class _friendPage extends State<FriendPage> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
+                    children: [
+                      const Text(
                         "You Will Get",
                         style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
 
-                      SizedBox(height: 5),
+                      const SizedBox(height: 5),
 
                       Text(
-                        "₹12,500",
-                        style: TextStyle(
+                        "₹${allExpenses[0]}",
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -90,7 +99,7 @@ class _friendPage extends State<FriendPage> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: const [
+                    children: [
                       Text(
                         "You Will Give",
                         style: TextStyle(color: Colors.white70, fontSize: 13),
@@ -99,7 +108,7 @@ class _friendPage extends State<FriendPage> {
                       SizedBox(height: 5),
 
                       Text(
-                        "₹4,200",
+                        "₹${allExpenses[1]}",
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 24,
@@ -184,114 +193,126 @@ class _friendPage extends State<FriendPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     itemCount: friendRecord!.length,
                     itemBuilder: (context, index) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
+                      return InkWell(
+                        onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => Specificfriendpage(friend_number: friendRecord![index]["friend_number"])));
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(15),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
 
-                        child: Row(
-                          children: [
-                            // Avatar
-                            CircleAvatar(
-                              radius: 28,
-                              backgroundColor: primaryColor.withOpacity(.15),
-                              child: Text(
-                                "A",
-                                style: TextStyle(
-                                  color: primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
+                          child: Row(
+                            children: [
+                              // Avatar
+                              CircleAvatar(
+                                radius: 28,
+                                backgroundColor: primaryColor.withOpacity(.15),
+                                child: Text(
+                                  (friendRecord![index]["friend_name"][0])
+                                      .toUpperCase(),
+                                  style: TextStyle(
+                                    color: primaryColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
                                 ),
                               ),
-                            ),
 
-                            const SizedBox(width: 12),
+                              const SizedBox(width: 12),
 
-                            // Name & Number
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              // Name & Number
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      friendRecord![index]["friend_name"],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 4),
+
+                                    Text(
+                                      friendRecord![index]["friend_number"],
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Get & Give
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(
-                                    "Amit Patel",
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withOpacity(.10),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      "Get ₹${friendRecord![index]["total_take"]}",
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
 
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
 
-                                  const Text(
-                                    "9876543210",
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 13,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withOpacity(.10),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      "Give ₹${friendRecord![index]["total_give"]}",
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-
-                            // Get & Give
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(.10),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    "Get ₹0",
-                                    style: const TextStyle(
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 6),
-
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(.10),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    "Give ₹1,500",
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     },
+                  )
+                  : (isLoading) ?
+                  Container(
+                    child: Center(
+                      child: CircularProgressIndicator(color: Colors.green,),
+                    ),
                   )
                 : Container(
                     height: double.infinity,

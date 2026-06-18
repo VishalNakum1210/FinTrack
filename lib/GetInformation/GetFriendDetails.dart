@@ -12,11 +12,11 @@ Future<List<Map<String, dynamic>>?> getFriendDetails (String phone_number) async
       data.forEach((key, value) {
         result.add(Map<String, dynamic>.from(value));
       });
-      print(result);
       return result;
     }
-    return null;
   }catch(e){
     Fluttertoast.showToast(msg: "Not connected $e");
+    print(e);
   }
+  return null;
 }

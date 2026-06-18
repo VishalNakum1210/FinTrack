@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class AddSpent extends StatefulWidget {
+class AddFriendExpenses extends StatefulWidget {
+  final String friend_number;
+  const AddFriendExpenses({
+    super.key,
+    required this.friend_number
+  });
   @override
-  State<AddSpent> createState() => _addSpent();
+  State<AddFriendExpenses> createState() => _addFriendExpenses();
 }
 
-class _addSpent extends State<AddSpent> {
+class _addFriendExpenses extends State<AddFriendExpenses> {
   bool isLoading = false;
 
   TextEditingController Camount = TextEditingController();
@@ -19,24 +24,15 @@ class _addSpent extends State<AddSpent> {
   List<String> PaymentMode = [
     "Spent Online",
     "Spent Cash",
-    "Spent Online For ADA",
-    "Spent Cash For ADA",
-    "Add CASH",
-    "Add Online",
   ];
 
   List<String> Catagory = [
-    "Shopping",
-    "Food",
-    "Transport",
-    "Education",
-    "HealthCare",
-    "Entertainment",
-    "Other",
+    "Give Money To Friend",
+    "Take Money From Friend"
   ];
 
   String selectedMode = "Select Payment mode";
-  String selectedCategory = "Select Catagory";
+  String selectedType = "Select Type";
 
   Future<void> pickDate() async {
     DateTime? picked = await showDatePicker(
@@ -74,7 +70,7 @@ class _addSpent extends State<AddSpent> {
         description,
         selectedMode,
         "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
-        selectedCategory,
+        selectedType,
       );
 
       Fluttertoast.showToast(msg: "Expense added successfully");
@@ -82,6 +78,7 @@ class _addSpent extends State<AddSpent> {
       Navigator.pop(context, true);
     } catch (e) {
       Fluttertoast.showToast(msg: "Failed to save expense");
+      print(e);
     }
 
     if (mounted) {
@@ -92,29 +89,63 @@ class _addSpent extends State<AddSpent> {
   }
 
   Future<void> StoreSpentOnDataBase(
-    String Amount,
-    String Description,
-    String selectedMode,
-    String selected_date,
-    String selectedCategory,
-  ) async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone_number = sp.getString("phone_number")!;
-    DatabaseReference myref = FirebaseDatabase.instance.ref(
-      "Expenses/$phone_number",
-    );
-    String key = myref.push().key!;
-    await myref.child(key).set({
-      "key": key,
-      "phone_number": phone_number,
-      "Amount": Amount,
-      "Description": Description,
-      "Payment_Mode": selectedMode,
-      "Date": selected_date,
-      "Category": selectedCategory,
-      "timestamp": ServerValue.timestamp,
+  String Amount,
+  String Description,
+  String selectedMode,
+  String selected_date,
+  String selectedCategory,
+) async {
+  SharedPreferences sp = await SharedPreferences.getInstance();
+  String phone_number = sp.getString("phone_number")!;
+
+  // Add Record
+  DatabaseReference recordRef = FirebaseDatabase.instance.ref(
+    "Friends/$phone_number/${widget.friend_number}/Records",
+  );
+
+  String key = recordRef.push().key!;
+
+  await recordRef.child(key).set({
+    "key": key,
+    "Amount": Amount,
+    "Description": Description,
+    "Payment_Mode": selectedMode,
+    "Date": selected_date,
+    "Type": selectedCategory,
+    "timestamp": ServerValue.timestamp,
+  });
+
+  // Friend Details Reference
+  DatabaseReference friendRef = FirebaseDatabase.instance.ref(
+    "Friends/$phone_number/${widget.friend_number}",
+  );
+
+  DataSnapshot snapshot = await friendRef.get();
+
+  int totalGive = int.tryParse(
+        snapshot.child("total_give").value?.toString() ?? "0",
+      ) ??
+      0;
+
+  int totalTake = int.tryParse(
+        snapshot.child("total_take").value?.toString() ?? "0",
+      ) ??
+      0;
+
+  if (selectedCategory == "Give Money To Friend") {
+    totalGive += int.parse(Amount);
+
+    await friendRef.update({
+      "total_give": totalGive.toString(),
+    });
+  } else {
+    totalTake += int.parse(Amount);
+
+    await friendRef.update({
+      "total_take": totalTake.toString(),
     });
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -232,8 +263,8 @@ class _addSpent extends State<AddSpent> {
                       Container(
                         margin: EdgeInsets.only(right: 20, left: 20, top: 20),
                         child: DropdownMenu(
-                          initialSelection: selectedCategory,
-                          label: Text("Selected Categories"),
+                          initialSelection: selectedType,
+                          label: Text("Select Type"),
                           dropdownMenuEntries: Catagory.map(
                             (item) =>
                                 DropdownMenuEntry(value: item, label: item),
@@ -241,7 +272,7 @@ class _addSpent extends State<AddSpent> {
 
                           onSelected: (value) {
                             setState(() {
-                              selectedCategory = value!;
+                              selectedType = value!;
                             });
                           },
 

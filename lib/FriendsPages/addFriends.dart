@@ -32,8 +32,9 @@ class _addFriendPage extends State<AddFriends> {
           "note": note,
           "date" : DateFormat('dd/MM/yyyy').format(now),
           "timestamp" : ServerValue.timestamp,
-          "total_get" : "0",
-          "total_give" : "0"
+          "total_take" : "0",
+          "total_give" : "0",
+          "Records" : null
         });
 
         Fluttertoast.showToast(msg: "Friend details add Successfully");
