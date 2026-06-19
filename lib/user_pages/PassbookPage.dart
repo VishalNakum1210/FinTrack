@@ -1,6 +1,8 @@
 import 'package:account/GetInformation/GetAllRecords.dart';
 import 'package:account/GetInformation/GetTotalExpenses.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -48,6 +50,28 @@ class _passbookPage extends State<Passbookpage> {
     return NumberFormat('#,##,##0', 'en_IN').format(number);
   }
 
+  Future<void> deleteRecord (String key) async {
+    setState(() {
+      isLoading = true;
+    });
+    try{
+      SharedPreferences sp = await SharedPreferences.getInstance();
+      String phone_number = sp.getString("phone_number")!;
+      DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone_number/$key");
+
+      await myref.remove();
+      records!.clear();
+      await filterExpenses(selectedType);
+      Fluttertoast.showToast(msg: "Recored Deleted Successfully");
+    }catch(e){
+      Fluttertoast.showToast(msg: "Not Connected $e");
+    }finally{
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -83,7 +107,6 @@ class _passbookPage extends State<Passbookpage> {
                   categoryChip("Spent Online For ADA"),
                   categoryChip("Add CASH"),
                   categoryChip("Add Online"),
-
                 ],
               ),
             ),
@@ -123,7 +146,7 @@ class _passbookPage extends State<Passbookpage> {
                         selectedType == "All"
                             ? Icons.receipt_long_rounded
                             : selectedType.contains("Online")
-                            ? Icons.credit_card_rounded  
+                            ? Icons.credit_card_rounded
                             : Icons.payments_rounded,
                         color: Colors.white,
                         size: 25,
@@ -202,67 +225,110 @@ class _passbookPage extends State<Passbookpage> {
                 ? ListView.builder(
                     itemCount: records!.length,
                     itemBuilder: (context, index) {
-                      return Card(
-                        elevation: 3,
-                        margin: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        color:
-                            (records![index]["Payment_Mode"] == "Add CASH" ||
-                                records![index]["Payment_Mode"] == "Add Online")
-                            ? Colors.green.shade100
-                            : Colors.red.shade100,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor:
-                                (records![index]["Payment_Mode"] ==
-                                        "Add CASH" ||
-                                    records![index]["Payment_Mode"] ==
-                                        "Add Online")
-                                ? Colors.green.shade100
-                                : Colors.red.shade100,
-                            child: Image.asset(
+                      return InkWell(
+                        onTap: () {
+                          showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    title: const Text("Delete Record"),
+                                    content: const Text(
+                                      "Are you sure you want to delete this record?",
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                        },
+                                        child: const Text("Cancel"),
+                                      ),
+
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        onPressed: () async {
+                                          Navigator.pop(context);
+
+                                          await deleteRecord(
+                                            records![index]["key"],
+                                          );
+                                        },
+                                        child: const Text("Delete"),
+                                      ),
+                                    ],
+                                  ),
+                          );
+                        },
+                        child: Card(
+                          elevation: 3,
+                          margin: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          color:
                               (records![index]["Payment_Mode"] == "Add CASH" ||
-                                      records![index]["Payment_Mode"] ==
-                                          "Add Online")
-                                  ? "assets/image/GetPic.png"
-                                  : "assets/image/SpentPic.png",
-                            ),
+                                  records![index]["Payment_Mode"] ==
+                                      "Add Online")
+                              ? Colors.green.shade100
+                              : Colors.red.shade100,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
                           ),
-                          title: Text(
-                            records![index]["Category"],
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(records![index]["Date"]),
-                              Text("Desc : "+records![index]["Description"]),
-                              Text(
-                                "Payment: ${records![index]["Payment_Mode"]}",
-                              ),
-                            ],
-                          ),
-                          trailing: Text(
-                            NumberFormat.currency(
-                              locale: 'en_IN',
-                              symbol: '₹',
-                              decimalDigits: 0,
-                            ).format(int.tryParse(records![index]["Amount"])),
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color:
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor:
                                   (records![index]["Payment_Mode"] ==
                                           "Add CASH" ||
                                       records![index]["Payment_Mode"] ==
                                           "Add Online")
-                                  ? Colors.green
-                                  : Colors.red,
+                                  ? Colors.green.shade100
+                                  : Colors.red.shade100,
+                              child: Image.asset(
+                                (records![index]["Payment_Mode"] ==
+                                            "Add CASH" ||
+                                        records![index]["Payment_Mode"] ==
+                                            "Add Online")
+                                    ? "assets/image/GetPic.png"
+                                    : "assets/image/SpentPic.png",
+                              ),
+                            ),
+                            title: Text(
+                              records![index]["Category"],
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(records![index]["Date"]),
+                                Text(
+                                  "Desc : " + records![index]["Description"],
+                                ),
+                                Text(
+                                  "Payment: ${records![index]["Payment_Mode"]}",
+                                ),
+                              ],
+                            ),
+                            trailing: Text(
+                              NumberFormat.currency(
+                                locale: 'en_IN',
+                                symbol: '₹',
+                                decimalDigits: 0,
+                              ).format(int.tryParse(records![index]["Amount"])),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    (records![index]["Payment_Mode"] ==
+                                            "Add CASH" ||
+                                        records![index]["Payment_Mode"] ==
+                                            "Add Online")
+                                    ? Colors.green
+                                    : Colors.red,
+                              ),
                             ),
                           ),
                         ),

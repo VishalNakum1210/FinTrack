@@ -3,6 +3,7 @@ import 'package:account/FriendsPages/specificFriendPage.dart';
 import 'package:account/GetInformation/GetFriendDetails.dart';
 import 'package:account/GetInformation/GetTotalFriendExpenses.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FriendPage extends StatefulWidget {
@@ -26,6 +27,10 @@ class _friendPage extends State<FriendPage> {
     setState(() {
       isLoading = false;
     });
+  }
+
+  String formatIndianNumber(int number) {
+    return NumberFormat('#,##,##0', 'en_IN').format(number);
   }
 
   @override
@@ -83,7 +88,11 @@ class _friendPage extends State<FriendPage> {
                       const SizedBox(height: 5),
 
                       Text(
-                        "₹${allExpenses[0]}",
+                        NumberFormat.currency(
+                          locale: 'en_IN',
+                          symbol: '₹',
+                          decimalDigits: 0,
+                        ).format(int.tryParse(allExpenses[0])),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
@@ -108,7 +117,11 @@ class _friendPage extends State<FriendPage> {
                       SizedBox(height: 5),
 
                       Text(
-                        "₹${allExpenses[1]}",
+                        NumberFormat.currency(
+                          locale: 'en_IN',
+                          symbol: '₹',
+                          decimalDigits: 0,
+                        ).format(int.tryParse(allExpenses[1])),
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 24,
@@ -194,8 +207,18 @@ class _friendPage extends State<FriendPage> {
                     itemCount: friendRecord!.length,
                     itemBuilder: (context, index) {
                       return InkWell(
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => Specificfriendpage(friend_number: friendRecord![index]["friend_number"])));
+                        onTap: () async {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => Specificfriendpage(
+                                friend_number:
+                                    friendRecord![index]["friend_number"],
+                              ),
+                            ),
+                          ).then((_) {
+                            getDetails();
+                          });
                         },
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -271,7 +294,13 @@ class _friendPage extends State<FriendPage> {
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
-                                      "Get ₹${friendRecord![index]["total_take"]}",
+                                      NumberFormat.currency(
+                                        locale: 'en_IN',
+                                        symbol: 'Get ₹',
+                                        decimalDigits: 0,
+                                      ).format(
+                                        int.parse(friendRecord![index]["total_get"]),
+                                      ),
                                       style: const TextStyle(
                                         color: Colors.green,
                                         fontWeight: FontWeight.bold,
@@ -292,7 +321,13 @@ class _friendPage extends State<FriendPage> {
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
-                                      "Give ₹${friendRecord![index]["total_give"]}",
+                                      NumberFormat.currency(
+                                        locale: 'en_IN',
+                                        symbol: 'Give ₹',
+                                        decimalDigits: 0,
+                                      ).format(
+                                        int.parse(friendRecord![index]["total_give"]),
+                                      ),
                                       style: const TextStyle(
                                         color: Colors.red,
                                         fontWeight: FontWeight.bold,
@@ -308,10 +343,10 @@ class _friendPage extends State<FriendPage> {
                       );
                     },
                   )
-                  : (isLoading) ?
-                  Container(
+                : (isLoading)
+                ? Container(
                     child: Center(
-                      child: CircularProgressIndicator(color: Colors.green,),
+                      child: CircularProgressIndicator(color: Colors.green),
                     ),
                   )
                 : Container(

@@ -127,22 +127,22 @@ class _addFriendExpenses extends State<AddFriendExpenses> {
       ) ??
       0;
 
-  int totalTake = int.tryParse(
-        snapshot.child("total_take").value?.toString() ?? "0",
+  int totalGet = int.tryParse(
+        snapshot.child("total_get").value?.toString() ?? "0",
       ) ??
       0;
 
-  if (selectedCategory == "Give Money To Friend") {
+  if (selectedCategory == "Take Money From Friend") {
     totalGive += int.parse(Amount);
 
     await friendRef.update({
       "total_give": totalGive.toString(),
     });
   } else {
-    totalTake += int.parse(Amount);
+    totalGet += int.parse(Amount);
 
     await friendRef.update({
-      "total_take": totalTake.toString(),
+      "total_get": totalGet.toString(),
     });
   }
 }

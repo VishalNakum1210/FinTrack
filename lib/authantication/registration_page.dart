@@ -73,6 +73,7 @@ class _RegistrationStatePage extends State<RegistrationPage> {
         "phone_number": phone_number,
         "email": email,
         "password": password,
+        "Address" : "Not Enter"
       });
 
       Fluttertoast.showToast(msg: "Registration Successful");

@@ -50,7 +50,7 @@ class _SplashPageState extends State<SplashPage> {
         height: double.infinity,
         color: Colors.white,
         child: const Center(
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(color: Colors.green,),
         ),
       ),
     );

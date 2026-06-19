@@ -11,14 +11,10 @@ Future<List<String>> getTotalFriendExpenses (String phone_number) async {
       Map data = event.snapshot.value as Map;
 
       data.forEach((key, value) {
-        total_get += int.parse(value["total_give"]);
-        total_give += int.parse(value["total_take"]);
+        total_get += int.parse(value["total_get"]);
+        total_give += int.parse(value["total_give"]);
       });
-
-      print("$total_get  $total_give");
       return[total_get.toString(), total_give.toString()];
-    }else{
-      return ["0", "0"];
     }
   }catch (e) {
     Fluttertoast.showToast(msg: "Not connected : $e");
