@@ -2,7 +2,9 @@ import 'package:account/FriendsPages/addFriends.dart';
 import 'package:account/FriendsPages/specificFriendPage.dart';
 import 'package:account/GetInformation/GetFriendDetails.dart';
 import 'package:account/GetInformation/GetTotalFriendExpenses.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -27,6 +29,28 @@ class _friendPage extends State<FriendPage> {
     setState(() {
       isLoading = false;
     });
+  }
+
+  Future<void> deleteFriend(String friend_number) async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
+      SharedPreferences sp = await SharedPreferences.getInstance();
+      String phone_number = sp.getString("phone_number")!;
+      DatabaseReference deleteRef = FirebaseDatabase.instance.ref(
+        "Friends/$phone_number/$friend_number",
+      );
+      await deleteRef.remove();
+      friendRecord!.clear();
+      await getDetails();
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Not connected $e");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   String formatIndianNumber(int number) {
@@ -207,6 +231,40 @@ class _friendPage extends State<FriendPage> {
                     itemCount: friendRecord!.length,
                     itemBuilder: (context, index) {
                       return InkWell(
+                        onLongPress: () async {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: const Text("Delete Record"),
+                              content: const Text(
+                                "Are you sure you want to delete this record?",
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text("Cancel"),
+                                ),
+
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+                                    deleteFriend(friendRecord![index]["friend_number"]);
+                                  },
+                                  child: const Text("Delete"),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                         onTap: () async {
                           Navigator.push(
                             context,
@@ -299,7 +357,9 @@ class _friendPage extends State<FriendPage> {
                                         symbol: 'Get ₹',
                                         decimalDigits: 0,
                                       ).format(
-                                        int.parse(friendRecord![index]["total_get"]),
+                                        int.parse(
+                                          friendRecord![index]["total_get"],
+                                        ),
                                       ),
                                       style: const TextStyle(
                                         color: Colors.green,
@@ -326,7 +386,9 @@ class _friendPage extends State<FriendPage> {
                                         symbol: 'Give ₹',
                                         decimalDigits: 0,
                                       ).format(
-                                        int.parse(friendRecord![index]["total_give"]),
+                                        int.parse(
+                                          friendRecord![index]["total_give"],
+                                        ),
                                       ),
                                       style: const TextStyle(
                                         color: Colors.red,

@@ -395,7 +395,7 @@ class _specificFriendPage extends State<Specificfriendpage> {
                                           foregroundColor: Colors.white,
                                         ),
                                         onPressed: () async {
-                                          Navigator.pop(context);
+                                          
 
                                           await deleteRecord(
                                             ExpensesRecords![index]["key"],
@@ -403,7 +403,9 @@ class _specificFriendPage extends State<Specificfriendpage> {
                                                     "Take Money From Friend"
                                                 ? true
                                                 : false,
-                                            int.parse(ExpensesRecords![index]["Amount"]),
+                                            int.parse(
+                                              ExpensesRecords![index]["Amount"],
+                                            ),
                                           );
                                         },
                                         child: const Text("Delete"),

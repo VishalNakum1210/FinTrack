@@ -1,3 +1,4 @@
+import 'package:account/GetInformation/HashPassword.dart';
 import 'package:account/authantication/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -72,7 +73,7 @@ class _RegistrationStatePage extends State<RegistrationPage> {
         "name": name,
         "phone_number": phone_number,
         "email": email,
-        "password": password,
+        "password": hashPassword(password),
         "Address" : "Not Enter"
       });
 

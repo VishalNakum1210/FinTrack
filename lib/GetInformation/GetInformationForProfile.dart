@@ -13,9 +13,10 @@ Future<List<String>> getProfieInformation(String phone_number) async {
       Map data = event.snapshot.value as Map;
 
       data.forEach((key, value) {
-        count += 1;
-        if (!(["Add CASH", "Add Online"].contains(value["Payment_Mode"])))
+        if (!(["Add CASH", "Add Online"].contains(value["Payment_Mode"]))){
+          count += 1;
           Expenses += int.parse(value["Amount"]);
+        }
       });
       return[Expenses.toString(), count.toString()];
     }

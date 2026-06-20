@@ -1,3 +1,4 @@
+import 'package:account/GetInformation/HashPassword.dart';
 import 'package:account/authantication/registration_page.dart';
 import 'package:account/nav_bar.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -41,6 +42,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (event.snapshot.value != null) {
         Map values = event.snapshot.value as Map;
+        password_user = hashPassword(password_user);
         if (password_user == values["password"]) {
           Fluttertoast.showToast(msg: "Login successfully");
           await Save_data(values["name"], phone_number, values["email"]);

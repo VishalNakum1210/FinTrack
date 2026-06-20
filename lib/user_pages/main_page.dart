@@ -59,6 +59,7 @@ class _userMainPage extends State<UserMainPage> {
             Text(
               "Welcome, ${name ?? ''}",
               style: TextStyle(
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF8BC24A),
               ),

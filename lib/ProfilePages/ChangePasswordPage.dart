@@ -1,3 +1,4 @@
+import 'package:account/GetInformation/HashPassword.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -54,13 +55,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
-    // if (newPassword.length < 6) {
-    //   Fluttertoast.showToast(
-    //     msg: "Password must be at least 6 characters",
-    //   );
-    //   return;
-    // }
-
     setState(() {
       isLoading = true;
     });
@@ -90,7 +84,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       String currentPassword =
           data["password"] ?? "";
 
-      if (currentPassword != oldPassword) {
+      if (currentPassword != hashPassword(oldPassword)) {
         Fluttertoast.showToast(
           msg: "Old password is incorrect",
         );
@@ -98,7 +92,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       }
 
       await myRef.update({
-        "password": newPassword,
+        "password": hashPassword(newPassword),
       });
 
       Fluttertoast.showToast(

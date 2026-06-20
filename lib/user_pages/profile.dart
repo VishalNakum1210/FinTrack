@@ -1,6 +1,8 @@
 import 'package:account/GetInformation/GetInformationForProfile.dart';
 import 'package:account/ProfilePages/ChangePasswordPage.dart';
+import 'package:account/ProfilePages/FeedbackPage.dart';
 import 'package:account/ProfilePages/PersonalInformationPage.dart';
+import 'package:account/ProfilePages/ReportPage.dart';
 import 'package:account/authantication/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -244,7 +246,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.person_outline,
                     title: "Personal Information",
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => PersonalInformationPage()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PersonalInformationPage(),
+                        ),
+                      );
                     },
                   ),
 
@@ -252,14 +259,24 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.lock_outline,
                     title: "Change Password",
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => ChangePasswordPage()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChangePasswordPage(),
+                        ),
+                      );
                     },
                   ),
 
                   menuTile(
                     icon: Icons.bar_chart,
                     title: "Reports",
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ReportsPage()),
+                      );
+                    },
                   ),
 
                   menuTile(
@@ -271,7 +288,12 @@ class _ProfilePageState extends State<ProfilePage> {
                   menuTile(
                     icon: Icons.help_outline,
                     title: "Feedback",
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => FeedbackPage()),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 20),
