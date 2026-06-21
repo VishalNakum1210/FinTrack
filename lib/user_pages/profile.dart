@@ -70,7 +70,7 @@ class _ProfilePageState extends State<ProfilePage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: themeColor.withOpacity(0.15),
+          backgroundColor: themeColor.withValues(alpha: 0.15),
           child: Icon(icon, color: themeColor),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
@@ -117,7 +117,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         BoxShadow(
                           blurRadius: 8,
                           spreadRadius: 1,
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                         ),
                       ],
                     ),
@@ -274,7 +274,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => ReportsPage()),
+                        MaterialPageRoute(builder: (context) => Reportpage()),
                       );
                     },
                   ),

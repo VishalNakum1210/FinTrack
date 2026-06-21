@@ -168,7 +168,7 @@ class _specificFriendPage extends State<Specificfriendpage> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: primaryColor.withOpacity(.35),
+                        color: primaryColor.withValues(alpha: .35),
                         blurRadius: 15,
                         offset: const Offset(0, 6),
                       ),
@@ -219,7 +219,7 @@ class _specificFriendPage extends State<Specificfriendpage> {
                         child: Container(
                           padding: const EdgeInsets.all(15),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(.08),
+                            color: Colors.green.withValues(alpha: .08),
                             borderRadius: BorderRadius.circular(18),
                           ),
                           child: Column(
@@ -257,7 +257,7 @@ class _specificFriendPage extends State<Specificfriendpage> {
                         child: Container(
                           padding: const EdgeInsets.all(15),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(.08),
+                            color: Colors.red.withValues(alpha: .08),
                             borderRadius: BorderRadius.circular(18),
                           ),
                           child: Column(
@@ -304,7 +304,7 @@ class _specificFriendPage extends State<Specificfriendpage> {
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(.05),
+                        color: Colors.black.withValues(alpha: .05),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -458,7 +458,7 @@ class _specificFriendPage extends State<Specificfriendpage> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.05),
+            color: Colors.black.withValues(alpha: .05),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -469,8 +469,8 @@ class _specificFriendPage extends State<Specificfriendpage> {
           CircleAvatar(
             radius: 22,
             backgroundColor: isGive
-                ? Colors.red.withOpacity(.12)
-                : Colors.green.withOpacity(.12),
+                ? Colors.red.withValues(alpha: .12)
+                : Colors.green.withValues(alpha: .12),
             child: Image.asset(
               isGive ? "assets/image/SpentPic.png" : "assets/image/GetPic.png",
             ),

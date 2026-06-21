@@ -92,7 +92,7 @@ class _friendPage extends State<FriendPage> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: primaryColor.withOpacity(.35),
+                  color: primaryColor.withValues(alpha: .35),
                   blurRadius: 15,
                   offset: const Offset(0, 6),
                 ),
@@ -286,7 +286,7 @@ class _friendPage extends State<FriendPage> {
                             borderRadius: BorderRadius.circular(18),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(.05),
+                                color: Colors.black.withValues(alpha: .05),
                                 blurRadius: 8,
                                 offset: const Offset(0, 3),
                               ),
@@ -298,7 +298,7 @@ class _friendPage extends State<FriendPage> {
                               // Avatar
                               CircleAvatar(
                                 radius: 28,
-                                backgroundColor: primaryColor.withOpacity(.15),
+                                backgroundColor: primaryColor.withValues(alpha: .15),
                                 child: Text(
                                   (friendRecord![index]["friend_name"][0])
                                       .toUpperCase(),
@@ -348,7 +348,7 @@ class _friendPage extends State<FriendPage> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(.10),
+                                      color: Colors.green.withValues(alpha: .10),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
@@ -377,7 +377,7 @@ class _friendPage extends State<FriendPage> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.red.withOpacity(.10),
+                                      color: Colors.red.withValues(alpha: .10),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(

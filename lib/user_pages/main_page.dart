@@ -2,34 +2,162 @@ import 'package:account/GetInformation/GetAllInformation.dart';
 import 'package:account/GetInformation/GetAllRecords.dart';
 import 'package:account/user_pages/add_spent.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserMainPage extends StatefulWidget {
+  const UserMainPage({super.key});
+
   @override
-  State<UserMainPage> createState() => _userMainPage();
+  State<UserMainPage> createState() =>
+      _UserMainPageState();
 }
 
-class _userMainPage extends State<UserMainPage> {
+class _UserMainPageState
+    extends State<UserMainPage> {
+  final Color themeColor =
+      const Color(0xFF8BC24A);
+
   bool isLoading = true;
+
   String? name;
-  String totalExpanses = "0";
-  List<String> allDetails = ["0", "0", "0", "0"];
+
+  List<String> allDetails = [
+    "0",
+    "0",
+    "0",
+    "0",
+  ];
+
   List<Map<String, dynamic>>? records;
 
+  int totalIncome = 0;
+  int totalExpense = 0;
+
+  int cashIncome = 0;
+  int cashExpense = 0;
+
+  int onlineIncome = 0;
+  int onlineExpense = 0;
+
+  int currentBalance = 0;
+
+  String biggestCategory = "No Data";
+  int biggestCategoryAmount = 0;
+
+  int highestTransaction = 0;
+
   Future<void> getDetails() async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone_number = sp.getString("phone_number")!;
-    allDetails = await getAllInformation(phone_number);
-    records = await allRecords(phone_number, "All");
-    setState(() {
+    try {
+      SharedPreferences sp =
+          await SharedPreferences.getInstance();
+
+      String phoneNumber =
+          sp.getString("phone_number")!;
+
+      allDetails =
+          await getAllInformation(phoneNumber);
+
+      records =
+          await allRecords(phoneNumber, "All");
+
       name = sp.getString("username") ?? "";
-      isLoading = false;
-    });
+
+      _calculateValues();
+
+      setState(() {
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
-  String formatIndianNumber(int number) {
-    return NumberFormat('#,##,##0', 'en_IN').format(number);
+  void _calculateValues() {
+    cashExpense =
+        int.tryParse(allDetails[0]) ?? 0;
+
+    cashIncome =
+        int.tryParse(allDetails[1]) ?? 0;
+
+    onlineExpense =
+        int.tryParse(allDetails[2]) ?? 0;
+
+    onlineIncome =
+        int.tryParse(allDetails[3]) ?? 0;
+
+    totalIncome =
+        cashIncome + onlineIncome;
+
+    totalExpense =
+        cashExpense + onlineExpense;
+
+    currentBalance =
+        totalIncome - totalExpense;
+
+    highestTransaction = 0;
+
+    Map<String, int> categoryTotals = {};
+
+    if (records != null) {
+      for (var record in records!) {
+        String paymentMode =
+            record["Payment_Mode"]
+                .toString();
+
+        int amount = int.tryParse(
+              record["Amount"]
+                  .toString(),
+            ) ??
+            0;
+
+        bool isIncome =
+            paymentMode == "Add CASH" ||
+                paymentMode ==
+                    "Add Online";
+
+        if (!isIncome) {
+          String category =
+              record["Category"]
+                  .toString();
+
+          categoryTotals[category] =
+              (categoryTotals[category] ??
+                      0) +
+                  amount;
+        }
+
+        if (amount >
+            highestTransaction) {
+          highestTransaction = amount;
+        }
+      }
+    }
+
+    biggestCategory = "No Data";
+    biggestCategoryAmount = 0;
+
+    categoryTotals.forEach(
+      (category, amount) {
+        if (amount >
+            biggestCategoryAmount) {
+          biggestCategoryAmount =
+              amount;
+
+          biggestCategory = category;
+        }
+      },
+    );
+  }
+
+  String money(int value) {
+    return NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    ).format(value);
   }
 
   @override
@@ -41,329 +169,787 @@ class _userMainPage extends State<UserMainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor:
+          const Color(0xFFF8FBF2),
+
       appBar: AppBar(
-        // elevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor:
+            Colors.white,
+        elevation: 0,
+
         title: Row(
           children: [
             Container(
-              margin: const EdgeInsets.only(bottom: 5, right: 10),
               height: 50,
               width: 50,
-              child: const CircleAvatar(
-                radius: 25,
-                backgroundImage: AssetImage(
-                  "assets/image/AccountApplicationLogo.jpg",
-                ),
+              decoration:
+                  BoxDecoration(
+                borderRadius:
+                    BorderRadius.circular(
+                      15,
+                    ),
+              ),
+              clipBehavior:
+                  Clip.antiAlias,
+              child: Image.asset(
+                "assets/image/AccountApplicationLogo.jpg",
+                fit: BoxFit.cover,
               ),
             ),
-            Text(
-              "Welcome, ${name ?? ''}",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8BC24A),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment
+                        .start,
+                children: [
+                  Text(
+                    "Welcome 👋",
+                    style: TextStyle(
+                      color: Colors
+                          .grey
+                          .shade600,
+                      fontSize: 12,
+                    ),
+                  ),
+
+                  Text(
+                    name ?? "",
+                    overflow:
+                        TextOverflow
+                            .ellipsis,
+                    style:
+                        TextStyle(
+                      color:
+                          themeColor,
+                      fontWeight:
+                          FontWeight
+                              .bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        backgroundColor: Colors.white,
       ),
 
-      body: Container(
-        color: const Color(0xFF8BC24A),
-        height: double.infinity,
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Container(
-                  width: double.infinity,
-                  height: 200,
-                  padding: EdgeInsets.all(10),
-                  margin: const EdgeInsets.only(left: 10, right: 10, top: 20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: const Color(0xFFE4D5A3),
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            color: themeColor,
+            onRefresh: getDetails,
+            child:
+                SingleChildScrollView(
+              physics:
+                  const AlwaysScrollableScrollPhysics(),
+
+              padding:
+                  const EdgeInsets.all(
+                    16,
                   ),
-                  child: Column(
-                    children: [
-                      Container(
-                        height: 85,
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                            topRight: Radius.circular(20),
-                          ),
-                          color: Colors.white,
+
+              child: Column(
+                children: [
+                  // BALANCE CARD
+
+                  Container(
+                    width:
+                        double.infinity,
+
+                    padding:
+                        const EdgeInsets.all(
+                          24,
                         ),
-                        child: InnerBox(
-                          "CASH EXpenses",
-                          "Total CASH",
-                          allDetails[0],
-                          allDetails[1],
+
+                    decoration:
+                        BoxDecoration(
+                      borderRadius:
+                          BorderRadius.circular(
+                            28,
+                          ),
+
+                      gradient:
+                          LinearGradient(
+                        colors: [
+                          themeColor,
+                          themeColor
+                              .withOpacity(
+                                .75,
+                              ),
+                        ],
+                      ),
+
+                      boxShadow: [
+                        BoxShadow(
+                          color: themeColor
+                              .withOpacity(
+                                .25,
+                              ),
+                          blurRadius:
+                              20,
+                          offset:
+                              const Offset(
+                                0,
+                                8,
+                              ),
+                        ),
+                      ],
+                    ),
+
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+
+                      children: [
+                        const Text(
+                          "Current Balance",
+                          style:
+                              TextStyle(
+                            color: Colors
+                                .white70,
+                          ),
+                        ),
+
+                        const SizedBox(
+                          height: 10,
+                        ),
+
+                        Text(
+                          money(
+                            currentBalance,
+                          ),
+                          style:
+                              const TextStyle(
+                            color: Colors
+                                .white,
+                            fontSize:
+                                34,
+                            fontWeight:
+                                FontWeight
+                                    .bold,
+                          ),
+                        ),
+
+                        const SizedBox(
+                          height: 12,
+                        ),
+
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons
+                                  .account_balance_wallet,
+                              color: Colors
+                                  .white,
+                            ),
+
+                            const SizedBox(
+                              width: 6,
+                            ),
+
+                            Text(
+                              "${money(totalIncome)} Income",
+                              style:
+                                  const TextStyle(
+                                color: Colors
+                                    .white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 20,
+                  ),
+
+                  GridView.count(
+  shrinkWrap: true,
+  physics:
+      const NeverScrollableScrollPhysics(),
+  crossAxisCount: 2,
+  crossAxisSpacing: 12,
+  mainAxisSpacing: 12,
+  childAspectRatio: 1.15,
+  children: [
+    _statCard(
+      "Income",
+      totalIncome,
+      Icons.arrow_downward,
+      Colors.green,
+    ),
+
+    _statCard(
+      "Expense",
+      totalExpense,
+      Icons.arrow_upward,
+      Colors.red,
+    ),
+
+    _statCard(
+      "Cash",
+      cashIncome - cashExpense,
+      Icons.account_balance_wallet,
+      Colors.blue,
+    ),
+
+    _statCard(
+      "Online",
+      onlineIncome - onlineExpense,
+      Icons.credit_card,
+      Colors.orange,
+    ),
+  ],
+),
+
+const SizedBox(height: 25),
+
+Align(
+  alignment: Alignment.centerLeft,
+  child: Text(
+    "Quick Insights",
+    style: TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+      color: Colors.grey.shade800,
+    ),
+  ),
+),
+
+const SizedBox(height: 12),
+
+GridView.count(
+  shrinkWrap: true,
+  physics:
+      const NeverScrollableScrollPhysics(),
+  crossAxisCount: 2,
+  crossAxisSpacing: 12,
+  mainAxisSpacing: 12,
+  childAspectRatio: 1.25,
+  children: [
+    _insightCard(
+      Icons.category,
+      "Biggest Expense",
+      biggestCategory,
+    ),
+
+    _insightCard(
+      Icons.currency_rupee,
+      "Highest Transaction",
+      money(highestTransaction),
+    ),
+
+    _insightCard(
+      Icons.receipt_long,
+      "Transactions",
+      "${records?.length ?? 0}",
+    ),
+
+    _insightCard(
+      Icons.account_balance,
+      "Balance",
+      money(currentBalance),
+    ),
+  ],
+),
+
+const SizedBox(height: 25),
+
+Align(
+  alignment: Alignment.centerLeft,
+  child: Text(
+    "Recent Transactions",
+    style: TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+      color: Colors.grey.shade800,
+    ),
+  ),
+),
+
+const SizedBox(height: 12),
+
+(records != null &&
+        records!.isNotEmpty)
+    ? ListView.builder(
+        shrinkWrap: true,
+        physics:
+            const NeverScrollableScrollPhysics(),
+        itemCount:
+            records!.length > 15
+                ? 15
+                : records!.length,
+        itemBuilder:
+            (context, index) {
+          bool isIncome =
+              records![index]["Payment_Mode"] ==
+                      "Add CASH" ||
+                  records![index]["Payment_Mode"] ==
+                      "Add Online";
+
+          int amount =
+              int.tryParse(
+                    records![index]["Amount"]
+                        .toString(),
+                  ) ??
+                  0;
+
+          return Container(
+            margin:
+                const EdgeInsets.only(
+                  bottom: 12,
+                ),
+
+            padding:
+                const EdgeInsets.all(
+                  14,
+                ),
+
+            decoration:
+                BoxDecoration(
+              color: Colors.white,
+
+              borderRadius:
+                  BorderRadius.circular(
+                    20,
+                  ),
+
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black
+                      .withOpacity(.05),
+                  blurRadius: 10,
+                  offset:
+                      const Offset(
+                        0,
+                        4,
+                      ),
+                ),
+              ],
+            ),
+
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor:
+                      isIncome
+                          ? Colors.green
+                              .withOpacity(
+                                .12,
+                              )
+                          : Colors.red
+                              .withOpacity(
+                                .12,
+                              ),
+
+                  child: Icon(
+                    isIncome
+                        ? Icons
+                            .arrow_downward
+                        : Icons
+                            .arrow_upward,
+
+                    color:
+                        isIncome
+                            ? Colors
+                                .green
+                            : Colors.red,
+                  ),
+                ),
+
+                const SizedBox(
+                  width: 12,
+                ),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .start,
+
+                    children: [
+                      Text(
+                        records![index]["Category"]
+                            .toString(),
+
+                        style:
+                            const TextStyle(
+                          fontWeight:
+                              FontWeight
+                                  .bold,
+                          fontSize: 15,
                         ),
                       ),
-                      Container(
-                        height: 85,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.only(
-                            bottomLeft: Radius.circular(20),
-                            bottomRight: Radius.circular(20),
-                          ),
-                          color: Colors.white,
+
+                      const SizedBox(
+                        height: 3,
+                      ),
+
+                      Text(
+                        records![index]["Description"]
+                            .toString(),
+
+                        maxLines: 1,
+
+                        overflow:
+                            TextOverflow
+                                .ellipsis,
+
+                        style:
+                            TextStyle(
+                          color: Colors
+                              .grey
+                              .shade600,
+                          fontSize: 12,
                         ),
-                        child: InnerBox(
-                          "ONLINE EXpenses",
-                          "Total ONLINE",
-                          allDetails[2],
-                          allDetails[3],
+                      ),
+
+                      const SizedBox(
+                        height: 5,
+                      ),
+
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+
+                        decoration:
+                            BoxDecoration(
+                          color:
+                              themeColor
+                                  .withOpacity(
+                                    .12,
+                                  ),
+
+                          borderRadius:
+                              BorderRadius.circular(
+                                20,
+                              ),
+                        ),
+
+                        child: Text(
+                          records![index]["Payment_Mode"]
+                              .toString(),
+
+                          style:
+                              TextStyle(
+                            color:
+                                themeColor,
+                            fontSize:
+                                11,
+                            fontWeight:
+                                FontWeight
+                                    .w600,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                Expanded(
-                  child: Container(
-                    // height: 410,
-                    padding: const EdgeInsets.all(10),
-                    margin: const EdgeInsets.only(
-                      left: 10,
-                      right: 10,
-                      top: 20,
-                      bottom: 10,
+                Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .end,
+
+                  children: [
+                    Text(
+                      isIncome
+                          ? "+${money(amount)}"
+                          : "-${money(amount)}",
+
+                      style:
+                          TextStyle(
+                        color:
+                            isIncome
+                                ? Colors
+                                    .green
+                                : Colors
+                                    .red,
+
+                        fontWeight:
+                            FontWeight
+                                .bold,
+
+                        fontSize:
+                            16,
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      color: const Color(0xFFE4D5A3),
+
+                    const SizedBox(
+                      height: 5,
                     ),
-                    clipBehavior: Clip.hardEdge,
-                    child: (records != null)
-                        ? ListView.builder(
-                            itemCount: records!.length,
-                            itemBuilder: (context, index) {
-                              return Card(
-                                elevation: 3,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: Colors.white,
-                                    child: Image.asset(
-                                      (records![index]["Payment_Mode"] ==
-                                                  "Add CASH" ||
-                                              records![index]["Payment_Mode"] ==
-                                                  "Add Online")
-                                          ? "assets/image/GetPic.png"
-                                          : "assets/image/SpentPic.png",
-                                    ),
-                                  ),
-                                  title: Text(
-                                    records![index]["Category"],
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(records![index]["Date"]),
-                                      Text(records![index]["Description"]),
-                                      Text(
-                                        "Payment: ${records![index]["Payment_Mode"]}",
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: Text(
-                                    NumberFormat.currency(
-                                      locale: 'en_IN',
-                                      symbol: '₹',
-                                      decimalDigits: 0,
-                                    ).format(
-                                      int.tryParse(records![index]["Amount"]),
-                                    ),
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          (records![index]["Payment_Mode"] ==
-                                                  "Add CASH" ||
-                                              records![index]["Payment_Mode"] ==
-                                                  "Add Online")
-                                          ? Colors.green
-                                          : Colors.red,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            height: double.infinity,
-                            width: double.infinity,
-                            child: Center(
-                              child: Text(
-                                "No Data Found",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 30,
-                                  color: Colors.green,
-                                ),
-                              ),
-                            ),
-                          ),
-                  ),
+
+                    Text(
+                      records![index]["Date"]
+                          .toString(),
+
+                      style:
+                          TextStyle(
+                        color: Colors
+                            .grey
+                            .shade500,
+
+                        fontSize:
+                            11,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-
-            if (isLoading)
-              Positioned(
-                child: Container(
-                  height: double.infinity,
-                  width: double.infinity,
-                  color: Colors.black87,
-                  child: Center(
-                    child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
-                  ),
-                ),
-              ),
-          ],
+          );
+        },
+      )
+    : Container(
+        height: 200,
+        alignment: Alignment.center,
+        child: Text(
+          "No Transactions Found",
+          style: TextStyle(
+            color: themeColor,
+            fontWeight:
+                FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
       ),
 
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddSpent()),
-          );
+const SizedBox(height: 80),
 
-          if (result == true) {
-            getDetails();
-          }
-        },
-        backgroundColor: Colors.white,
-        child: Image.asset("assets/image/GreenPlus.png", height: 30, width: 30),
+],
+),
+),
+),
+
+if (isLoading)
+  Container(
+    color: Colors.black.withOpacity(.25),
+
+    child: Center(
+      child: Container(
+        padding:
+            const EdgeInsets.all(20),
+
+        decoration:
+            BoxDecoration(
+          color: Colors.white,
+          borderRadius:
+              BorderRadius.circular(
+                20,
+              ),
+        ),
+
+        child:
+            CircularProgressIndicator(
+          color: themeColor,
+        ),
+      ),
+    ),
+  ),
+],
+),floatingActionButton:
+    FloatingActionButton.extended(
+      onPressed: () async {
+        final result =
+            await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) =>
+                    AddSpent(),
+          ),
+        );
+
+        if (result == true) {
+          getDetails();
+        }
+      },
+
+      backgroundColor:
+          themeColor,
+
+      elevation: 8,
+
+      icon: const Icon(
+        Icons.add,
+        color: Colors.white,
+      ),
+
+      label: const Text(
+        "Add Expense",
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight:
+              FontWeight.bold,
+        ),
+      ),
+    ),
+    );
+  }
+
+  Widget _statCard(
+    String title,
+    int amount,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding:
+          const EdgeInsets.all(16),
+
+      decoration: BoxDecoration(
+        color: Colors.white,
+
+        borderRadius:
+            BorderRadius.circular(
+              22,
+            ),
+
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withOpacity(.05),
+            blurRadius: 10,
+            offset:
+                const Offset(0, 4),
+          ),
+        ],
+      ),
+
+      child: Column(
+        mainAxisAlignment:
+            MainAxisAlignment
+                .spaceEvenly,
+
+        children: [
+          CircleAvatar(
+            radius: 22,
+
+            backgroundColor:
+                color.withOpacity(
+                  .12,
+                ),
+
+            child: Icon(
+              icon,
+              color: color,
+            ),
+          ),
+
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors
+                  .grey
+                  .shade700,
+              fontWeight:
+                  FontWeight.w500,
+            ),
+          ),
+
+          FittedBox(
+            child: Text(
+              money(amount),
+
+              style:
+                  const TextStyle(
+                fontWeight:
+                    FontWeight
+                        .bold,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget InnerBox(
-    String LeftExpenses,
-    String RigthGain,
-    String Expenses,
-    String Gain,
+  Widget _insightCard(
+    IconData icon,
+    String title,
+    String value,
   ) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border(
-                right: BorderSide(color: Colors.grey.shade300, width: 1),
-              ),
+    return Container(
+      padding:
+          const EdgeInsets.all(16),
+
+      decoration: BoxDecoration(
+        color: Colors.white,
+
+        borderRadius:
+            BorderRadius.circular(
+              22,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Image.asset(
-                      "assets/image/ExpensesPic2.png",
-                      height: 22,
-                      width: 22,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        "$LeftExpenses",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
 
-                const Spacer(),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withOpacity(.05),
+            blurRadius: 10,
+            offset:
+                const Offset(0, 4),
+          ),
+        ],
+      ),
 
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    NumberFormat.currency(
-                      locale: 'en_IN',
-                      symbol: '-₹',
-                      decimalDigits: 0,
-                    ).format(int.tryParse(Expenses)),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
-                  ),
-                ),
-              ],
+      child: Column(
+        mainAxisAlignment:
+            MainAxisAlignment
+                .spaceEvenly,
+
+        children: [
+          Icon(
+            icon,
+            color: themeColor,
+            size: 30,
+          ),
+
+          Text(
+            value,
+            textAlign:
+                TextAlign.center,
+
+            maxLines: 2,
+
+            overflow:
+                TextOverflow
+                    .ellipsis,
+
+            style:
+                const TextStyle(
+              fontWeight:
+                  FontWeight.bold,
+              fontSize: 15,
             ),
           ),
-        ),
 
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Image.asset(
-                      "assets/image/GainPic.png",
-                      height: 22,
-                      width: 22,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        "$RigthGain",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          Text(
+            title,
+            textAlign:
+                TextAlign.center,
 
-                const Spacer(),
-
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    NumberFormat.currency(
-                      locale: 'en_IN',
-                      symbol: '+₹',
-                      decimalDigits: 0,
-                    ).format(int.tryParse(Gain)),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                ),
-              ],
+            style: TextStyle(
+              color: Colors
+                  .grey
+                  .shade600,
+              fontSize: 12,
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

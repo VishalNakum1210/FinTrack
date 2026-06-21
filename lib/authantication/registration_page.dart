@@ -261,7 +261,7 @@ class _RegistrationStatePage extends State<RegistrationPage> {
               Container(
                 height: double.infinity,
                 width: double.infinity,
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 child: Center(
                   child: CircularProgressIndicator(color: Color(0xFF8BC24A),),
                 )

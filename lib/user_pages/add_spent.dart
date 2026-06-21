@@ -32,6 +32,7 @@ class _addSpent extends State<AddSpent> {
     "Education",
     "HealthCare",
     "Entertainment",
+    "Add Money",
     "Other",
   ];
 

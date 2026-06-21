@@ -178,7 +178,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: TextField(
                       style: TextStyle(color: Color(0xFF8BC24A)),
                       controller: username,
-                      keyboardType: TextInputType.number,
+                      keyboardType: TextInputType.phone,
                       decoration: InputDecoration(
                         hint: Text(
                           "Phone Number",
@@ -272,7 +272,7 @@ class _LoginPageState extends State<LoginPage> {
             Container(
               width: double.infinity,
               height: double.infinity,
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               child: const Center(
                 child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
               ),
