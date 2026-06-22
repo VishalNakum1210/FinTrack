@@ -37,9 +37,7 @@ class _SplashPageState extends State<SplashPage> {
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      getDecision();
-    });
+    getDecision();
   }
 
   @override

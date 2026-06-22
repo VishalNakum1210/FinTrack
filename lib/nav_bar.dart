@@ -12,17 +12,25 @@ class NavPageSelector extends StatefulWidget {
 class _navPageSelector extends State<NavPageSelector> {
   int selectedIndex = 0;
 
-  final List<Widget> pages = [
-    UserMainPage(),
-    Passbookpage(),
-    FriendPage(),
-    ProfilePage(),
-  ];
+  Widget getCurrentPage() {
+    switch (selectedIndex) {
+      case 0:
+        return UserMainPage();
+      case 1:
+        return Passbookpage();
+      case 2:
+        return FriendPage();
+      case 3:
+        return ProfilePage();
+      default:
+        return UserMainPage();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: pages[selectedIndex],
+      body: getCurrentPage(),
 
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,

@@ -280,12 +280,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
 
                   menuTile(
-                    icon: Icons.settings_outlined,
-                    title: "Settings",
-                    onTap: () {},
-                  ),
-
-                  menuTile(
                     icon: Icons.help_outline,
                     title: "Feedback",
                     onTap: () {
