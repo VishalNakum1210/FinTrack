@@ -103,8 +103,6 @@ class _passbookPage extends State<Passbookpage> {
                   categoryChip("All"),
                   categoryChip("Spent Cash"),
                   categoryChip("Spent Online"),
-                  categoryChip("Spent Cash For ADA"),
-                  categoryChip("Spent Online For ADA"),
                   categoryChip("Add CASH"),
                   categoryChip("Add Online"),
                 ],
@@ -198,7 +196,7 @@ class _passbookPage extends State<Passbookpage> {
                   child: Column(
                     children: [
                       const Text(
-                        "Total Amount",
+                        "Total Expanses",
                         style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
 

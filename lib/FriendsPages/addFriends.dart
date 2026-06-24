@@ -20,7 +20,7 @@ class _addFriendPage extends State<AddFriends> {
     String name = cname.text,
         phone_number = cphone_number.text,
         note = cnote.text;
-    if (name.isNotEmpty && phone_number.isNotEmpty && note.isNotEmpty) {
+    if (name.isNotEmpty && phone_number.isNotEmpty) {
       try {
         DatabaseReference myref = FirebaseDatabase.instance.ref(
           "Friends/$userPhone_number",
@@ -138,7 +138,7 @@ class _addFriendPage extends State<AddFriends> {
                         child: TextField(
                           controller: cnote,
                           decoration: InputDecoration(
-                            hintText: "Note",
+                            hintText: "Note (optional)",
                             enabledBorder: OutlineInputBorder(
                               borderSide: BorderSide(
                                 width: 3,
@@ -167,7 +167,7 @@ class _addFriendPage extends State<AddFriends> {
                             setFriendDetails();
                           },
                           child: Text(
-                            "Add Spent Details",
+                            "Add Friend Detail",
                             style: TextStyle(color: Colors.white),
                           ),
                           style: ElevatedButton.styleFrom(

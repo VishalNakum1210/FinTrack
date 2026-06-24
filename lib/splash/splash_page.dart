@@ -10,7 +10,7 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
-  String appVersion = "1.0.0";
+  String appVersion = "0.0.0";
 
   Future<void> getVersion() async {
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -80,7 +80,7 @@ class _SplashPageState extends State<SplashPage> {
               const SizedBox(height: 25),
 
               const Text(
-                "Account",
+                "FinTrack",
                 style: TextStyle(
                   fontSize: 38,
                   fontWeight: FontWeight.bold,
@@ -102,18 +102,18 @@ class _SplashPageState extends State<SplashPage> {
               const Spacer(),
 
               Text(
-                "Developed by Vishal",
-                style: TextStyle(color: Colors.grey.shade700, fontSize: 15),
-              ),
-
-              const SizedBox(height: 5),
-
-              Text(
                 "Version $appVersion",
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
               ),
 
               const SizedBox(height: 25),
+
+              Text(
+                "© 2026 Vishal Nakum",
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 15),
+              ),
+
+              const SizedBox(height: 5),
             ],
           ),
         ),

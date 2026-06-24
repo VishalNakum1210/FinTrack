@@ -578,7 +578,7 @@ class _UserMainPageState extends State<UserMainPage> {
         icon: const Icon(Icons.add, color: Colors.white),
 
         label: const Text(
-          "Add Expense",
+          "Add",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),

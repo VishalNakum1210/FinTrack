@@ -19,8 +19,6 @@ class _addSpent extends State<AddSpent> {
   List<String> PaymentMode = [
     "Spent Online",
     "Spent Cash",
-    "Spent Online For ADA",
-    "Spent Cash For ADA",
     "Add CASH",
     "Add Online",
   ];
@@ -122,7 +120,7 @@ class _addSpent extends State<AddSpent> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          "Add Spent",
+          "Add Record",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight(800)),
         ),
         iconTheme: IconThemeData(color: Colors.white),
