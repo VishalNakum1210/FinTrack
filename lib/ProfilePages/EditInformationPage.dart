@@ -1,4 +1,4 @@
-import 'package:account/GetInformation/GetUserDetail.dart';
+import 'package:FinTrack/GetInformation/GetUserDetail.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';

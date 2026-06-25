@@ -1,9 +1,9 @@
-import 'package:account/GetInformation/GetInformationForProfile.dart';
-import 'package:account/ProfilePages/ChangePasswordPage.dart';
-import 'package:account/ProfilePages/FeedbackPage.dart';
-import 'package:account/ProfilePages/PersonalInformationPage.dart';
-import 'package:account/ProfilePages/ReportPage.dart';
-import 'package:account/authantication/login_page.dart';
+import 'package:FinTrack/GetInformation/GetInformationForProfile.dart';
+import 'package:FinTrack/ProfilePages/ChangePasswordPage.dart';
+import 'package:FinTrack/ProfilePages/FeedbackPage.dart';
+import 'package:FinTrack/ProfilePages/PersonalInformationPage.dart';
+import 'package:FinTrack/ProfilePages/ReportPage.dart';
+import 'package:FinTrack/authantication/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';

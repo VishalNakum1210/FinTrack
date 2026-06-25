@@ -1,5 +1,5 @@
-import 'package:account/authantication/login_page.dart';
-import 'package:account/nav_bar.dart';
+import 'package:FinTrack/authantication/login_page.dart';
+import 'package:FinTrack/nav_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';

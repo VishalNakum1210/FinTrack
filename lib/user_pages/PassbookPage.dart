@@ -1,5 +1,5 @@
-import 'package:account/GetInformation/GetAllRecords.dart';
-import 'package:account/GetInformation/GetTotalExpenses.dart';
+import 'package:FinTrack/GetInformation/GetAllRecords.dart';
+import 'package:FinTrack/GetInformation/GetTotalExpenses.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';

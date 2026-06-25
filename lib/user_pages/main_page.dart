@@ -1,6 +1,6 @@
-import 'package:account/GetInformation/GetAllInformation.dart';
-import 'package:account/GetInformation/GetAllRecords.dart';
-import 'package:account/user_pages/add_spent.dart';
+import 'package:FinTrack/GetInformation/GetAllInformation.dart';
+import 'package:FinTrack/GetInformation/GetAllRecords.dart';
+import 'package:FinTrack/user_pages/add_spent.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';

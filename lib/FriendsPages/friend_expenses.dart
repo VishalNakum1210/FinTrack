@@ -1,7 +1,7 @@
-import 'package:account/FriendsPages/addFriends.dart';
-import 'package:account/FriendsPages/specificFriendPage.dart';
-import 'package:account/GetInformation/GetFriendDetails.dart';
-import 'package:account/GetInformation/GetTotalFriendExpenses.dart';
+import 'package:FinTrack/FriendsPages/addFriends.dart';
+import 'package:FinTrack/FriendsPages/specificFriendPage.dart';
+import 'package:FinTrack/GetInformation/GetFriendDetails.dart';
+import 'package:FinTrack/GetInformation/GetTotalFriendExpenses.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';

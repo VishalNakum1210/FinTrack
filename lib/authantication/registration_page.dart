@@ -1,5 +1,5 @@
-import 'package:account/GetInformation/HashPassword.dart';
-import 'package:account/authantication/login_page.dart';
+import 'package:FinTrack/GetInformation/HashPassword.dart';
+import 'package:FinTrack/authantication/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:firebase_database/firebase_database.dart';

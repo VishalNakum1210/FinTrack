@@ -1,7 +1,7 @@
-import 'package:account/user_pages/PassbookPage.dart';
-import 'package:account/FriendsPages/friend_expenses.dart';
-import 'package:account/user_pages/main_page.dart';
-import 'package:account/user_pages/profile.dart';
+import 'package:FinTrack/user_pages/PassbookPage.dart';
+import 'package:FinTrack/FriendsPages/friend_expenses.dart';
+import 'package:FinTrack/user_pages/main_page.dart';
+import 'package:FinTrack/user_pages/profile.dart';
 import 'package:flutter/material.dart';
 
 class NavPageSelector extends StatefulWidget {

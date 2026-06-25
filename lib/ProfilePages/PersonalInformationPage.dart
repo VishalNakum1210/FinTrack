@@ -1,5 +1,5 @@
-import 'package:account/GetInformation/GetUserDetail.dart';
-import 'package:account/ProfilePages/EditInformationPage.dart';
+import 'package:FinTrack/GetInformation/GetUserDetail.dart';
+import 'package:FinTrack/ProfilePages/EditInformationPage.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

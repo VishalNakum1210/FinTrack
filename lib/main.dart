@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:account/splash/splash_page.dart';
+import 'package:FinTrack/splash/splash_page.dart';
 
 
 Future<void> main() async {
@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "Account",
+      title: "FinTrack",
       debugShowCheckedModeBanner: false,
       home: SplashPage(),
     );

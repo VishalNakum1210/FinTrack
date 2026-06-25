@@ -1,6 +1,6 @@
-import 'package:account/GetInformation/HashPassword.dart';
-import 'package:account/authantication/registration_page.dart';
-import 'package:account/nav_bar.dart';
+import 'package:FinTrack/GetInformation/HashPassword.dart';
+import 'package:FinTrack/authantication/registration_page.dart';
+import 'package:FinTrack/nav_bar.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
