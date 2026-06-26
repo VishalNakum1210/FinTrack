@@ -50,22 +50,24 @@ class _passbookPage extends State<Passbookpage> {
     return NumberFormat('#,##,##0', 'en_IN').format(number);
   }
 
-  Future<void> deleteRecord (String key) async {
+  Future<void> deleteRecord(String key) async {
     setState(() {
       isLoading = true;
     });
-    try{
+    try {
       SharedPreferences sp = await SharedPreferences.getInstance();
       String phone_number = sp.getString("phone_number")!;
-      DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone_number/$key");
+      DatabaseReference myref = FirebaseDatabase.instance.ref(
+        "Expenses/$phone_number/$key",
+      );
 
       await myref.remove();
       records!.clear();
       await filterExpenses(selectedType);
       Fluttertoast.showToast(msg: "Recored Deleted Successfully");
-    }catch(e){
+    } catch (e) {
       Fluttertoast.showToast(msg: "Not Connected $e");
-    }finally{
+    } finally {
       setState(() {
         isLoading = false;
       });
@@ -96,15 +98,33 @@ class _passbookPage extends State<Passbookpage> {
           Container(
             margin: EdgeInsets.symmetric(horizontal: 9),
             child: SizedBox(
-              height: 50,
+              height: 100,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  categoryChip("All"),
-                  categoryChip("Spent Cash"),
-                  categoryChip("Spent Online"),
-                  categoryChip("Add CASH"),
-                  categoryChip("Add Online"),
+                  Column(
+                    children: [
+                      Row(
+                        children: [
+                          categoryChip("All"),
+                          categoryChip("Spent Cash"),
+                          categoryChip("Spent Online"),
+                          categoryChip("Add CASH"),
+                          categoryChip("Add Online"),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          categoryChip("Food"),
+                          categoryChip("Shopping"),
+                          categoryChip("Transport"),
+                          categoryChip("Entertainment"),
+                          categoryChip("HealthCare"),
+                          categoryChip("Other"),
+                        ],
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -226,39 +246,37 @@ class _passbookPage extends State<Passbookpage> {
                       return InkWell(
                         onTap: () {
                           showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    title: const Text("Delete Record"),
-                                    content: const Text(
-                                      "Are you sure you want to delete this record?",
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text("Cancel"),
-                                      ),
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: const Text("Delete Record"),
+                              content: const Text(
+                                "Are you sure you want to delete this record?",
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text("Cancel"),
+                                ),
 
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        onPressed: () async {
-                                          Navigator.pop(context);
-
-                                          await deleteRecord(
-                                            records![index]["key"],
-                                          );
-                                        },
-                                        child: const Text("Delete"),
-                                      ),
-                                    ],
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
                                   ),
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+
+                                    await deleteRecord(records![index]["key"]);
+                                  },
+                                  child: const Text("Delete"),
+                                ),
+                              ],
+                            ),
                           );
                         },
                         child: Card(

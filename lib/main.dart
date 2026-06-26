@@ -1,3 +1,4 @@
+import 'package:FinTrack/user_pages/NewPassbookPage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -20,7 +21,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: "FinTrack",
       debugShowCheckedModeBanner: false,
-      home: SplashPage(),
+      home: PassbookApp(),
     );
   }
 }
