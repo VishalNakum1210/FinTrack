@@ -12,13 +12,18 @@ class PassbookApp extends StatelessWidget {
         fontFamily: 'Roboto',
         scaffoldBackgroundColor: Colors.white,
       ),
-      home: const PassbookPage(),
+      home: PassbookPage(),
     );
   }
 }
 
 class PassbookPage extends StatelessWidget {
-  const PassbookPage({super.key});
+  PassbookPage({super.key});
+
+  int income = 35000;
+  int expense = 18500;
+
+  int get balance => income - expense;
 
   static const Color green = Color(0xFF138A3D);
   static const Color darkGreen = Color(0xFF006B45);
@@ -129,10 +134,7 @@ class PassbookPage extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Search category or description...',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -200,145 +202,139 @@ class PassbookPage extends StatelessWidget {
 
   Widget _balanceCard() {
     return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF23B15A), Color(0xFF006B45)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withOpacity(0.25),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+  width: double.infinity,
+  padding: const EdgeInsets.all(22),
+  decoration: BoxDecoration(
+    borderRadius: BorderRadius.circular(25),
+    gradient: const LinearGradient(
+      colors: [
+        Color(0xFF43A047),
+        Color(0xFF1B5E20),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.greenAccent.withOpacity(.25),
+        blurRadius: 18,
+        offset: const Offset(0, 10),
       ),
-      child: Column(
+    ],
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
         children: [
-          Row(
-            children: [
-              Container(
-                height: 82,
-                width: 82,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.9),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet,
-                  color: darkGreen,
-                  size: 42,
-                ),
-              ),
-              const SizedBox(width: 18),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'TOTAL BALANCE',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(Icons.visibility, color: Colors.white, size: 20),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '₹ 12,45,300',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Available Balance',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Column(
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'This Month',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Icon(Icons.keyboard_arrow_down, color: Colors.white),
-                    ],
+          Container(
+            height: 55,
+            width: 55,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.15),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.account_balance_wallet_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+
+          const SizedBox(width: 15),
+
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Total Balance",
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
                   ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Divider(color: Colors.white.withOpacity(0.28)),
-          const SizedBox(height: 12),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _BalanceInfo(
-                title: 'Income',
-                amount: '₹ 25,000',
-                icon: Icons.arrow_upward,
-                iconColor: Colors.lightGreenAccent,
-              ),
-              _VerticalLine(),
-              _BalanceInfo(
-                title: 'Expense',
-                amount: '₹ 15,500',
-                icon: Icons.arrow_downward,
-                iconColor: Colors.redAccent,
-              ),
-              _VerticalLine(),
-              _BalanceInfo(
-                title: 'Balance',
-                amount: '₹ 9,500',
-                icon: Icons.remove,
-                iconColor: Colors.white,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Divider(color: Colors.white.withOpacity(0.28)),
-          const SizedBox(height: 12),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.wallet, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Text(
-                '128 Transactions',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
                 ),
-              ),
-            ],
+                SizedBox(height: 3),
+                Text(
+                  "Available Balance",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.visibility_outlined,
+              color: Colors.white,
+            ),
           ),
         ],
       ),
-    );
+
+      const SizedBox(height: 25),
+
+      Text(
+        "₹ ${balance}",
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 34,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+
+      const SizedBox(height: 25),
+
+      Divider(
+        color: Colors.white.withOpacity(.25),
+        thickness: 1,
+      ),
+
+      const SizedBox(height: 18),
+
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: balanceItem(
+              Icons.arrow_downward,
+              Colors.red.shade300,
+              "Expense",
+              expense,
+            ),
+          ),
+
+          Expanded(
+            child: balanceItem(
+              Icons.arrow_upward,
+              Colors.greenAccent,
+              "Income",
+              income,
+            ),
+          ),
+
+          Expanded(
+            child: balanceItem(
+              Icons.receipt_long,
+              Colors.white,
+              "Records",
+              "20000",
+              isMoney: false,
+            ),
+          ),
+        ],
+      ),
+    ],
+  ),
+);
   }
 
   Widget _sortRow() {
@@ -357,10 +353,7 @@ class PassbookPage extends StatelessWidget {
           ),
           child: const Row(
             children: [
-              Text(
-                'Newest First',
-                style: TextStyle(fontSize: 16),
-              ),
+              Text('Newest First', style: TextStyle(fontSize: 16)),
               SizedBox(width: 10),
               Icon(Icons.keyboard_arrow_down),
             ],
@@ -378,10 +371,7 @@ class PassbookPage extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
           Text(
             date,
@@ -442,10 +432,7 @@ class PassbookPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 15),
-                ),
+                Text(subtitle, style: const TextStyle(fontSize: 15)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -453,10 +440,10 @@ class PassbookPage extends StatelessWidget {
                       method == 'Cash'
                           ? Icons.account_balance_wallet
                           : method == 'UPI'
-                              ? Icons.mobile_friendly
-                              : method == 'Bank Transfer'
-                                  ? Icons.account_balance
-                                  : Icons.credit_card,
+                          ? Icons.mobile_friendly
+                          : method == 'Bank Transfer'
+                          ? Icons.account_balance
+                          : Icons.credit_card,
                       color: Colors.grey,
                       size: 18,
                     ),
@@ -553,4 +540,36 @@ class _VerticalLine extends StatelessWidget {
       color: Colors.white.withOpacity(0.25),
     );
   }
+}
+Widget balanceItem(
+  IconData icon,
+  Color iconColor,
+  String title,
+  dynamic value, {
+  bool isMoney = true,
+}) {
+  return Column(
+    children: [
+      Icon(icon, color: iconColor, size: 20),
+      const SizedBox(height: 8),
+      Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 13,
+        ),
+      ),
+      const SizedBox(height: 5),
+      Text(
+        isMoney
+            ? "₹${int.parse(value.toString())}"
+            : value.toString(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
+    ],
+  );
 }
