@@ -202,139 +202,177 @@ class PassbookPage extends StatelessWidget {
 
   Widget _balanceCard() {
     return Container(
-  width: double.infinity,
-  padding: const EdgeInsets.all(22),
-  decoration: BoxDecoration(
-    borderRadius: BorderRadius.circular(25),
-    gradient: const LinearGradient(
-      colors: [
-        Color(0xFF43A047),
-        Color(0xFF1B5E20),
-      ],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    ),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.greenAccent.withOpacity(.25),
-        blurRadius: 18,
-        offset: const Offset(0, 10),
-      ),
-    ],
-  ),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Container(
-            height: 55,
-            width: 55,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.15),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Icon(
-              Icons.account_balance_wallet_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-
-          const SizedBox(width: 15),
-
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Total Balance",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 15,
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  "Available Balance",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.visibility_outlined,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-
-      const SizedBox(height: 25),
-
-      Text(
-        "₹ ${balance}",
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 34,
-          fontWeight: FontWeight.bold,
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xff34D399), Color(0xff16A34A), Color(0xff166534)],
         ),
-      ),
-
-      const SizedBox(height: 25),
-
-      Divider(
-        color: Colors.white.withOpacity(.25),
-        thickness: 1,
-      ),
-
-      const SizedBox(height: 18),
-
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: balanceItem(
-              Icons.arrow_downward,
-              Colors.red.shade300,
-              "Expense",
-              expense,
-            ),
-          ),
-
-          Expanded(
-            child: balanceItem(
-              Icons.arrow_upward,
-              Colors.greenAccent,
-              "Income",
-              income,
-            ),
-          ),
-
-          Expanded(
-            child: balanceItem(
-              Icons.receipt_long,
-              Colors.white,
-              "Records",
-              "20000",
-              isMoney: false,
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(.25),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
           ),
         ],
       ),
-    ],
-  ),
-);
+      child: Stack(
+        children: [
+          Positioned(
+            right: -35,
+            top: -35,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(.08),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: -30,
+            bottom: -40,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(.05),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    height: 58,
+                    width: 58,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(.15),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+
+                  const SizedBox(width: 15),
+
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Total Balance",
+                          style: TextStyle(color: Colors.white70, fontSize: 15),
+                        ),
+
+                        SizedBox(height: 4),
+
+                        Text(
+                          "Available Balance",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(.15),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Icon(
+                      Icons.visibility_outlined,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 30),
+
+              Text(
+                "₹ ${balance}",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 38,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -.5,
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              Text(
+                "Updated just now",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(.75),
+                  fontSize: 13,
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              Divider(color: Colors.white.withOpacity(.20), thickness: 1),
+
+              const SizedBox(height: 20),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: balanceItem(
+                      Icons.arrow_upward_rounded,
+                      Colors.greenAccent,
+                      "Income",
+                      income,
+                    ),
+                  ),
+
+                  Container(height: 45, width: 1, color: Colors.white24),
+
+                  Expanded(
+                    child: balanceItem(
+                      Icons.arrow_downward_rounded,
+                      Colors.redAccent.shade100,
+                      "Expense",
+                      expense,
+                    ),
+                  ),
+
+                  Container(height: 45, width: 1, color: Colors.white24),
+
+                  Expanded(
+                    child: balanceItem(
+                      Icons.receipt_long_rounded,
+                      Colors.white,
+                      "Records",
+                      "24",
+                      isMoney: false,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _sortRow() {
@@ -541,6 +579,7 @@ class _VerticalLine extends StatelessWidget {
     );
   }
 }
+
 Widget balanceItem(
   IconData icon,
   Color iconColor,
@@ -550,24 +589,27 @@ Widget balanceItem(
 }) {
   return Column(
     children: [
-      Icon(icon, color: iconColor, size: 20),
-      const SizedBox(height: 8),
+      Icon(icon, color: iconColor, size: 22),
+
+      const SizedBox(height: 10),
+
       Text(
         title,
         style: const TextStyle(
           color: Colors.white70,
           fontSize: 13,
+          fontWeight: FontWeight.w500,
         ),
       ),
-      const SizedBox(height: 5),
+
+      const SizedBox(height: 6),
+
       Text(
-        isMoney
-            ? "₹${int.parse(value.toString())}"
-            : value.toString(),
+        isMoney ? "₹${value}" : value.toString(),
         style: const TextStyle(
           color: Colors.white,
+          fontSize: 18,
           fontWeight: FontWeight.bold,
-          fontSize: 16,
         ),
       ),
     ],
