@@ -16,8 +16,6 @@ Future<String> getTotalExpenses(String phone_number, String Specific) async {
       "All",
       "Spent Cash",
       "Spent Online",
-      "Spent Cash For ADA",
-      "Spent Online For ADA",
       "Add CASH",
       "Add Online"
     ].contains(Specific)) {

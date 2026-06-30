@@ -17,7 +17,7 @@ class _navPageSelector extends State<NavPageSelector> {
       case 0:
         return UserMainPage();
       case 1:
-        return Passbookpage();
+        return PassbookApp();
       case 2:
         return FriendPage();
       case 3:
