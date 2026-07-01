@@ -13,7 +13,7 @@ class PassbookPage extends State<PassbookApp> {
   String selectSort = "Newest First";
   int recordCount = 0;
   List<String> sortList = ["Newest First", "Last First"];
-
+  List<Map<String, dynamic>> records = [];
   String balance = "*,**,***";
 
   static const Color green = Color(0xFF8BC24A);
@@ -21,34 +21,35 @@ class PassbookPage extends State<PassbookApp> {
 
   void ShowHideBalance() {
     setState(() {
-      balance = balance != "*,**,***" ? "*,**,***" : (income - expense).toString();
+      balance = balance != "*,**,***"
+          ? "*,**,***"
+          : (income - expense).toString();
     });
   }
 
-  Future<void> getDetails () async {
+  Future<void> getDetails() async {
     SharedPreferences sp = await SharedPreferences.getInstance();
     String phone = sp.getString("phone_number")!;
     DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone");
 
     DatabaseEvent event = await myref.once();
 
-    if(event.snapshot.value != null){
+    if (event.snapshot.value != null) {
       Map data = event.snapshot.value as Map;
 
       data.forEach(((key, value) {
-        recordCount ++;
-        if(["Add CASH", "Add Online"].contains(value["Payment_Mode"])){
+        recordCount++;
+        if (["Add CASH", "Add Online"].contains(value["Payment_Mode"])) {
           income += int.parse(value["Amount"]);
-        }
-        else{
+        } else {
           expense += int.parse(value["Amount"]);
         }
+
+        records.add(Map<String, dynamic>.from(value));
       }));
     }
 
-    setState(() {
-
-    });
+    setState(() {});
   }
 
   @override
@@ -60,7 +61,6 @@ class PassbookPage extends State<PassbookApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
@@ -146,6 +146,32 @@ class PassbookPage extends State<PassbookApp> {
               isIncome: false,
             ),
             const SizedBox(height: 18),
+
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: records.length,
+
+              itemBuilder: (context, index) {
+                return _transactionTile(
+                  icon: icon_name(records[index]["Category"]),
+                  iconColor: iconColor(records[index]["Category"]),
+                  bgColor: backgroundColor(records[index]["Category"]),
+                  title: records[index]["Category"]!,
+                  subtitle: records[index]["Description"]!,
+                  method: records[index]["Payment_Mode"]!,
+                  time: records[index]["Date"]!,
+                  amount: records[index]["Amount"]!,
+                  isIncome:
+                      [
+                        "Add CASH",
+                        "Add Online",
+                      ].contains(records[index]["Payment_Mode"])
+                      ? true
+                      : false,
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -327,7 +353,7 @@ class PassbookPage extends State<PassbookApp> {
                     child: InkWell(
                       onTap: () {
                         ShowHideBalance();
-                        },
+                      },
                       child: Icon(
                         Icons.visibility_outlined,
                         color: Colors.white,
@@ -576,66 +602,6 @@ class PassbookPage extends State<PassbookApp> {
   }
 }
 
-class _BalanceInfo extends StatelessWidget {
-  final String title;
-  final String amount;
-  final IconData icon;
-  final Color iconColor;
-
-  const _BalanceInfo({
-    required this.title,
-    required this.amount,
-    required this.icon,
-    required this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: iconColor, size: 18),
-              const SizedBox(width: 4),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            amount,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 21,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VerticalLine extends StatelessWidget {
-  const _VerticalLine();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 46,
-      width: 1,
-      color: Colors.white.withOpacity(0.25),
-    );
-  }
-}
 
 Widget balanceItem(
   IconData icon,
@@ -671,4 +637,83 @@ Widget balanceItem(
       ),
     ],
   );
+}
+
+IconData icon_name (String Payment_Mode) {
+  switch (Payment_Mode) {
+    case "Shopping":
+      return Icons.shopping_bag_rounded;
+    case "Food":
+      return Icons.restaurant_rounded;
+    case "Transport":
+      return Icons.directions_bus_rounded;
+    case "Education":
+      return Icons.school_rounded;
+    case "HealthCare":
+      return Icons.local_hospital_rounded;
+    case "Entertainment":
+      return Icons.movie_rounded;
+    case "Add Money":
+      return Icons.account_balance_wallet_rounded;
+    default:
+      return Icons.category_rounded;
+  }
+}
+
+Color iconColor(String category) {
+  switch (category.trim()) {
+    case "Shopping":
+      return const Color(0xFF7C3AED); // Purple
+
+    case "Food":
+      return const Color(0xFFFF9800); // Orange
+
+    case "Transport":
+      return const Color(0xFF2196F3); // Blue
+
+    case "Education":
+      return const Color(0xFF3F51B5); // Indigo
+
+    case "HealthCare":
+      return const Color(0xFFE53935); // Red
+
+    case "Entertainment":
+      return const Color(0xFFEC407A); // Pink
+
+    case "Add CASH":
+    case "Add Online":
+      return const Color(0xFF43A047); // Green
+
+    default:
+      return const Color(0xFF757575); // Grey
+  }
+}
+
+Color backgroundColor(String category) {
+  switch (category.trim()) {
+    case "Shopping":
+      return const Color(0xFFF3E5F5); // Light Purple
+
+    case "Food":
+      return const Color(0xFFFFF3E0); // Light Orange
+
+    case "Transport":
+      return const Color(0xFFE3F2FD); // Light Blue
+
+    case "Education":
+      return const Color(0xFFE8EAF6); // Light Indigo
+
+    case "HealthCare":
+      return const Color(0xFFFFEBEE); // Light Red
+
+    case "Entertainment":
+      return const Color(0xFFFCE4EC); // Light Pink
+
+    case "Add CASH":
+    case "Add Online":
+      return const Color(0xFFE8F5E9); // Light Green
+
+    default:
+      return const Color(0xFFF5F5F5); // Light Grey
+  }
 }
