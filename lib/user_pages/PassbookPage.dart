@@ -1,6 +1,8 @@
+import 'package:FinTrack/GetInformation/GetAllRecords.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class PassbookApp extends StatefulWidget {
   @override
@@ -11,13 +13,13 @@ class PassbookPage extends State<PassbookApp> {
   int income = 0;
   int expense = 0;
   String selectSort = "Newest First";
+  String last = "";
   int recordCount = 0;
   List<String> sortList = ["Newest First", "Last First"];
   List<Map<String, dynamic>> records = [];
   String balance = "*,**,***";
 
   static const Color green = Color(0xFF8BC24A);
-  static const Color darkGreen = Color(0xFF8BC24A);
 
   void ShowHideBalance() {
     setState(() {
@@ -26,6 +28,22 @@ class PassbookPage extends State<PassbookApp> {
           : (income - expense).toString();
     });
   }
+
+  Widget checkDate (String date) {
+    if(date != last){
+        last = date;
+        return _sectionHeader('', '${formatDate(date)}');
+    }
+    return const SizedBox.shrink();
+  }
+
+  String formatDate(String date) {
+  final inputFormat = DateFormat('d/M/yyyy');
+  final outputFormat = DateFormat('d MMM yyyy');
+
+  final parsedDate = inputFormat.parse(date);
+  return outputFormat.format(parsedDate);
+}
 
   Future<void> getDetails() async {
     SharedPreferences sp = await SharedPreferences.getInstance();
@@ -45,10 +63,11 @@ class PassbookPage extends State<PassbookApp> {
           expense += int.parse(value["Amount"]);
         }
 
-        records.add(Map<String, dynamic>.from(value));
+        // records.add(Map<String, dynamic>.from(value));
       }));
     }
 
+    records = (await allRecords(phone, "All"))!;
     setState(() {});
   }
 
@@ -122,30 +141,6 @@ class PassbookPage extends State<PassbookApp> {
             const SizedBox(height: 10),
             _sortRow(),
             const SizedBox(height: 10),
-            _sectionHeader('Today', '25 June 2026'),
-            _transactionTile(
-              icon: Icons.fastfood,
-              iconColor: Colors.orange,
-              bgColor: const Color(0xFFFFF1D8),
-              title: 'Food',
-              subtitle: "Domino's Pizza",
-              method: 'Cash',
-              time: '7:45 PM',
-              amount: '- ₹250',
-              isIncome: false,
-            ),
-            _transactionTile(
-              icon: Icons.directions_car,
-              iconColor: Colors.blue,
-              bgColor: const Color(0xFFE2F4FF),
-              title: 'Transport',
-              subtitle: 'Auto Rickshaw',
-              method: 'UPI',
-              time: '2:30 PM',
-              amount: '- ₹120',
-              isIncome: false,
-            ),
-            const SizedBox(height: 18),
 
             ListView.builder(
               shrinkWrap: true,
@@ -153,22 +148,27 @@ class PassbookPage extends State<PassbookApp> {
               itemCount: records.length,
 
               itemBuilder: (context, index) {
-                return _transactionTile(
-                  icon: icon_name(records[index]["Category"]),
-                  iconColor: iconColor(records[index]["Category"]),
-                  bgColor: backgroundColor(records[index]["Category"]),
-                  title: records[index]["Category"]!,
-                  subtitle: records[index]["Description"]!,
-                  method: records[index]["Payment_Mode"]!,
-                  time: records[index]["Date"]!,
-                  amount: records[index]["Amount"]!,
-                  isIncome:
-                      [
-                        "Add CASH",
-                        "Add Online",
-                      ].contains(records[index]["Payment_Mode"])
-                      ? true
-                      : false,
+                return Column(
+                  children: [
+                    checkDate(records[index]["Date"]),
+                    _transactionTile(
+                      icon: icon_name(records[index]["Category"]),
+                      iconColor: iconColor(records[index]["Category"]),
+                      bgColor: backgroundColor(records[index]["Category"]),
+                      title: records[index]["Category"]!,
+                      subtitle: records[index]["Description"]!,
+                      method: records[index]["Payment_Mode"]!,
+                      time: records[index]["Date"]!,
+                      amount: records[index]["Amount"]!,
+                      isIncome:
+                          [
+                            "Add CASH",
+                            "Add Online",
+                          ].contains(records[index]["Payment_Mode"])
+                          ? true
+                          : false,
+                    ),
+                  ],
                 );
               },
             ),
@@ -488,7 +488,7 @@ class PassbookPage extends State<PassbookApp> {
 
   Widget _sectionHeader(String title, String date) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 10, right: 15),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -500,7 +500,7 @@ class PassbookPage extends State<PassbookApp> {
             date,
             style: const TextStyle(
               fontSize: 15,
-              color: Colors.grey,
+              color: Colors.black,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -560,13 +560,13 @@ class PassbookPage extends State<PassbookApp> {
                 Row(
                   children: [
                     Icon(
-                      method == 'Cash'
-                          ? Icons.account_balance_wallet
-                          : method == 'UPI'
-                          ? Icons.mobile_friendly
-                          : method == 'Bank Transfer'
-                          ? Icons.account_balance
-                          : Icons.credit_card,
+                      method == 'Spent Cash'
+                          ? Icons.currency_rupee_rounded
+                          : method == 'Spent Online'
+                          ? Icons.payment_rounded
+                          // : method == 'Bank Transfer'
+                          // ? Icons.account_balance
+                          : Icons.add_card_rounded,
                       color: Colors.grey,
                       size: 18,
                     ),
@@ -589,7 +589,9 @@ class PassbookPage extends State<PassbookApp> {
           ),
           const SizedBox(width: 8),
           Text(
-            amount,
+            (["Add Online", "Add CASH"].contains(method))
+                ? "+ ₹$amount"
+                : "- ₹$amount",
             style: TextStyle(
               color: isIncome ? green : Colors.red.shade700,
               fontSize: 20,
@@ -601,7 +603,6 @@ class PassbookPage extends State<PassbookApp> {
     );
   }
 }
-
 
 Widget balanceItem(
   IconData icon,
@@ -639,7 +640,7 @@ Widget balanceItem(
   );
 }
 
-IconData icon_name (String Payment_Mode) {
+IconData icon_name(String Payment_Mode) {
   switch (Payment_Mode) {
     case "Shopping":
       return Icons.shopping_bag_rounded;
@@ -715,5 +716,16 @@ Color backgroundColor(String category) {
 
     default:
       return const Color(0xFFF5F5F5); // Light Grey
+  }
+}
+
+IconData methodIcon(String method) {
+  switch (method) {
+    case "Spent Cash":
+      return Icons.money_off_rounded;
+    case "Spent Online":
+      return Icons.payment_rounded;
+    default:
+      return Icons.add_card_rounded;
   }
 }
