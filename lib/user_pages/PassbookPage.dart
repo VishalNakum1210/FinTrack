@@ -1,4 +1,5 @@
 import 'package:FinTrack/GetInformation/GetAllRecords.dart';
+import 'package:FinTrack/user_pages/add_spent.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,25 +26,25 @@ class PassbookPage extends State<PassbookApp> {
     setState(() {
       balance = balance != "*,**,***"
           ? "*,**,***"
-          : (income - expense).toString();
+          : money(income - expense);
     });
   }
 
-  Widget checkDate (String date) {
-    if(date != last){
-        last = date;
-        return _sectionHeader('', '${formatDate(date)}');
+  Widget checkDate(String date) {
+    if (date != last) {
+      last = date;
+      return _sectionHeader('', '${formatDate(date)}');
     }
     return const SizedBox.shrink();
   }
 
   String formatDate(String date) {
-  final inputFormat = DateFormat('d/M/yyyy');
-  final outputFormat = DateFormat('d MMM yyyy');
+    final inputFormat = DateFormat('d/M/yyyy');
+    final outputFormat = DateFormat('d MMM yyyy');
 
-  final parsedDate = inputFormat.parse(date);
-  return outputFormat.format(parsedDate);
-}
+    final parsedDate = inputFormat.parse(date);
+    return outputFormat.format(parsedDate);
+  }
 
   Future<void> getDetails() async {
     SharedPreferences sp = await SharedPreferences.getInstance();
@@ -69,6 +70,20 @@ class PassbookPage extends State<PassbookApp> {
 
     records = (await allRecords(phone, "All"))!;
     setState(() {});
+  }
+
+  void changeOrder () {
+    records.reversed;
+    setState(() {
+    });
+  }
+
+  String money(int value) {
+    return NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹ ',
+      decimalDigits: 0,
+    ).format(value);
   }
 
   @override
@@ -125,7 +140,15 @@ class PassbookPage extends State<PassbookApp> {
       floatingActionButton: FloatingActionButton(
         backgroundColor: green,
         shape: const CircleBorder(),
-        onPressed: () {},
+        onPressed: () async {
+          final bool change = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => AddSpent()),
+          );
+          if (change) {
+            getDetails();
+          }
+        },
         child: const Icon(Icons.add, color: Colors.white, size: 34),
       ),
       body: SingleChildScrollView(
@@ -159,7 +182,7 @@ class PassbookPage extends State<PassbookApp> {
                       subtitle: records[index]["Description"]!,
                       method: records[index]["Payment_Mode"]!,
                       time: records[index]["Date"]!,
-                      amount: records[index]["Amount"]!,
+                      amount: money(int.parse(records[index]["Amount"]!)),
                       isIncome:
                           [
                             "Add CASH",
@@ -368,7 +391,7 @@ class PassbookPage extends State<PassbookApp> {
               Container(
                 margin: EdgeInsets.only(left: 10),
                 child: Text(
-                  "₹ ${balance}",
+                  "${balance}",
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 25,
@@ -404,7 +427,7 @@ class PassbookPage extends State<PassbookApp> {
                       Icons.arrow_upward_rounded,
                       Colors.greenAccent,
                       "Income",
-                      income,
+                      money(income),
                     ),
                   ),
 
@@ -415,7 +438,7 @@ class PassbookPage extends State<PassbookApp> {
                       Icons.arrow_downward_rounded,
                       Colors.redAccent.shade100,
                       "Expense",
-                      expense,
+                      money(expense),
                     ),
                   ),
 
@@ -457,9 +480,7 @@ class PassbookPage extends State<PassbookApp> {
                     .toList(),
 
                 onSelected: (value) {
-                  setState(() {
-                    selectSort = value!;
-                  });
+                    changeOrder();
                 },
 
                 inputDecorationTheme: InputDecorationTheme(
@@ -590,8 +611,8 @@ class PassbookPage extends State<PassbookApp> {
           const SizedBox(width: 8),
           Text(
             (["Add Online", "Add CASH"].contains(method))
-                ? "+ ₹$amount"
-                : "- ₹$amount",
+                ? "+$amount"
+                : "-$amount",
             style: TextStyle(
               color: isIncome ? green : Colors.red.shade700,
               fontSize: 20,
@@ -629,7 +650,7 @@ Widget balanceItem(
       const SizedBox(height: 6),
 
       Text(
-        isMoney ? "₹${value}" : value.toString(),
+        isMoney ? "${value}" : value.toString(),
         style: const TextStyle(
           color: Colors.white,
           fontSize: 18,

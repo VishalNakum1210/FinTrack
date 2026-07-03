@@ -366,8 +366,8 @@ class _UserMainPageState extends State<UserMainPage> {
                       ? ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: records!.length > 15
-                              ? 15
+                          itemCount: records!.length > 5
+                              ? 5
                               : records!.length,
                           itemBuilder: (context, index) {
                             bool isIncome =
