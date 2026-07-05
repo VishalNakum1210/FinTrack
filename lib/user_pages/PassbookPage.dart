@@ -14,6 +14,7 @@ class PassbookPage extends State<PassbookApp> {
   int income = 0;
   int expense = 0;
   String selectSort = "Newest First";
+  String current_Sort = "Newest First";
   String last = "";
   int recordCount = 0;
   List<String> sortList = ["Newest First", "Last First"];
@@ -24,9 +25,8 @@ class PassbookPage extends State<PassbookApp> {
 
   void ShowHideBalance() {
     setState(() {
-      balance = balance != "*,**,***"
-          ? "*,**,***"
-          : money(income - expense);
+      last = "";
+      balance = balance != "*,**,***" ? "*,**,***" : money(income - expense);
     });
   }
 
@@ -72,10 +72,14 @@ class PassbookPage extends State<PassbookApp> {
     setState(() {});
   }
 
-  void changeOrder () {
-    records.reversed;
-    setState(() {
-    });
+  void changeOrder(String? value) {
+    if (current_Sort != value) {
+      current_Sort = value!;
+      records = records.reversed.toList();
+      setState(() {
+        last = "";
+      });
+    }
   }
 
   String money(int value) {
@@ -480,7 +484,7 @@ class PassbookPage extends State<PassbookApp> {
                     .toList(),
 
                 onSelected: (value) {
-                    changeOrder();
+                  changeOrder(value);
                 },
 
                 inputDecorationTheme: InputDecorationTheme(
