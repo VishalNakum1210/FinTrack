@@ -11,6 +11,7 @@ class PassbookApp extends StatefulWidget {
 }
 
 class PassbookPage extends State<PassbookApp> {
+  bool isLoading = true;
   int income = 0;
   int expense = 0;
   String selectSort = "Newest First";
@@ -47,6 +48,9 @@ class PassbookPage extends State<PassbookApp> {
   }
 
   Future<void> getDetails() async {
+    setState(() {
+      isLoading = true;
+    });
     SharedPreferences sp = await SharedPreferences.getInstance();
     String phone = sp.getString("phone_number")!;
     DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone");
@@ -69,7 +73,10 @@ class PassbookPage extends State<PassbookApp> {
     }
 
     records = (await allRecords(phone, "All"))!;
-    setState(() {});
+    setState(() {
+      records = records.reversed.toList();
+      isLoading = false;
+    });
   }
 
   void changeOrder(String? value) {
@@ -80,6 +87,22 @@ class PassbookPage extends State<PassbookApp> {
         last = "";
       });
     }
+  }
+
+  Future<void> deleteRecord(String key) async {
+    setState(() {
+      isLoading = true;
+    });
+
+    SharedPreferences sp = await SharedPreferences.getInstance();
+    String phone = sp.getString("phone_number")!;
+    DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone/$key");
+
+    await myref.remove();
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   String money(int value) {
@@ -155,53 +178,98 @@ class PassbookPage extends State<PassbookApp> {
         },
         child: const Icon(Icons.add, color: Colors.white, size: 34),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _searchRow(),
-            const SizedBox(height: 10),
-            _categoryChips(),
-            const SizedBox(height: 10),
-            _balanceCard(),
-            const SizedBox(height: 10),
-            _sortRow(),
-            const SizedBox(height: 10),
+      body: isLoading
+          ? Container(
+              child: Center(child: CircularProgressIndicator(color: green)),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _searchRow(),
+                  const SizedBox(height: 10),
+                  _categoryChips(),
+                  const SizedBox(height: 10),
+                  _balanceCard(),
+                  const SizedBox(height: 10),
+                  _sortRow(),
+                  const SizedBox(height: 10),
 
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: records.length,
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: records.length,
 
-              itemBuilder: (context, index) {
-                return Column(
-                  children: [
-                    checkDate(records[index]["Date"]),
-                    _transactionTile(
-                      icon: icon_name(records[index]["Category"]),
-                      iconColor: iconColor(records[index]["Category"]),
-                      bgColor: backgroundColor(records[index]["Category"]),
-                      title: records[index]["Category"]!,
-                      subtitle: records[index]["Description"]!,
-                      method: records[index]["Payment_Mode"]!,
-                      time: records[index]["Date"]!,
-                      amount: money(int.parse(records[index]["Amount"]!)),
-                      isIncome:
-                          [
-                            "Add CASH",
-                            "Add Online",
-                          ].contains(records[index]["Payment_Mode"])
-                          ? true
-                          : false,
-                    ),
-                  ],
-                );
-              },
+                    itemBuilder: (context, index) {
+                      return InkWell(
+                        child: Column(
+                          children: [
+                            checkDate(records[index]["Date"]),
+                            _transactionTile(
+                              icon: icon_name(records[index]["Category"]),
+                              iconColor: iconColor(records[index]["Category"]),
+                              bgColor: backgroundColor(
+                                records[index]["Category"],
+                              ),
+                              title: records[index]["Category"]!,
+                              subtitle: records[index]["Description"]!,
+                              method: records[index]["Payment_Mode"]!,
+                              time: records[index]["Date"]!,
+                              amount: money(
+                                int.parse(records[index]["Amount"]!),
+                              ),
+                              isIncome:
+                                  [
+                                    "Add CASH",
+                                    "Add Online",
+                                  ].contains(records[index]["Payment_Mode"])
+                                  ? true
+                                  : false,
+                            ),
+                          ],
+                        ),
+
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: const Text("Delete Record"),
+                              content: const Text(
+                                "Are you sure you want to delete this record?",
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text("Cancel"),
+                                ),
+
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () async {
+                                    Navigator.pop(context);
+                                    await deleteRecord(records[index]["key"]);
+                                  },
+                                  child: const Text("Delete"),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
     );
   }
 

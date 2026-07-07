@@ -1,4 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:intl/intl.dart';
 
 Future<List<Map<String, dynamic>>?> allRecords(
   String phone_number,
@@ -26,9 +27,13 @@ Future<List<Map<String, dynamic>>?> allRecords(
     if(result.isEmpty){
       return null;
     }
-    result.sort((a,b) => 
-      (b["timestamp"] as int).compareTo(a["timestamp"] as int)
-    );
+    final formatter = DateFormat("d/M/yyyy");
+    
+    result.sort((a, b) {
+    DateTime dateA = formatter.parse(a["Date"]!);
+    DateTime dateB = formatter.parse(b["Date"]!);
+    return dateA.compareTo(dateB);
+  });
     return result;
   }
   return null;
