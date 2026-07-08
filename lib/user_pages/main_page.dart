@@ -47,7 +47,7 @@ class _UserMainPageState extends State<UserMainPage> {
 
       allDetails = await getAllInformation(phoneNumber);
 
-      records = await allRecords(phoneNumber, "All");
+      records = (await allRecords(phoneNumber, "All"))?.reversed.toList();
 
       name = sp.getString("username") ?? "";
 

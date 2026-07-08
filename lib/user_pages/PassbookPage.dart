@@ -21,7 +21,7 @@ class PassbookPage extends State<PassbookApp> {
   List<String> sortList = ["Newest First", "Last First"];
   List<Map<String, dynamic>> records = [];
   String balance = "*,**,***";
-
+  String selectedCategory = "All";
   static const Color green = Color(0xFF8BC24A);
 
   void ShowHideBalance() {
@@ -96,7 +96,9 @@ class PassbookPage extends State<PassbookApp> {
 
     SharedPreferences sp = await SharedPreferences.getInstance();
     String phone = sp.getString("phone_number")!;
-    DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone/$key");
+    DatabaseReference myref = FirebaseDatabase.instance.ref(
+      "Expenses/$phone/$key",
+    );
 
     await myref.remove();
 
@@ -308,41 +310,50 @@ class PassbookPage extends State<PassbookApp> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _chip(Icons.grid_view_rounded, 'All', true, green),
-          _chip(Icons.arrow_downward, 'Expense', false, Colors.red),
-          _chip(Icons.arrow_upward, 'Income', false, Colors.green),
-          _chip(Icons.fastfood, 'Food', false, Colors.orange),
-          _chip(Icons.shopping_bag, 'Shopping', false, Colors.deepOrange),
-          _chip(Icons.more_horiz, 'More', false, Colors.black87),
+          _chip(Icons.grid_view_rounded, 'All', green),
+          _chip(Icons.arrow_downward, 'Expense', Colors.red),
+          _chip(Icons.arrow_upward, 'Income', Colors.green),
+          _chip(Icons.fastfood, 'Food', Colors.orange),
+          _chip(Icons.shopping_bag, 'Shopping', Colors.deepOrange),
+          _chip(Icons.more_horiz, 'More', Colors.black87),
         ],
       ),
     );
   }
 
-  Widget _chip(IconData icon, String label, bool selected, Color iconColor) {
-    return Container(
-      margin: const EdgeInsets.only(right: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFFF2FFF5) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: selected ? green : const Color(0xFFE8E8E8),
-          width: selected ? 1.5 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 15),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-            ),
+  Widget _chip(IconData icon, String label, Color iconColor) {
+    bool selected = selectedCategory == label;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedCategory = label;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFF2FFF5) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? green : const Color(0xFFE8E8E8),
+            width: selected ? 1.5 : 1,
           ),
-        ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 15),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
