@@ -14,22 +14,16 @@ class PassbookPage extends State<PassbookApp> {
   bool isLoading = true;
   int income = 0;
   int expense = 0;
+  int SpentCase = 0;
+  int SpentOnline = 0;
   String selectSort = "Newest First";
   String current_Sort = "Newest First";
   String last = "";
   int recordCount = 0;
   List<String> sortList = ["Newest First", "Last First"];
   List<Map<String, dynamic>> records = [];
-  String balance = "*,**,***";
   String selectedCategory = "All";
   static const Color green = Color(0xFF8BC24A);
-
-  void ShowHideBalance() {
-    setState(() {
-      last = "";
-      balance = balance != "*,**,***" ? "*,**,***" : money(income - expense);
-    });
-  }
 
   Widget checkDate(String date) {
     if (date != last) {
@@ -47,10 +41,15 @@ class PassbookPage extends State<PassbookApp> {
     return outputFormat.format(parsedDate);
   }
 
-  Future<void> getDetails() async {
+  Future<void> getDetails(String condition) async {
     setState(() {
       isLoading = true;
     });
+    income = 0;
+    expense = 0;
+    recordCount = 0;
+    SpentCase = 0;
+    SpentOnline = 0;
     SharedPreferences sp = await SharedPreferences.getInstance();
     String phone = sp.getString("phone_number")!;
     DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone");
@@ -61,18 +60,32 @@ class PassbookPage extends State<PassbookApp> {
       Map data = event.snapshot.value as Map;
 
       data.forEach(((key, value) {
-        recordCount++;
         if (["Add CASH", "Add Online"].contains(value["Payment_Mode"])) {
           income += int.parse(value["Amount"]);
         } else {
           expense += int.parse(value["Amount"]);
         }
+        if (condition == "All") {
+          recordCount++;
+        }
 
-        // records.add(Map<String, dynamic>.from(value));
+        if (value["Category"] == condition) {
+          recordCount++;
+          if (value["Payment_Mode"] == "Spent Cash") {
+            SpentCase += int.parse(value["Amount"]);
+          } else if (value["Payment_Mode"] == "Spent Online") {
+            SpentOnline += int.parse(value['Amount']);
+          }
+        }
       }));
     }
+    getRecords(condition);
+  }
 
-    records = (await allRecords(phone, "All"))!;
+  Future<void> getRecords(String condition) async {
+    SharedPreferences sp = await SharedPreferences.getInstance();
+    String phone = sp.getString("phone_number")!;
+    records = (await allRecords(phone, condition))!;
     setState(() {
       records = records.reversed.toList();
       isLoading = false;
@@ -118,7 +131,7 @@ class PassbookPage extends State<PassbookApp> {
   @override
   void initState() {
     super.initState();
-    getDetails();
+    getDetails("All");
   }
 
   @override
@@ -175,7 +188,7 @@ class PassbookPage extends State<PassbookApp> {
             MaterialPageRoute(builder: (context) => AddSpent()),
           );
           if (change) {
-            getDetails();
+            getDetails("All");
           }
         },
         child: const Icon(Icons.add, color: Colors.white, size: 34),
@@ -325,10 +338,8 @@ class PassbookPage extends State<PassbookApp> {
     bool selected = selectedCategory == label;
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedCategory = label;
-        });
+      onTap: () async {
+        await getDetails(label);
       },
       child: Container(
         margin: const EdgeInsets.only(right: 10),
@@ -408,99 +419,6 @@ class PassbookPage extends State<PassbookApp> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    height: 58,
-                    width: 58,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.15),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-
-                  const SizedBox(width: 15),
-
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Total Balance",
-                          style: TextStyle(color: Colors.white70, fontSize: 15),
-                        ),
-
-                        SizedBox(height: 4),
-
-                        Text(
-                          "Available Balance",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  Container(
-                    margin: EdgeInsets.only(right: 10),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.15),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: InkWell(
-                      onTap: () {
-                        ShowHideBalance();
-                      },
-                      child: Icon(
-                        Icons.visibility_outlined,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-
-              Container(
-                margin: EdgeInsets.only(left: 10),
-                child: Text(
-                  "${balance}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -.5,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              Container(
-                margin: EdgeInsets.only(left: 10),
-                child: Text(
-                  "Updated just now",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(.75),
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Divider(color: Colors.white.withOpacity(.20), thickness: 1),
-
               const SizedBox(height: 10),
 
               Row(
@@ -534,6 +452,30 @@ class PassbookPage extends State<PassbookApp> {
                       "Records",
                       recordCount,
                       isMoney: false,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
+              Row(
+                children: [
+                  Expanded(
+                    child: balanceItem(
+                      Icons.payments_rounded,
+                      Colors.orangeAccent,
+                      "Cash Exp.",
+                      money(SpentCase),
+                    ),
+                  ),
+
+                  Container(height: 45, width: 1, color: Colors.white24),
+
+                  Expanded(
+                    child: balanceItem(
+                      Icons.account_balance_wallet_rounded,
+                      Colors.lightBlueAccent,
+                      "Online Exp.",
+                      money(SpentOnline),
                     ),
                   ),
                 ],

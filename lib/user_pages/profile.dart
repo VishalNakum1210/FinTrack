@@ -325,3 +325,98 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 }
+// card change changes
+
+
+// Row(
+              //   children: [
+              //     Container(
+              //       height: 58,
+              //       width: 58,
+              //       decoration: BoxDecoration(
+              //         color: Colors.white.withOpacity(.15),
+              //         borderRadius: BorderRadius.circular(18),
+              //       ),
+              //       child: const Icon(
+              //         Icons.account_balance_wallet_rounded,
+              //         color: Colors.white,
+              //         size: 30,
+              //       ),
+              //     ),
+
+              //     const SizedBox(width: 15),
+
+              //     const Expanded(
+              //       child: Column(
+              //         crossAxisAlignment: CrossAxisAlignment.start,
+              //         children: [
+              //           Text(
+              //             "Total Balance",
+              //             style: TextStyle(color: Colors.white70, fontSize: 15),
+              //           ),
+
+              //           SizedBox(height: 4),
+
+              //           Text(
+              //             "Available Balance",
+              //             style: TextStyle(
+              //               color: Colors.white,
+              //               fontSize: 18,
+              //               fontWeight: FontWeight.w700,
+              //             ),
+              //           ),
+              //         ],
+              //       ),
+              //     ),
+
+              //     Container(
+              //       margin: EdgeInsets.only(right: 10),
+              //       padding: const EdgeInsets.all(10),
+              //       decoration: BoxDecoration(
+              //         color: Colors.white.withOpacity(.15),
+              //         borderRadius: BorderRadius.circular(15),
+              //       ),
+              //       child: InkWell(
+              //         onTap: () {
+              //           ShowHideBalance();
+              //         },
+              //         child: Icon(
+              //           Icons.visibility_outlined,
+              //           color: Colors.white,
+              //         ),
+              //       ),
+              //     ),
+              //   ],
+              // ),
+
+              // const SizedBox(height: 30),
+
+              // Container(
+              //   margin: EdgeInsets.only(left: 10),
+              //   child: Text(
+              //     "${balance}",
+              //     style: const TextStyle(
+              //       color: Colors.white,
+              //       fontSize: 25,
+              //       fontWeight: FontWeight.w900,
+              //       letterSpacing: -.5,
+              //     ),
+              //   ),
+              // ),
+
+              // const SizedBox(height: 6),
+
+              // Container(
+              //   margin: EdgeInsets.only(left: 10),
+              //   child: Text(
+              //     "Updated just now",
+              //     style: TextStyle(
+              //       color: Colors.white.withOpacity(.75),
+              //       fontSize: 13,
+              //     ),
+              //   ),
+              // ),
+
+              // const SizedBox(height: 10),
+
+              // Divider(color: Colors.white.withOpacity(.20), thickness: 1),
