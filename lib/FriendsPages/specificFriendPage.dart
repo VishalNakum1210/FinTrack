@@ -395,8 +395,7 @@ class _specificFriendPage extends State<Specificfriendpage> {
                                           foregroundColor: Colors.white,
                                         ),
                                         onPressed: () async {
-                                          
-
+                                          Navigator.pop(context);
                                           await deleteRecord(
                                             ExpensesRecords![index]["key"],
                                             ExpensesRecords![index]["Type"] ==

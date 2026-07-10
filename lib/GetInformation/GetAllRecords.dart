@@ -12,8 +12,28 @@ Future<List<Map<String, dynamic>>?> allRecords(
   List<Map<String, dynamic>> result = [];
   if (event.snapshot.value != null) {
     Map Data = event.snapshot.value as Map;
-
-    if (["Spent Cash", "Spent Online", "Spent Cash For ADA", "Spent Online For ADA", "Add CASH", "Add Online"].contains(Specific)) {
+    if ([
+      "Food",
+      "Shopping",
+      "Transport",
+      "Education",
+      "HealthCare",
+      "Entertainment",
+      "Add Money",
+    ].contains(Specific)) {
+      Data.forEach((key, value) {
+        if (value["Category"] == Specific) {
+          result.add(Map<String, dynamic>.from(value));
+        }
+      });
+    } else if ([
+      "Spent Cash",
+      "Spent Online",
+      "Spent Cash For ADA",
+      "Spent Online For ADA",
+      "Add CASH",
+      "Add Online",
+    ].contains(Specific)) {
       Data.forEach((key, value) {
         if (value["Payment_Mode"] == Specific) {
           result.add(Map<String, dynamic>.from(value));
@@ -24,16 +44,16 @@ Future<List<Map<String, dynamic>>?> allRecords(
         result.add(Map<String, dynamic>.from(value));
       });
     }
-    if(result.isEmpty){
+    if (result.isEmpty) {
       return null;
     }
     final formatter = DateFormat("d/M/yyyy");
-    
+
     result.sort((a, b) {
-    DateTime dateA = formatter.parse(a["Date"]!);
-    DateTime dateB = formatter.parse(b["Date"]!);
-    return dateA.compareTo(dateB);
-  });
+      DateTime dateA = formatter.parse(a["Date"]!);
+      DateTime dateB = formatter.parse(b["Date"]!);
+      return dateA.compareTo(dateB);
+    });
     return result;
   }
   return null;

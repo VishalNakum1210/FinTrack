@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:FinTrack/GetInformation/GetAllRecords.dart';
 import 'package:FinTrack/user_pages/add_spent.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -12,6 +14,7 @@ class PassbookApp extends StatefulWidget {
 
 class PassbookPage extends State<PassbookApp> {
   bool isLoading = true;
+  bool noRecords = true;
   int income = 0;
   int expense = 0;
   int SpentCase = 0;
@@ -69,7 +72,7 @@ class PassbookPage extends State<PassbookApp> {
           recordCount++;
         }
 
-        if (value["Category"] == condition) {
+        if (value["Category"] == condition || condition == "All") {
           recordCount++;
           if (value["Payment_Mode"] == "Spent Cash") {
             SpentCase += int.parse(value["Amount"]);
@@ -197,13 +200,33 @@ class PassbookPage extends State<PassbookApp> {
           ? Container(
               child: Center(child: CircularProgressIndicator(color: green)),
             )
+          : (noRecords)
+          ? Container(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _categoryChips(),
+                  const SizedBox(height: 10),
+                  _balanceCard(),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        "No Record Found!",
+                        style: TextStyle(color: green),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _searchRow(),
-                  const SizedBox(height: 10),
+                  // _searchRow(),
+                  // const SizedBox(height: 10),
                   _categoryChips(),
                   const SizedBox(height: 10),
                   _balanceCard(),
@@ -288,36 +311,6 @@ class PassbookPage extends State<PassbookApp> {
     );
   }
 
-  Widget _searchRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 58,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE0E0E0)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.search, color: Colors.grey, size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Search category or description...',
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _categoryChips() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -340,6 +333,9 @@ class PassbookPage extends State<PassbookApp> {
     return GestureDetector(
       onTap: () async {
         await getDetails(label);
+        setState(() {
+          selectedCategory = label;
+        });
       },
       child: Container(
         margin: const EdgeInsets.only(right: 10),
@@ -391,8 +387,8 @@ class PassbookPage extends State<PassbookApp> {
       child: Stack(
         children: [
           Positioned(
-            right: -35,
-            top: -35,
+            right: -50,
+            top: -50,
             child: Container(
               width: 130,
               height: 130,
