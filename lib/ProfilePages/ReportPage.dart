@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Reportpage extends StatefulWidget {
@@ -26,6 +27,9 @@ class _reportPage extends State<Reportpage> {
   List<Map> recentTransactions = [];
 
   Future<void> loadReportData() async {
+    setState(() {
+      isLoading = true;
+    });
     try {
       SharedPreferences sp = await SharedPreferences.getInstance();
 
@@ -59,7 +63,7 @@ class _reportPage extends State<Reportpage> {
           try {
             Map<String, dynamic> record = Map<String, dynamic>.from(value);
 
-            double amount = double.tryParse(record["Amount"].toString()) ?? 0;
+            double amount = double.parse(record["Amount"]);
 
             String paymentMode = record["Payment_Mode"]?.toString() ?? "";
 
@@ -78,6 +82,10 @@ class _reportPage extends State<Reportpage> {
             // Income
             if (paymentMode.contains("Add")) {
               totalIncome += amount;
+
+              if (amount > highestIncome) {
+                highestIncome = amount;
+              }
             }
 
             // Expense
@@ -195,14 +203,18 @@ class _reportPage extends State<Reportpage> {
     return "Needs Improvement";
   }
 
-  double get netFriendBalance {
-    return friendGiven - friendTaken;
-  }
-
   double get highestCategoryAmount {
     if (categoryTotals.isEmpty) return 0;
 
     return categoryTotals.values.reduce((a, b) => a > b ? a : b);
+  }
+
+  String money(num value) {
+    return NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹ ',
+      decimalDigits: 0,
+    ).format(value);
   }
 
   @override
@@ -232,292 +244,307 @@ class _reportPage extends State<Reportpage> {
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Balance Card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30),
-                gradient: LinearGradient(
-                  colors: [themeColor, themeColor.withOpacity(.75)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: themeColor.withOpacity(.25),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+      body: (isLoading)
+          ? Container(
+              child: Center(
+                child: CircularProgressIndicator(color: themeColor),
               ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Current Balance",
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    "₹${currentBalance.toStringAsFixed(0)}",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 34,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(Icons.trending_up, color: Colors.white),
-                      SizedBox(width: 5),
-                      Text(
-                        "${((healthScore) * 100).toStringAsFixed(0)}% healthy",
-                        style: TextStyle(color: Colors.white),
+                  // Balance Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      gradient: LinearGradient(
+                        colors: [themeColor, themeColor.withOpacity(.75)],
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: _cardDecoration(),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 70,
-                    height: 70,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          value: healthScore,
-                          color: themeColor,
-                          strokeWidth: 8,
-                        ),
-                        Text(
-                          "${(healthScore * 100).toStringAsFixed(0)}%",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: themeColor.withOpacity(.25),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Financial Health",
+                          "Current Balance",
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          "${money(currentBalance)}",
                           style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 34,
                             fontWeight: FontWeight.bold,
-                            fontSize: 17,
                           ),
                         ),
-                        SizedBox(height: 5),
-                        Text(healthText),
+                        SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Icon(Icons.trending_up, color: Colors.white),
+                            SizedBox(width: 5),
+                            Text(
+                              "${((healthScore) * 100).toStringAsFixed(0)}% healthy",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 20),
-            const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-            // Quick Insights
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "Quick Insights",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              childAspectRatio: 1.35,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              children: [
-                _insightCard(
-                  icon: Icons.shopping_bag,
-                  title: "Biggest Expense",
-                  value: topCategory,
-                ),
-                _insightCard(
-                  icon: Icons.monetization_on,
-                  title: "Highest Income",
-                  value: "₹${highestIncome.toStringAsFixed(0)}",
-                ),
-                _insightCard(
-                  icon: Icons.receipt_long,
-                  title: "Transactions",
-                  value: transactionCount.toString(),
-                ),
-                _insightCard(
-                  icon: Icons.calendar_month,
-                  title: "Active Days",
-                  value: recentTransactions.length.toString(),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // Top Categories
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "Top Categories",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            ...categoryTotals.entries.take(3).map((e) {
-              // double maxValue = categoryTotals.values.isEmpty
-              //     ? 1
-              //     : categoryTotals.values.reduce((a, b) => a > b ? a : b);
-
-              return _categoryTile(
-                themeColor: themeColor,
-                icon: Icons.category,
-                title: e.key,
-                amount: "₹${e.value.toStringAsFixed(0)}",
-                value: e.value / totalExpense,
-              );
-            }),
-
-            const SizedBox(height: 20),
-
-            // Friend Summary
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: _cardDecoration(),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.people, color: themeColor),
-                      const SizedBox(width: 10),
-                      const Text(
-                        "Friend Summary",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: _cardDecoration(),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 70,
+                          height: 70,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                value: healthScore,
+                                color: themeColor,
+                                strokeWidth: 8,
+                              ),
+                              Text(
+                                "${(healthScore * 100).toStringAsFixed(0)}%",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Financial Health",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
+                                ),
+                              ),
+                              SizedBox(height: 5),
+                              Text(healthText),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+                  const SizedBox(height: 20),
+
+                  // Quick Insights
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "Quick Insights",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.35,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    children: [
+                      _insightCard(
+                        icon: Icons.shopping_bag,
+                        title: "Biggest Expense",
+                        value: topCategory,
+                      ),
+                      _insightCard(
+                        icon: Icons.monetization_on,
+                        title: "Highest Income",
+                        value: "${money(highestIncome)}",
+                      ),
+                      _insightCard(
+                        icon: Icons.receipt_long,
+                        title: "Transactions",
+                        value: transactionCount.toString(),
+                      ),
+                      _insightCard(
+                        icon: Icons.calendar_month,
+                        title: "Active Days",
+                        value: recentTransactions.length.toString(),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 20),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Money You Get"),
-                      Text(
-                        "₹${friendGiven.toStringAsFixed(0)}",
-                        style: TextStyle(
-                          color: themeColor,
-                          fontWeight: FontWeight.bold,
-                        ),
+                  // Top Categories
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "Top Categories",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ],
+                    ),
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Money You Want To Give"),
-                      Text(
-                        "₹${friendTaken.toStringAsFixed(0)}",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const Divider(height: 25),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Net Balance",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        "₹${netFriendBalance.toStringAsFixed(0)}",
-                        style: TextStyle(
-                          color: themeColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Recent Activity
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: _cardDecoration(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Recent Activity",
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                  ),
-
-                  const SizedBox(height: 15),
-
-                  ...recentTransactions.take(5).map((record) {
-                    bool isExpense = record["payment"].toString().contains(
-                      "Spent",
-                    );
-
-                    return _activityTile(
-                      themeColor,
-                      isExpense ? Icons.arrow_upward : Icons.arrow_downward,
-                      record["category"].toString(),
-                      "${isExpense ? "-" : "+"}₹${record["amount"].toStringAsFixed(0)}",
-                      isExpense ? Colors.red : themeColor,
+                  ...categoryTotals.entries.take(3).map((e) {
+                    return _categoryTile(
+                      themeColor: themeColor,
+                      icon: Icons.category,
+                      title: e.key,
+                      amount: "${money(e.value)}",
+                      value: e.value / totalExpense,
                     );
                   }),
+
+                  const SizedBox(height: 20),
+
+                  // Friend Summary
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: _cardDecoration(),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.people, color: themeColor),
+                            const SizedBox(width: 10),
+                            const Text(
+                              "Friend Summary",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 17,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("Money You Get"),
+                            Text(
+                              "${money(friendGiven)}",
+                              style: TextStyle(
+                                color: themeColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text("Money You Want To Give"),
+                            Text(
+                              "${money(friendTaken)}",
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const Divider(height: 25),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Net Balance",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              money(friendGiven - friendTaken),
+                              style: TextStyle(
+                                color: (friendGiven < friendTaken)
+                                    ? Colors.red
+                                    : themeColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Recent Activity
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: _cardDecoration(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Recent Activity",
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        ...recentTransactions.take(5).map((record) {
+                          bool isExpense = record["payment"]
+                              .toString()
+                              .contains("Spent");
+
+                          return _activityTile(
+                            themeColor,
+                            isExpense
+                                ? Icons.arrow_upward
+                                : Icons.arrow_downward,
+                            record["category"].toString(),
+                            "${isExpense ? "-" : "+"}${money(record["amount"])}",
+                            isExpense ? Colors.red : themeColor,
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
                 ],
               ),
             ),
-
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
     );
   }
 

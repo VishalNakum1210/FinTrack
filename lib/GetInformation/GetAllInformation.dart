@@ -13,7 +13,6 @@ Future<List<String>> getAllInformation (String phone_number) async {
       String Mode = value["Payment_Mode"];
       int Amount = int.parse(value['Amount']);
       if(Mode == "Add CASH"){
-        print(value["Amount"]);
         Add_CASH += Amount;
       }
       else if (Mode == "Spent Cash" || Mode == "Spent Cash For ADA") {

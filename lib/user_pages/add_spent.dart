@@ -4,26 +4,28 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AddSpent extends StatefulWidget {
+  const AddSpent({super.key});
+
   @override
-  State<AddSpent> createState() => _addSpent();
+  State<AddSpent> createState() => _AddSpentState();
 }
 
-class _addSpent extends State<AddSpent> {
+class _AddSpentState extends State<AddSpent> {
   bool isLoading = false;
 
-  TextEditingController Camount = TextEditingController();
-  TextEditingController Cdescription = TextEditingController();
+  final TextEditingController amountController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
 
   DateTime selectedDate = DateTime.now();
 
-  List<String> PaymentMode = [
+  final List<String> paymentModes = [
     "Spent Online",
     "Spent Cash",
     "Add CASH",
     "Add Online",
   ];
 
-  List<String> Catagory = [
+  final List<String> categories = [
     "Shopping",
     "Food",
     "Transport",
@@ -35,12 +37,12 @@ class _addSpent extends State<AddSpent> {
   ];
 
   String selectedMode = "Select Payment mode";
-  String selectedCategory = "Select Catagory";
+  String selectedCategory = "Select Category";
 
   Future<void> pickDate() async {
     DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: selectedDate,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
@@ -53,13 +55,14 @@ class _addSpent extends State<AddSpent> {
   }
 
   void getAllDetails() async {
-    String amount = Camount.text.trim();
-    String description = Cdescription.text.trim();
+    String amount = amountController.text.trim();
+    String description = descriptionController.text.trim();
 
     if (amount.isEmpty ||
         description.isEmpty ||
         selectedMode == "Select Payment mode") {
       Fluttertoast.showToast(msg: "Please Enter All Values");
+
       return;
     }
 
@@ -68,7 +71,7 @@ class _addSpent extends State<AddSpent> {
     });
 
     try {
-      await StoreSpentOnDataBase(
+      await storeSpentOnDatabase(
         amount,
         description,
         selectedMode,
@@ -76,11 +79,11 @@ class _addSpent extends State<AddSpent> {
         selectedCategory,
       );
 
-      Fluttertoast.showToast(msg: "Expense added successfully");
+      Fluttertoast.showToast(msg: "Transaction Added Successfully");
 
       Navigator.pop(context, true);
     } catch (e) {
-      Fluttertoast.showToast(msg: "Failed to save expense");
+      Fluttertoast.showToast(msg: "Failed to save transaction");
     }
 
     if (mounted) {
@@ -90,240 +93,242 @@ class _addSpent extends State<AddSpent> {
     }
   }
 
-  Future<void> StoreSpentOnDataBase(
-    String Amount,
-    String Description,
-    String selectedMode,
-    String selected_date,
-    String selectedCategory,
+  Future<void> storeSpentOnDatabase(
+    String amount,
+    String description,
+    String mode,
+    String date,
+    String category,
   ) async {
     SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone_number = sp.getString("phone_number")!;
-    DatabaseReference myref = FirebaseDatabase.instance.ref(
-      "Expenses/$phone_number",
-    );
-    String key = myref.push().key!;
-    await myref.child(key).set({
+
+    String phone = sp.getString("phone_number")!;
+
+    DatabaseReference ref = FirebaseDatabase.instance.ref("Expenses/$phone");
+
+    String key = ref.push().key!;
+
+    await ref.child(key).set({
       "key": key,
-      "phone_number": phone_number,
-      "Amount": Amount,
-      "Description": Description,
-      "Payment_Mode": selectedMode,
-      "Date": selected_date,
-      "Category": selectedCategory,
+      "phone_number": phone,
+      "Amount": amount,
+      "Description": description,
+      "Payment_Mode": mode,
+      "Date": date,
+      "Category": category,
       "timestamp": ServerValue.timestamp,
     });
+  }
+
+  InputDecoration inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+
+      enabledBorder: OutlineInputBorder(
+        borderSide: BorderSide(width: 3, color: Color(0xFF8BC24A)),
+
+        borderRadius: BorderRadius.circular(20),
+      ),
+
+      focusedBorder: OutlineInputBorder(
+        borderSide: BorderSide(width: 3, color: Color(0xFF8BC24A)),
+
+        borderRadius: BorderRadius.circular(20),
+      ),
+    );
+  }
+
+  InputDecorationTheme inputTheme() {
+    return InputDecorationTheme(
+      enabledBorder: OutlineInputBorder(
+        borderSide: BorderSide(width: 3, color: Color(0xFF8BC24A)),
+
+        borderRadius: BorderRadius.circular(20),
+      ),
+
+      focusedBorder: OutlineInputBorder(
+        borderSide: BorderSide(width: 3, color: Color(0xFF8BC24A)),
+
+        borderRadius: BorderRadius.circular(20),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "Add Record",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight(800)),
+        title: const Text(
+          "Add Transaction",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
         ),
-        iconTheme: IconThemeData(color: Colors.white),
-        backgroundColor: Color(0xFF8BC24A),
+
+        iconTheme: const IconThemeData(color: Colors.white),
+
+        backgroundColor: const Color(0xFF8BC24A),
       ),
+
       body: Stack(
         children: [
-          Container(color: Color(0xFFE4D5A3)),
+          Container(color: const Color(0xFFE4D5A3)),
+
           Positioned(
             bottom: -200,
+
+            left: -50,
+
             child: Container(
               height: 500,
+
               width: 700,
-              decoration: BoxDecoration(
+
+              decoration: const BoxDecoration(
                 color: Color(0xff8BC24A),
+
                 shape: BoxShape.circle,
               ),
             ),
           ),
-          Positioned(
-            child: Center(
-              child: Container(
-                height: 500,
-                margin: EdgeInsets.symmetric(horizontal: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                ),
 
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          controller: Camount,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: "Amount",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
+          Center(
+            child: Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+
+              padding: const EdgeInsets.all(20),
+
+              decoration: BoxDecoration(
+                color: Colors.white,
+
+                borderRadius: BorderRadius.circular(30),
+              ),
+
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+
+                  children: [
+                    TextField(
+                      controller: amountController,
+
+                      keyboardType: TextInputType.number,
+
+                      decoration: inputDecoration("Enter Amount"),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    TextField(
+                      controller: descriptionController,
+
+                      decoration: inputDecoration("Enter Description"),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    TextField(
+                      readOnly: true,
+
+                      decoration: inputDecoration(
+                        "Date : ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
                       ),
 
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          controller: Cdescription,
-                          decoration: InputDecoration(
-                            hintText: "Description",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
-                      ),
+                      onTap: pickDate,
+                    ),
 
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            hintText:
-                                "Selected: ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          onTap: () => pickDate(),
-                        ),
-                      ),
+                    const SizedBox(height: 20),
 
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: DropdownMenu(
-                          initialSelection: selectedCategory,
-                          label: Text("Selected Categories"),
-                          dropdownMenuEntries: Catagory.map(
+                    DropdownMenu<String>(
+                      width: MediaQuery.of(context).size.width - 80,
+
+                      initialSelection: selectedCategory,
+
+                      label: const Text("Select Category"),
+
+                      dropdownMenuEntries: categories
+                          .map(
                             (item) =>
                                 DropdownMenuEntry(value: item, label: item),
-                          ).toList(),
+                          )
+                          .toList(),
 
-                          onSelected: (value) {
-                            setState(() {
-                              selectedCategory = value!;
-                            });
-                          },
+                      onSelected: (value) {
+                        setState(() {
+                          selectedCategory = value!;
+                        });
+                      },
 
-                          inputDecorationTheme: InputDecorationTheme(
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
-                      ),
+                      inputDecorationTheme: inputTheme(),
+                    ),
 
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: DropdownMenu<String>(
-                          initialSelection: selectedMode,
-                          label: const Text("Select Payment Mode"),
-                          dropdownMenuEntries: PaymentMode.map(
+                    const SizedBox(height: 20),
+
+                    DropdownMenu<String>(
+                      width: MediaQuery.of(context).size.width - 80,
+
+                      initialSelection: selectedMode,
+
+                      label: const Text("Select Payment Mode"),
+
+                      dropdownMenuEntries: paymentModes
+                          .map(
                             (item) =>
                                 DropdownMenuEntry(value: item, label: item),
-                          ).toList(),
+                          )
+                          .toList(),
 
-                          onSelected: (value) {
-                            setState(() {
-                              selectedMode = value!;
-                            });
-                          },
+                      onSelected: (value) {
+                        setState(() {
+                          selectedMode = value!;
+                        });
+                      },
 
-                          inputDecorationTheme: InputDecorationTheme(
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                      inputDecorationTheme: inputTheme(),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    SizedBox(
+                      width: double.infinity,
+
+                      child: ElevatedButton(
+                        onPressed: getAllDetails,
+
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8BC24A),
+
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+
+                        child: const Text(
+                          "Save",
+
+                          style: TextStyle(
+                            color: Colors.white,
+
+                            fontSize: 18,
+
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-
-                      Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.only(left: 40, right: 40, top: 30),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            getAllDetails();
-                          },
-                          child: Text(
-                            "Add Spent Details",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF8BC24A),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+
           if (isLoading)
             Container(
               color: Colors.black87,
-              child: Center(
+
+              child: const Center(
                 child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
               ),
             ),

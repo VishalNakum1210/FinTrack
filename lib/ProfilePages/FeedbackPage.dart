@@ -90,7 +90,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
         Icons.star_rounded,
         size: 38,
         color: index < rating
-            ? themeColor
+            ? Colors.amber
             : Colors.grey.shade300,
       ),
     );

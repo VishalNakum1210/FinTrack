@@ -1,7 +1,8 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 
-Future<List<Map<String, dynamic>>?> allRecords(
+Future<List<Map<String, dynamic>>> allRecords(
   String phone_number,
   String Specific,
 ) async {
@@ -45,7 +46,7 @@ Future<List<Map<String, dynamic>>?> allRecords(
       });
     }
     if (result.isEmpty) {
-      return null;
+      return [];
     }
     final formatter = DateFormat("d/M/yyyy");
 
@@ -56,5 +57,5 @@ Future<List<Map<String, dynamic>>?> allRecords(
     });
     return result;
   }
-  return null;
+  return [];
 }

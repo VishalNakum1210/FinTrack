@@ -4,7 +4,9 @@ import 'package:FinTrack/ProfilePages/FeedbackPage.dart';
 import 'package:FinTrack/ProfilePages/PersonalInformationPage.dart';
 import 'package:FinTrack/ProfilePages/ReportPage.dart';
 import 'package:FinTrack/authantication/login_page.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,6 +47,30 @@ class _ProfilePageState extends State<ProfilePage> {
     });
     SharedPreferences sp = await SharedPreferences.getInstance();
     await sp.clear();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => LoginPage()),
+    );
+  }
+
+  Future<void> DeleteUser() async {
+    setState(() {
+      isLoading = true;
+    });
+    SharedPreferences sp = await SharedPreferences.getInstance();
+    String phone = sp.getString("phone_number")!;
+    DatabaseReference myref = FirebaseDatabase.instance.ref("Friends/$phone");
+    await myref.remove();
+
+    myref = FirebaseDatabase.instance.ref("Expenses/$phone");
+    await myref.remove();
+
+    myref = FirebaseDatabase.instance.ref("user_details/$phone");
+    await myref.remove();
+
+    Fluttertoast.showToast(msg: "Account is Deleted successfully");
+    sp.clear();
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => LoginPage()),
@@ -290,133 +316,130 @@ class _ProfilePageState extends State<ProfilePage> {
                     },
                   ),
 
-                  const SizedBox(height: 20),
+                  Container(
+                    padding: EdgeInsets.only(left: 10, right: 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 55,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    title: const Text("Logout Account"),
+                                    content: const Text(
+                                      "Are you sure you want to Logout this Account?",
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                        },
+                                        child: const Text("Cancel"),
+                                      ),
 
-                  /// Logout Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Logout();
-                      },
-                      icon: const Icon(Icons.logout),
-                      label: const Text(
-                        "Logout",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        onPressed: () {
+                                          Logout();
+                                        },
+                                        child: const Text("Logout"),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.logout),
+                              label: const Text(
+                                "Logout",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
+
+                        SizedBox(width: 10),
+
+                        Expanded(
+                          child: SizedBox(
+                            height: 55,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    title: const Text("Delete Account"),
+                                    content: const Text(
+                                      "Are you sure you want to delete this Account?",
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                        },
+                                        child: const Text("Cancel"),
+                                      ),
+
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        onPressed: () async {
+                                          Navigator.pop(context);
+                                          await DeleteUser();
+                                        },
+                                        child: const Text("Delete"),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.delete),
+                              label: const Text(
+                                "Delete",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 20),
                 ],
               ),
             ),
     );
   }
 }
-// card change changes
-
-
-// Row(
-              //   children: [
-              //     Container(
-              //       height: 58,
-              //       width: 58,
-              //       decoration: BoxDecoration(
-              //         color: Colors.white.withOpacity(.15),
-              //         borderRadius: BorderRadius.circular(18),
-              //       ),
-              //       child: const Icon(
-              //         Icons.account_balance_wallet_rounded,
-              //         color: Colors.white,
-              //         size: 30,
-              //       ),
-              //     ),
-
-              //     const SizedBox(width: 15),
-
-              //     const Expanded(
-              //       child: Column(
-              //         crossAxisAlignment: CrossAxisAlignment.start,
-              //         children: [
-              //           Text(
-              //             "Total Balance",
-              //             style: TextStyle(color: Colors.white70, fontSize: 15),
-              //           ),
-
-              //           SizedBox(height: 4),
-
-              //           Text(
-              //             "Available Balance",
-              //             style: TextStyle(
-              //               color: Colors.white,
-              //               fontSize: 18,
-              //               fontWeight: FontWeight.w700,
-              //             ),
-              //           ),
-              //         ],
-              //       ),
-              //     ),
-
-              //     Container(
-              //       margin: EdgeInsets.only(right: 10),
-              //       padding: const EdgeInsets.all(10),
-              //       decoration: BoxDecoration(
-              //         color: Colors.white.withOpacity(.15),
-              //         borderRadius: BorderRadius.circular(15),
-              //       ),
-              //       child: InkWell(
-              //         onTap: () {
-              //           ShowHideBalance();
-              //         },
-              //         child: Icon(
-              //           Icons.visibility_outlined,
-              //           color: Colors.white,
-              //         ),
-              //       ),
-              //     ),
-              //   ],
-              // ),
-
-              // const SizedBox(height: 30),
-
-              // Container(
-              //   margin: EdgeInsets.only(left: 10),
-              //   child: Text(
-              //     "${balance}",
-              //     style: const TextStyle(
-              //       color: Colors.white,
-              //       fontSize: 25,
-              //       fontWeight: FontWeight.w900,
-              //       letterSpacing: -.5,
-              //     ),
-              //   ),
-              // ),
-
-              // const SizedBox(height: 6),
-
-              // Container(
-              //   margin: EdgeInsets.only(left: 10),
-              //   child: Text(
-              //     "Updated just now",
-              //     style: TextStyle(
-              //       color: Colors.white.withOpacity(.75),
-              //       fontSize: 13,
-              //     ),
-              //   ),
-              // ),
-
-              // const SizedBox(height: 10),
-
-              // Divider(color: Colors.white.withOpacity(.20), thickness: 1),

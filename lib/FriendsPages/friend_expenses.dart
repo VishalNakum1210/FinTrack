@@ -196,7 +196,7 @@ class _friendPage extends State<FriendPage> {
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => AddFriends()),
-                    );
+                    ) ?? false;
 
                     if (result == true) {
                       getDetails();

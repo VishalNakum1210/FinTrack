@@ -564,9 +564,9 @@ class _UserMainPageState extends State<UserMainPage> {
           final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => AddSpent()),
-          );
+          ) ?? false;
 
-          if (result == true) {
+          if (result) {
             getDetails();
           }
         },

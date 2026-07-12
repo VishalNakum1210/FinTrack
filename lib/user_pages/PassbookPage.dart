@@ -14,7 +14,7 @@ class PassbookApp extends StatefulWidget {
 
 class PassbookPage extends State<PassbookApp> {
   bool isLoading = true;
-  bool noRecords = true;
+  bool noRecords = false;
   int income = 0;
   int expense = 0;
   int SpentCase = 0;
@@ -68,10 +68,6 @@ class PassbookPage extends State<PassbookApp> {
         } else {
           expense += int.parse(value["Amount"]);
         }
-        if (condition == "All") {
-          recordCount++;
-        }
-
         if (value["Category"] == condition || condition == "All") {
           recordCount++;
           if (value["Payment_Mode"] == "Spent Cash") {
@@ -89,10 +85,18 @@ class PassbookPage extends State<PassbookApp> {
     SharedPreferences sp = await SharedPreferences.getInstance();
     String phone = sp.getString("phone_number")!;
     records = (await allRecords(phone, condition))!;
-    setState(() {
-      records = records.reversed.toList();
-      isLoading = false;
-    });
+    if (records.isEmpty) {
+      setState(() {
+        isLoading = false;
+        noRecords = true;
+      });
+    } else {
+      setState(() {
+        records = records.reversed.toList();
+        isLoading = false;
+        noRecords = false;
+      });
+    }
   }
 
   void changeOrder(String? value) {
@@ -317,11 +321,18 @@ class PassbookPage extends State<PassbookApp> {
       child: Row(
         children: [
           _chip(Icons.grid_view_rounded, 'All', green),
-          _chip(Icons.arrow_downward, 'Expense', Colors.red),
-          _chip(Icons.arrow_upward, 'Income', Colors.green),
-          _chip(Icons.fastfood, 'Food', Colors.orange),
-          _chip(Icons.shopping_bag, 'Shopping', Colors.deepOrange),
-          _chip(Icons.more_horiz, 'More', Colors.black87),
+          _chip(icon_name("Food"), 'Food', iconColor("Food")),
+          _chip(icon_name("Shopping"), 'Shopping', iconColor("Shopping")),
+          _chip(icon_name("Transport"), 'Transport', iconColor("Transport")),
+          _chip(icon_name("Education"), 'Education', iconColor("Education")),
+          _chip(icon_name("HealthCare"), 'HealthCare', iconColor("HealthCare")),
+          _chip(
+            icon_name("Entertainment"),
+            'Entertainment',
+            iconColor("Entertainment"),
+          ),
+          _chip(icon_name("Add Money"), 'Add Money', iconColor("Add Money")),
+          _chip(Icons.more_horiz, 'Other', iconColor("other")),
         ],
       ),
     );
@@ -341,10 +352,10 @@ class PassbookPage extends State<PassbookApp> {
         margin: const EdgeInsets.only(right: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFF2FFF5) : Colors.white,
+          color: selected ? backgroundColor(label) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? green : const Color(0xFFE8E8E8),
+            color: selected ? iconColor : const Color(0xFFE8E8E8),
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -356,7 +367,7 @@ class PassbookPage extends State<PassbookApp> {
               label,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
           ],
@@ -468,7 +479,7 @@ class PassbookPage extends State<PassbookApp> {
 
                   Expanded(
                     child: balanceItem(
-                      Icons.account_balance_wallet_rounded,
+                      Icons.payment_rounded,
                       Colors.lightBlueAccent,
                       "Online Exp.",
                       money(SpentOnline),
@@ -687,7 +698,7 @@ IconData icon_name(String Payment_Mode) {
     case "Shopping":
       return Icons.shopping_bag_rounded;
     case "Food":
-      return Icons.restaurant_rounded;
+      return Icons.fastfood;
     case "Transport":
       return Icons.directions_bus_rounded;
     case "Education":
@@ -706,7 +717,7 @@ IconData icon_name(String Payment_Mode) {
 Color iconColor(String category) {
   switch (category.trim()) {
     case "Shopping":
-      return const Color(0xFF7C3AED); // Purple
+      return Colors.deepOrange; // Purple
 
     case "Food":
       return const Color(0xFFFF9800); // Orange
@@ -735,7 +746,7 @@ Color iconColor(String category) {
 Color backgroundColor(String category) {
   switch (category.trim()) {
     case "Shopping":
-      return const Color(0xFFF3E5F5); // Light Purple
+      return const Color.fromARGB(39, 255, 86, 34); // Light Purple
 
     case "Food":
       return const Color(0xFFFFF3E0); // Light Orange

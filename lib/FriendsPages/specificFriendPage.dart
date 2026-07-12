@@ -36,7 +36,6 @@ class _specificFriendPage extends State<Specificfriendpage> {
         ExpensesRecords!.add(Map<String, dynamic>.from(value));
       });
     }
-    print(friendDetails[0]);
     setState(() {
       isLoading = false;
     });
@@ -138,7 +137,7 @@ class _specificFriendPage extends State<Specificfriendpage> {
               builder: (context) =>
                   AddFriendExpenses(friend_number: widget.friend_number),
             ),
-          );
+          ) ?? false;
 
           if (result == true) {
             getDetails();

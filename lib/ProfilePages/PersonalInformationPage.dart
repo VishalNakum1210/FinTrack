@@ -178,7 +178,7 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
                           MaterialPageRoute(
                             builder: (context) => EditInformationPage(),
                           ),
-                        );
+                        ) ?? false;
 
                         if(result){
                           getDetails();
