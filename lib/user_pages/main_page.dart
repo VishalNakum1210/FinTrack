@@ -47,7 +47,7 @@ class _UserMainPageState extends State<UserMainPage> {
 
       allDetails = await getAllInformation(phoneNumber);
 
-      records = (await allRecords(phoneNumber, "All"))?.reversed.toList();
+      records = (await allRecords(phoneNumber, "All")).reversed.toList();
 
       name = sp.getString("username") ?? "";
 
@@ -203,12 +203,12 @@ class _UserMainPageState extends State<UserMainPage> {
                       borderRadius: BorderRadius.circular(28),
 
                       gradient: LinearGradient(
-                        colors: [themeColor, themeColor.withOpacity(.75)],
+                        colors: [themeColor, themeColor.withValues(alpha: .75)],
                       ),
 
                       boxShadow: [
                         BoxShadow(
-                          color: themeColor.withOpacity(.25),
+                          color: themeColor.withValues(alpha: .25),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -366,9 +366,7 @@ class _UserMainPageState extends State<UserMainPage> {
                       ? ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: records!.length > 5
-                              ? 5
-                              : records!.length,
+                          itemCount: records!.length > 5 ? 5 : records!.length,
                           itemBuilder: (context, index) {
                             bool isIncome =
                                 records![index]["Payment_Mode"] == "Add CASH" ||
@@ -392,7 +390,7 @@ class _UserMainPageState extends State<UserMainPage> {
 
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(.05),
+                                    color: Colors.black.withValues(alpha: .05),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -404,8 +402,8 @@ class _UserMainPageState extends State<UserMainPage> {
                                   CircleAvatar(
                                     radius: 24,
                                     backgroundColor: isIncome
-                                        ? Colors.green.withOpacity(.12)
-                                        : Colors.red.withOpacity(.12),
+                                        ? Colors.green.withValues(alpha: .12)
+                                        : Colors.red.withValues(alpha: .12),
 
                                     child: Icon(
                                       isIncome
@@ -461,7 +459,9 @@ class _UserMainPageState extends State<UserMainPage> {
                                           ),
 
                                           decoration: BoxDecoration(
-                                            color: themeColor.withOpacity(.12),
+                                            color: themeColor.withValues(
+                                              alpha: .12,
+                                            ),
 
                                             borderRadius: BorderRadius.circular(
                                               20,
@@ -542,7 +542,7 @@ class _UserMainPageState extends State<UserMainPage> {
 
           if (isLoading)
             Container(
-              color: Colors.black.withOpacity(.25),
+              color: Colors.black.withValues(alpha: .25),
 
               child: Center(
                 child: Container(
@@ -561,10 +561,12 @@ class _UserMainPageState extends State<UserMainPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddSpent()),
-          ) ?? false;
+          final result =
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AddSpent()),
+              ) ??
+              false;
 
           if (result) {
             getDetails();
@@ -596,7 +598,7 @@ class _UserMainPageState extends State<UserMainPage> {
 
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.05),
+            color: Colors.black.withValues(alpha: .05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -610,7 +612,7 @@ class _UserMainPageState extends State<UserMainPage> {
           CircleAvatar(
             radius: 22,
 
-            backgroundColor: color.withOpacity(.12),
+            backgroundColor: color.withValues(alpha: .12),
 
             child: Icon(icon, color: color),
           ),
@@ -646,7 +648,7 @@ class _UserMainPageState extends State<UserMainPage> {
 
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.05),
+            color: Colors.black.withValues(alpha: .05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

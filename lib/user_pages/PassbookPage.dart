@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:FinTrack/GetInformation/GetAllRecords.dart';
 import 'package:FinTrack/user_pages/add_spent.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -84,7 +82,7 @@ class PassbookPage extends State<PassbookApp> {
   Future<void> getRecords(String condition) async {
     SharedPreferences sp = await SharedPreferences.getInstance();
     String phone = sp.getString("phone_number")!;
-    records = (await allRecords(phone, condition))!;
+    records = (await allRecords(phone, condition));
     if (records.isEmpty) {
       setState(() {
         isLoading = false;
@@ -389,7 +387,7 @@ class PassbookPage extends State<PassbookApp> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(.25),
+            color: Colors.green.withValues(alpha: .25),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -404,7 +402,7 @@ class PassbookPage extends State<PassbookApp> {
               width: 130,
               height: 130,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.08),
+                color: Colors.white.withValues(alpha: .08),
                 shape: BoxShape.circle,
               ),
             ),
@@ -417,7 +415,7 @@ class PassbookPage extends State<PassbookApp> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.05),
+                color: Colors.white.withValues(alpha: .05),
                 shape: BoxShape.circle,
               ),
             ),
@@ -582,7 +580,7 @@ class PassbookPage extends State<PassbookApp> {
         border: Border.all(color: const Color(0xFFE8E8E8)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 5,
             offset: const Offset(0, 2),
           ),

@@ -20,14 +20,14 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
 
   void check_user_details() async {
-    String phone_number = username.text;
-    String password_user = password.text;
+    String phoneNumber = username.text;
+    String passwordUser = password.text;
 
-    if (phone_number == "" || password_user == "") {
+    if (phoneNumber == "" || passwordUser == "") {
       Fluttertoast.showToast(msg: "Enter All Requried Details");
       return;
     }
-    if (phone_number.length != 10) {
+    if (phoneNumber.length != 10) {
       Fluttertoast.showToast(msg: "Invalid Phone number !!!");
       return;
     }
@@ -37,15 +37,15 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final MyRef = FirebaseDatabase.instance.ref("user_details/$phone_number");
+      final MyRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
       DatabaseEvent event = await MyRef.once();
 
       if (event.snapshot.value != null) {
         Map values = event.snapshot.value as Map;
-        password_user = hashPassword(password_user);
-        if (password_user == values["password"]) {
+        passwordUser = hashPassword(passwordUser);
+        if (passwordUser == values["password"]) {
           Fluttertoast.showToast(msg: "Login successfully");
-          await Save_data(values["name"], phone_number, values["email"]);
+          await Save_data(values["name"], phoneNumber, values["email"]);
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => NavPageSelector()),

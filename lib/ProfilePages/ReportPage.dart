@@ -261,11 +261,11 @@ class _reportPage extends State<Reportpage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(30),
                       gradient: LinearGradient(
-                        colors: [themeColor, themeColor.withOpacity(.75)],
+                        colors: [themeColor, themeColor.withValues(alpha: .75)],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: themeColor.withOpacity(.25),
+                          color: themeColor.withValues(alpha: .25),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -554,7 +554,7 @@ class _reportPage extends State<Reportpage> {
       borderRadius: BorderRadius.circular(22),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(.05),
+          color: Colors.black.withValues(alpha: .05),
           blurRadius: 12,
           offset: const Offset(0, 4),
         ),
@@ -605,7 +605,7 @@ class _reportPage extends State<Reportpage> {
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundColor: themeColor.withOpacity(.15),
+                backgroundColor: themeColor.withValues(alpha: .15),
                 child: Icon(icon, color: themeColor, size: 18),
               ),
               const SizedBox(width: 10),
@@ -623,7 +623,7 @@ class _reportPage extends State<Reportpage> {
             value: value,
             minHeight: 8,
             borderRadius: BorderRadius.circular(20),
-            backgroundColor: themeColor.withOpacity(.15),
+            backgroundColor: themeColor.withValues(alpha: .15),
             valueColor: AlwaysStoppedAnimation(themeColor),
           ),
         ],

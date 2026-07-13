@@ -13,11 +13,9 @@ class FeedbackPage extends StatefulWidget {
 class _FeedbackPageState extends State<FeedbackPage> {
   final Color themeColor = const Color(0xFF8BC24A);
 
-  final TextEditingController feedbackController =
-      TextEditingController();
+  final TextEditingController feedbackController = TextEditingController();
 
-  final TextEditingController emailController =
-      TextEditingController();
+  final TextEditingController emailController = TextEditingController();
 
   String selectedType = "Suggestion";
   int rating = 0;
@@ -25,11 +23,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
   Future<void> submitFeedback() async {
     if (feedbackController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please enter feedback"),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Please enter feedback")));
       return;
     }
 
@@ -38,11 +34,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
     });
 
     try {
-      SharedPreferences sp =
-          await SharedPreferences.getInstance();
+      SharedPreferences sp = await SharedPreferences.getInstance();
 
-      String phoneNumber =
-          sp.getString("phone_number") ?? "";
+      String phoneNumber = sp.getString("phone_number") ?? "";
 
       DatabaseReference ref = FirebaseDatabase.instance.ref(
         "userUpdates/$phoneNumber",
@@ -65,13 +59,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
         selectedType = "Suggestion";
       });
 
-      Fluttertoast.showToast(
-        msg: "Thank you for your feedback ❤️",
-      );
+      Fluttertoast.showToast(msg: "Thank you for your feedback ❤️");
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: "Error : $e",
-      );
+      Fluttertoast.showToast(msg: "Error : $e");
     }
 
     setState(() {
@@ -89,9 +79,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
       icon: Icon(
         Icons.star_rounded,
         size: 38,
-        color: index < rating
-            ? Colors.amber
-            : Colors.grey.shade300,
+        color: index < rating ? Colors.amber : Colors.grey.shade300,
       ),
     );
   }
@@ -104,16 +92,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
       contentPadding: const EdgeInsets.all(16),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(
-          color: themeColor.withOpacity(0.25),
-        ),
+        borderSide: BorderSide(color: themeColor.withValues(alpha: 0.25)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(
-          color: themeColor,
-          width: 2,
-        ),
+        borderSide: BorderSide(color: themeColor, width: 2),
       ),
     );
   }
@@ -130,9 +113,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
         foregroundColor: Colors.white,
         title: const Text(
           "Feedback & Suggestions",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
 
@@ -148,19 +129,12 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    themeColor,
-                    themeColor.withOpacity(0.75),
-                  ],
+                  colors: [themeColor, themeColor.withValues(alpha: 0.75)],
                 ),
               ),
               child: Column(
                 children: const [
-                  Icon(
-                    Icons.feedback_rounded,
-                    color: Colors.white,
-                    size: 55,
-                  ),
+                  Icon(Icons.feedback_rounded, color: Colors.white, size: 55),
                   SizedBox(height: 12),
                   Text(
                     "We Value Your Feedback",
@@ -175,10 +149,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   Text(
                     "Help us improve the app by sharing your suggestions and experiences.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ],
               ),
@@ -193,51 +164,39 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
-                    color:
-                        themeColor.withOpacity(0.08),
+                    color: themeColor.withValues(alpha: 0.08),
                     blurRadius: 15,
                     offset: const Offset(0, 5),
                   ),
                 ],
               ),
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     "Rate Your Experience",
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
 
                   const SizedBox(height: 10),
 
                   Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.center,
-                    children: List.generate(
-                      5,
-                      (index) => buildStar(index),
-                    ),
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) => buildStar(index)),
                   ),
 
                   const SizedBox(height: 20),
 
                   const Text(
                     "Feedback Type",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
 
                   const SizedBox(height: 8),
 
                   DropdownButtonFormField<String>(
-                    value: selectedType,
-                    decoration:
-                        inputDecoration("Select Type"),
+                    initialValue: selectedType,
+                    decoration: inputDecoration("Select Type"),
                     items: const [
                       DropdownMenuItem(
                         value: "Suggestion",
@@ -251,10 +210,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                         value: "Feature Request",
                         child: Text("Feature Request"),
                       ),
-                      DropdownMenuItem(
-                        value: "Other",
-                        child: Text("Other"),
-                      ),
+                      DropdownMenuItem(value: "Other", child: Text("Other")),
                     ],
                     onChanged: (value) {
                       setState(() {
@@ -267,9 +223,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
                   const Text(
                     "Your Feedback",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
 
                   const SizedBox(height: 8),
@@ -277,29 +231,22 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   TextField(
                     controller: feedbackController,
                     maxLines: 6,
-                    decoration: inputDecoration(
-                      "Write your feedback here...",
-                    ),
+                    decoration: inputDecoration("Write your feedback here..."),
                   ),
 
                   const SizedBox(height: 20),
 
                   const Text(
                     "Email (Optional)",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
 
                   const SizedBox(height: 8),
 
                   TextField(
                     controller: emailController,
-                    keyboardType:
-                        TextInputType.emailAddress,
-                    decoration: inputDecoration(
-                      "example@gmail.com",
-                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: inputDecoration("example@gmail.com"),
                   ),
                 ],
               ),
@@ -311,23 +258,19 @@ class _FeedbackPageState extends State<FeedbackPage> {
               width: double.infinity,
               height: 58,
               child: ElevatedButton.icon(
-                onPressed:
-                    isLoading ? null : submitFeedback,
+                onPressed: isLoading ? null : submitFeedback,
                 icon: isLoading
                     ? const SizedBox(
                         width: 22,
                         height: 22,
-                        child:
-                            CircularProgressIndicator(
+                        child: CircularProgressIndicator(
                           strokeWidth: 2.5,
                           color: Colors.white,
                         ),
                       )
                     : const Icon(Icons.send_rounded),
                 label: Text(
-                  isLoading
-                      ? "Submitting..."
-                      : "Submit Feedback",
+                  isLoading ? "Submitting..." : "Submit Feedback",
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -338,8 +281,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   foregroundColor: Colors.white,
                   elevation: 3,
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                 ),
               ),

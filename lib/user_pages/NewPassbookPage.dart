@@ -143,7 +143,7 @@ class _passbookPage extends State<Passbookpage> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.greenAccent.withOpacity(0.3),
+                  color: Colors.greenAccent.withValues(alpha: 0.3),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 ),
@@ -157,7 +157,7 @@ class _passbookPage extends State<Passbookpage> {
                       height: 40,
                       width: 55,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: Icon(
@@ -210,7 +210,7 @@ class _passbookPage extends State<Passbookpage> {
                     horizontal: 15,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Column(

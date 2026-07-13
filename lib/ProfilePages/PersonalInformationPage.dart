@@ -28,13 +28,13 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8),
         ],
       ),
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: themeColor.withOpacity(0.15),
+            backgroundColor: themeColor.withValues(alpha: 0.15),
             child: Icon(icon, color: themeColor),
           ),
 
@@ -173,14 +173,16 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
                     height: 55,
                     child: ElevatedButton.icon(
                       onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditInformationPage(),
-                          ),
-                        ) ?? false;
+                        final result =
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditInformationPage(),
+                              ),
+                            ) ??
+                            false;
 
-                        if(result){
+                        if (result) {
                           getDetails();
                         }
                       },
