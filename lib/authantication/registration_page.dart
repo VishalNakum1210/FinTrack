@@ -284,8 +284,11 @@ class _RegistrationStatePage extends State<RegistrationPage> {
         ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(25),
-        borderSide: const BorderSide(width: 3, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          width: 3,
+          color: Color.fromARGB(255, 74, 127, 61),
+        ),
       ),
     );
   }
