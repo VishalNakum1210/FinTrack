@@ -63,7 +63,7 @@ It helps users effortlessly:
 <tr>
 <td align="center">
 <h2>🏠 Home</h2>
-<img src="screenshots/home1.jpg" width="230">
+<img src="screenshots/Home1.jpg" width="230">
 </td>
 
 <td align="center">
