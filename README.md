@@ -45,18 +45,6 @@ It helps users effortlessly:
 
 ---
 
-# 🎥 Demo
-
-<p align="center">
-
-> Add a demo GIF here
-
-<img src="assets/demo.gif" width="280">
-
-</p>
-
----
-
 # 📱 Screenshots
 
 <table align="center">
@@ -380,6 +368,6 @@ Flutter Developer • Firebase Enthusiast
 
 <p align="center">
 
-Made with ❤️ using Flutter
+Made with 💚 using Flutter
 
 </p>
