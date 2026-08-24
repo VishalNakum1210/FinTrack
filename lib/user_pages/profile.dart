@@ -1,13 +1,16 @@
-import 'package:FinTrack/GetInformation/GetInformationForProfile.dart';
+import 'package:FinTrack/GetInformation/SessionManager.dart';
 import 'package:FinTrack/ProfilePages/ChangePasswordPage.dart';
 import 'package:FinTrack/ProfilePages/FeedbackPage.dart';
 import 'package:FinTrack/ProfilePages/PersonalInformationPage.dart';
 import 'package:FinTrack/ProfilePages/ReportPage.dart';
 import 'package:FinTrack/authantication/login_page.dart';
+import 'package:FinTrack/providers/expense_provider.dart';
+import 'package:FinTrack/providers/user_provider.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -18,69 +21,59 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String userName = "User";
-  String email = "User@gmail.com";
-  List<String> ExpensesRecord = ["0", "0"];
-  bool isLoading = false;
-
-  void getDetails() async {
-    setState(() {
-      isLoading = true;
-    });
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone_number = sp.getString("phone_number")!;
-    userName = sp.getString("username")!;
-    email = sp.getString("email")!;
-    ExpensesRecord = await getProfieInformation(phone_number);
-    setState(() {
-      isLoading = false;
-    });
-  }
+  bool isActionLoading = false;
 
   String formatIndianNumber(int number) {
     return NumberFormat('#,##,##0', 'en_IN').format(number);
   }
 
-  void Logout() async {
-    setState(() {
-      isLoading = true;
-    });
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    await sp.clear();
-    Navigator.pushReplacement(
+  Future<void> logout() async {
+    if (mounted) {
+      setState(() {
+        isActionLoading = true;
+      });
+    }
+    context.read<UserProvider>().clearUser();
+    await SessionManager.clearSession();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
     );
   }
 
-  Future<void> DeleteUser() async {
-    setState(() {
-      isLoading = true;
-    });
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone = sp.getString("phone_number")!;
-    DatabaseReference myref = FirebaseDatabase.instance.ref("Friends/$phone");
-    await myref.remove();
-
-    myref = FirebaseDatabase.instance.ref("Expenses/$phone");
-    await myref.remove();
-
-    myref = FirebaseDatabase.instance.ref("user_details/$phone");
-    await myref.remove();
-
-    Fluttertoast.showToast(msg: "Account is Deleted successfully");
-    sp.clear();
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
-    );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    getDetails();
+  Future<void> deleteUser() async {
+    if (mounted) {
+      setState(() {
+        isActionLoading = true;
+      });
+    }
+    try {
+      SharedPreferences sp = await SharedPreferences.getInstance();
+      String phone = sp.getString("phone_number") ?? "";
+      if (phone.isNotEmpty) {
+        await FirebaseDatabase.instance.ref("Friends/$phone").remove();
+        await FirebaseDatabase.instance.ref("Expenses/$phone").remove();
+        await FirebaseDatabase.instance.ref("user_details/$phone").remove();
+      }
+      Fluttertoast.showToast(msg: "Account deleted successfully");
+      if (mounted) context.read<UserProvider>().clearUser();
+      await SessionManager.clearSession();
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Failed to delete account: $e");
+      if (mounted) {
+        setState(() {
+          isActionLoading = false;
+        });
+      }
+    }
   }
 
   final Color themeColor = const Color(0xFF8BC24A);
@@ -108,164 +101,159 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+    return Consumer2<UserProvider, ExpenseProvider>(
+      builder: (context, userProvider, expenseProvider, _) {
+        final userName = userProvider.name;
+        final email = userProvider.email.isNotEmpty ? userProvider.email : "Not Provided";
+        final totalExpense = expenseProvider.totalExpense;
+        final recordCount = expenseProvider.records.length;
 
-      appBar: AppBar(
-        title: const Text(
-          "Profile",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: themeColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-
-      body: (isLoading)
-          ? Container(
-              child: Center(
-                child: CircularProgressIndicator(color: Colors.green),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  /// Profile Header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 25),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                          color: Colors.black.withValues(alpha: 0.05),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundColor: themeColor,
-                          child: const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Colors.white,
-                          ),
-                        ),
-
-                        const SizedBox(height: 15),
-
-                        Text(
-                          userName,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        const SizedBox(height: 5),
-
-                        Text(email, style: TextStyle(color: Colors.grey[600])),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  /// Statistics Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: themeColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.account_balance_wallet,
-                              color: Colors.white,
+        return Scaffold(
+          backgroundColor: const Color(0xFFF5F7FA),
+          appBar: AppBar(
+            title: const Text(
+              "Profile",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            centerTitle: true,
+            backgroundColor: themeColor,
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+          body: (isActionLoading)
+              ? Center(
+                  child: CircularProgressIndicator(color: themeColor),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      /// Profile Header
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 25),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                              color: Colors.black.withValues(alpha: 0.05),
                             ),
-                            SizedBox(width: 8),
-                            Text(
-                              "Expense Summary",
-                              style: TextStyle(
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 50,
+                              backgroundColor: themeColor,
+                              child: const Icon(
+                                Icons.person,
+                                size: 60,
                                 color: Colors.white,
-                                fontSize: 18,
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+                            Text(
+                              userName,
+                              style: const TextStyle(
+                                fontSize: 22,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                            const SizedBox(height: 5),
+                            Text(email, style: TextStyle(color: Colors.grey[600])),
                           ],
                         ),
+                      ),
 
-                        const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      /// Statistics Card
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: themeColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Column(
                           children: [
-                            Column(
+                            const Row(
                               children: [
-                                const Text(
-                                  "Total Expenses",
-                                  style: TextStyle(color: Colors.white70),
+                                Icon(
+                                  Icons.account_balance_wallet,
+                                  color: Colors.white,
                                 ),
-                                const SizedBox(height: 5),
+                                SizedBox(width: 8),
                                 Text(
-                                  NumberFormat.currency(
-                                    locale: 'en_IN',
-                                    symbol: '₹',
-                                    decimalDigits: 0,
-                                  ).format(int.tryParse(ExpensesRecord[0])),
-                                  style: const TextStyle(
+                                  "Expense Summary",
+                                  style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 22,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
                             ),
-
-                            Container(
-                              height: 50,
-                              width: 1,
-                              color: Colors.white54,
-                            ),
-
-                            Column(
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
-                                const Text(
-                                  "Records",
-                                  style: TextStyle(color: Colors.white70),
+                                Column(
+                                  children: [
+                                    const Text(
+                                      "Total Expenses",
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      NumberFormat.currency(
+                                        locale: 'en_IN',
+                                        symbol: '₹',
+                                        decimalDigits: 0,
+                                      ).format(totalExpense),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  NumberFormat.currency(
-                                    locale: 'en_IN',
-                                    symbol: '',
-                                    decimalDigits: 0,
-                                  ).format(int.tryParse(ExpensesRecord[1])),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                Container(
+                                  height: 50,
+                                  width: 1,
+                                  color: Colors.white54,
+                                ),
+                                Column(
+                                  children: [
+                                    const Text(
+                                      "Records",
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      NumberFormat.currency(
+                                        locale: 'en_IN',
+                                        symbol: '',
+                                        decimalDigits: 0,
+                                      ).format(recordCount),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
 
-                  const SizedBox(height: 25),
+                      const SizedBox(height: 25),
 
                   /// Menu Section
                   menuTile(
@@ -275,7 +263,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PersonalInformationPage(),
+                          builder: (context) => const PersonalInformationPage(),
                         ),
                       );
                     },
@@ -288,7 +276,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ChangePasswordPage(),
+                          builder: (context) => const ChangePasswordPage(),
                         ),
                       );
                     },
@@ -300,7 +288,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => Reportpage()),
+                        MaterialPageRoute(builder: (context) => const Reportpage()),
                       );
                     },
                   ),
@@ -311,13 +299,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => FeedbackPage()),
+                        MaterialPageRoute(builder: (_) => const FeedbackPage()),
                       );
                     },
                   ),
 
                   Container(
-                    padding: EdgeInsets.only(left: 10, right: 10),
+                    padding: const EdgeInsets.only(left: 10, right: 10),
                     child: Row(
                       children: [
                         Expanded(
@@ -349,7 +337,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                           foregroundColor: Colors.white,
                                         ),
                                         onPressed: () {
-                                          Logout();
+                                          Navigator.pop(context);
+                                          logout();
                                         },
                                         child: const Text("Logout"),
                                       ),
@@ -376,7 +365,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ),
 
-                        SizedBox(width: 10),
+                        const SizedBox(width: 10),
 
                         Expanded(
                           child: SizedBox(
@@ -408,7 +397,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         ),
                                         onPressed: () async {
                                           Navigator.pop(context);
-                                          await DeleteUser();
+                                          await deleteUser();
                                         },
                                         child: const Text("Delete"),
                                       ),
@@ -440,6 +429,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
+        );
+      },
     );
   }
 }

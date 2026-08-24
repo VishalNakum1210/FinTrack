@@ -1,7 +1,7 @@
-import 'package:FinTrack/GetInformation/GetUserDetail.dart';
 import 'package:FinTrack/ProfilePages/EditInformationPage.dart';
+import 'package:FinTrack/providers/user_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class PersonalInformationPage extends StatefulWidget {
   const PersonalInformationPage({super.key});
@@ -13,8 +13,14 @@ class PersonalInformationPage extends StatefulWidget {
 
 class _PersonalInformationPageState extends State<PersonalInformationPage> {
   final Color themeColor = const Color(0xFF8BC24A);
-  bool isLoading = false;
-  Map<String, String> details = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<UserProvider>().loadUserSession();
+    });
+  }
 
   Widget infoTile({
     required IconData icon,
@@ -37,9 +43,7 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
             backgroundColor: themeColor.withValues(alpha: 0.15),
             child: Icon(icon, color: themeColor),
           ),
-
           const SizedBox(width: 15),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,7 +54,7 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  value,
+                  value.isNotEmpty ? value : "Not Entered",
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -64,148 +68,88 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
     );
   }
 
-  void getDetails() async {
-    setState(() {
-      isLoading = true;
-    });
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone_number = sp.getString("phone_number")!;
-    details = await getUserInformation(phone_number);
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    getDetails();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, _) {
+        final name = userProvider.name;
+        final phone = userProvider.phoneNumber;
+        final email = userProvider.email;
+        final address = userProvider.address;
+        final isLoading = userProvider.isLoading;
 
-      appBar: AppBar(
-        title: const Text(
-          "Personal Information",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: themeColor,
-        foregroundColor: Colors.white,
-        centerTitle: true,
-      ),
-
-      body: (isLoading)
-          ? Container(
-              child: Center(
-                child: CircularProgressIndicator(color: Colors.green),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  /// Profile Header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 25),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 55,
-                          backgroundColor: themeColor,
-                          child: const Icon(
-                            Icons.person,
-                            size: 65,
-                            color: Colors.white,
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        Text(
-                          details["name"]!,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  infoTile(
-                    icon: Icons.person_outline,
-                    title: "Full Name",
-                    value: details["name"]!,
-                  ),
-
-                  infoTile(
-                    icon: Icons.phone_outlined,
-                    title: "Mobile Number",
-                    value: details["phone_number"]!,
-                  ),
-
-                  infoTile(
-                    icon: Icons.email_outlined,
-                    title: "Email",
-                    value: details["email"]!,
-                  ),
-
-                  infoTile(
-                    icon: Icons.location_on_outlined,
-                    title: "Address",
-                    value: details["address"] ?? "Not Updated",
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        final result =
-                            await Navigator.push(
+        return Scaffold(
+          backgroundColor: const Color(0xFFF5F7FA),
+          appBar: AppBar(
+            title: const Text(
+              "Personal Information",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            centerTitle: true,
+            backgroundColor: themeColor,
+            foregroundColor: Colors.white,
+          ),
+          body: (isLoading)
+              ? Center(child: CircularProgressIndicator(color: themeColor))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      infoTile(
+                        icon: Icons.person_outline,
+                        title: "Full Name",
+                        value: name,
+                      ),
+                      infoTile(
+                        icon: Icons.phone_outlined,
+                        title: "Mobile Number",
+                        value: phone,
+                      ),
+                      infoTile(
+                        icon: Icons.email_outlined,
+                        title: "Email Address",
+                        value: email,
+                      ),
+                      infoTile(
+                        icon: Icons.location_on_outlined,
+                        title: "Address",
+                        value: address,
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => EditInformationPage(),
+                                builder: (context) => const EditInformationPage(),
                               ),
-                            ) ??
-                            false;
-
-                        if (result) {
-                          getDetails();
-                        }
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text(
-                        "Edit Information",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                            );
+                          },
+                          icon: const Icon(Icons.edit),
+                          label: const Text(
+                            "Edit Information",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: themeColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: themeColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+        );
+      },
     );
   }
 }

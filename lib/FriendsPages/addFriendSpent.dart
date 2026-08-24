@@ -1,43 +1,60 @@
-import 'package:firebase_database/firebase_database.dart';
+import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class AddFriendExpenses extends StatefulWidget {
   final String friend_number;
   const AddFriendExpenses({
     super.key,
-    required this.friend_number
+    required this.friend_number,
   });
+
   @override
-  State<AddFriendExpenses> createState() => _addFriendExpenses();
+  State<AddFriendExpenses> createState() => _AddFriendExpensesState();
 }
 
-class _addFriendExpenses extends State<AddFriendExpenses> {
+class _AddFriendExpensesState extends State<AddFriendExpenses> {
   bool isLoading = false;
 
-  TextEditingController Camount = TextEditingController();
-  TextEditingController Cdescription = TextEditingController();
+  final TextEditingController amountController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
 
   DateTime selectedDate = DateTime.now();
 
-  List<String> PaymentMode = [
+  final List<String> paymentModes = const [
     "Spent Online",
     "Spent Cash",
   ];
 
-  List<String> Catagory = [
+  final List<String> categoryTypes = const [
     "Give Money To Friend",
-    "Take Money From Friend"
+    "Take Money From Friend",
   ];
 
-  String selectedMode = "Select Payment mode";
-  String selectedType = "Select Type";
+  late String selectedMode;
+  late String selectedType;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedMode = paymentModes.first;
+    selectedType = categoryTypes.first;
+  }
+
+  @override
+  void dispose() {
+    amountController.dispose();
+    descriptionController.dispose();
+    super.dispose();
+  }
 
   Future<void> pickDate() async {
     DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: selectedDate,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
@@ -49,14 +66,17 @@ class _addFriendExpenses extends State<AddFriendExpenses> {
     }
   }
 
-  void getAllDetails() async {
-    String amount = Camount.text.trim();
-    String description = Cdescription.text.trim();
+  Future<void> getAllDetails() async {
+    String amount = amountController.text.trim();
+    String description = descriptionController.text.trim();
 
-    if (amount.isEmpty ||
-        description.isEmpty ||
-        selectedMode == "Select Payment mode") {
-      Fluttertoast.showToast(msg: "Please Enter All Values");
+    if (amount.isEmpty || description.isEmpty) {
+      Fluttertoast.showToast(msg: "Please fill in all fields");
+      return;
+    }
+
+    if (int.tryParse(amount) == null || (int.tryParse(amount) ?? 0) <= 0) {
+      Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
     }
 
@@ -65,297 +85,222 @@ class _addFriendExpenses extends State<AddFriendExpenses> {
     });
 
     try {
-      await StoreSpentOnDataBase(
-        amount,
-        description,
-        selectedMode,
-        "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
-        selectedType,
+      String userPhoneNumber = await SessionManager.getPhoneNumber() ?? "";
+      if (userPhoneNumber.isEmpty) {
+        Fluttertoast.showToast(msg: "User session not found");
+        return;
+      }
+
+      String formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
+      if (!mounted) return;
+      final success = await context.read<FriendProvider>().addFriendTransaction(
+        userPhone: userPhoneNumber,
+        friendNumber: widget.friend_number,
+        amount: amount,
+        description: description,
+        paymentMode: selectedMode,
+        date: formattedDate,
+        categoryType: selectedType,
       );
 
-      Fluttertoast.showToast(msg: "Expense added successfully");
-
-      Navigator.pop(context, true);
+      if (success) {
+        Fluttertoast.showToast(msg: "Friend expense recorded successfully");
+        if (!mounted) return;
+        Navigator.pop(context, true);
+      } else {
+        Fluttertoast.showToast(msg: "Failed to save expense");
+      }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Failed to save expense");
-      print(e);
-    }
-
-    if (mounted) {
-      setState(() {
-        isLoading = false;
-      });
+      Fluttertoast.showToast(msg: "Failed to save expense: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> StoreSpentOnDataBase(
-  String Amount,
-  String Description,
-  String selectedMode,
-  String selected_date,
-  String selectedCategory,
-) async {
-  SharedPreferences sp = await SharedPreferences.getInstance();
-  String phone_number = sp.getString("phone_number")!;
-
-  // Add Record
-  DatabaseReference recordRef = FirebaseDatabase.instance.ref(
-    "Friends/$phone_number/${widget.friend_number}/Records",
-  );
-
-  String key = recordRef.push().key!;
-
-  await recordRef.child(key).set({
-    "key": key,
-    "Amount": Amount,
-    "Description": Description,
-    "Payment_Mode": selectedMode,
-    "Date": selected_date,
-    "Type": selectedCategory,
-    "timestamp": ServerValue.timestamp,
-  });
-
-  // Friend Details Reference
-  DatabaseReference friendRef = FirebaseDatabase.instance.ref(
-    "Friends/$phone_number/${widget.friend_number}",
-  );
-
-  DataSnapshot snapshot = await friendRef.get();
-
-  int totalGive = int.tryParse(
-        snapshot.child("total_give").value?.toString() ?? "0",
-      ) ??
-      0;
-
-  int totalGet = int.tryParse(
-        snapshot.child("total_get").value?.toString() ?? "0",
-      ) ??
-      0;
-
-  if (selectedCategory == "Take Money From Friend") {
-    totalGive += int.parse(Amount);
-
-    await friendRef.update({
-      "total_give": totalGive.toString(),
-    });
-  } else {
-    totalGet += int.parse(Amount);
-
-    await friendRef.update({
-      "total_get": totalGet.toString(),
-    });
+  InputDecoration inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      enabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(width: 2, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(width: 2.5, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+    );
   }
-}
+
+  InputDecorationTheme inputTheme() {
+    return InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      enabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(width: 2, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(width: 2.5, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FBF2),
       appBar: AppBar(
-        title: Text(
-          "Add Spent",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight(800)),
+        title: const Text(
+          "Add Friend Transaction",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        iconTheme: IconThemeData(color: Colors.white),
-        backgroundColor: Color(0xFF8BC24A),
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: const Color(0xFF8BC24A),
+        elevation: 0,
       ),
       body: Stack(
         children: [
-          Container(color: Color(0xFFE4D5A3)),
-          Positioned(
-            bottom: -200,
-            child: Container(
-              height: 500,
-              width: 700,
-              decoration: BoxDecoration(
-                color: Color(0xff8BC24A),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            child: Center(
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Container(
-                height: 500,
-                margin: EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 15,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
                 ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      "Friend Ledger Entry",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8BC24A),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          controller: Camount,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: "Amount",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: inputDecoration("Enter Amount (₹)"),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    TextField(
+                      controller: descriptionController,
+                      decoration: inputDecoration("Enter Description / Note"),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    TextField(
+                      readOnly: true,
+                      decoration: inputDecoration(
+                        "Date: ${DateFormat('dd MMM yyyy').format(selectedDate)}",
+                      ),
+                      onTap: pickDate,
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    DropdownMenu<String>(
+                      width: MediaQuery.of(context).size.width - 84,
+                      initialSelection: selectedType,
+                      label: const Text("Select Transaction Type"),
+                      dropdownMenuEntries: categoryTypes
+                          .map(
+                            (item) => DropdownMenuEntry(
+                              value: item,
+                              label: item,
                             ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
+                          )
+                          .toList(),
+                      onSelected: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedType = value;
+                          });
+                        }
+                      },
+                      inputDecorationTheme: inputTheme(),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    DropdownMenu<String>(
+                      width: MediaQuery.of(context).size.width - 84,
+                      initialSelection: selectedMode,
+                      label: const Text("Select Payment Mode"),
+                      dropdownMenuEntries: paymentModes
+                          .map(
+                            (item) => DropdownMenuEntry(
+                              value: item,
+                              label: item,
                             ),
+                          )
+                          .toList(),
+                      onSelected: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedMode = value;
+                          });
+                        }
+                      },
+                      inputDecorationTheme: inputTheme(),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : getAllDetails,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8BC24A),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          "Save Friend Expense",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          controller: Cdescription,
-                          decoration: InputDecoration(
-                            hintText: "Description",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            hintText:
-                                "Selected: ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          onTap: () => pickDate(),
-                        ),
-                      ),
-
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: DropdownMenu(
-                          initialSelection: selectedType,
-                          label: Text("Select Type"),
-                          dropdownMenuEntries: Catagory.map(
-                            (item) =>
-                                DropdownMenuEntry(value: item, label: item),
-                          ).toList(),
-
-                          onSelected: (value) {
-                            setState(() {
-                              selectedType = value!;
-                            });
-                          },
-
-                          inputDecorationTheme: InputDecorationTheme(
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: DropdownMenu<String>(
-                          initialSelection: selectedMode,
-                          label: const Text("Select Payment Mode"),
-                          dropdownMenuEntries: PaymentMode.map(
-                            (item) =>
-                                DropdownMenuEntry(value: item, label: item),
-                          ).toList(),
-
-                          onSelected: (value) {
-                            setState(() {
-                              selectedMode = value!;
-                            });
-                          },
-
-                          inputDecorationTheme: InputDecorationTheme(
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.only(left: 40, right: 40, top: 30),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            getAllDetails();
-                          },
-                          child: Text(
-                            "Add Spent Details",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF8BC24A),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+
           if (isLoading)
             Container(
-              color: Colors.black87,
-              child: Center(
+              color: Colors.black45,
+              child: const Center(
                 child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
               ),
             ),

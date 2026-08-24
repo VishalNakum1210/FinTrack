@@ -1,9 +1,10 @@
 import 'package:FinTrack/FriendsPages/addFriendSpent.dart';
 import 'package:FinTrack/GetInformation/GetSpecificFriendDetails.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Specificfriendpage extends StatefulWidget {
@@ -11,93 +12,84 @@ class Specificfriendpage extends StatefulWidget {
   const Specificfriendpage({super.key, required this.friend_number});
 
   @override
-  State<Specificfriendpage> createState() => _specificFriendPage();
+  State<Specificfriendpage> createState() => _SpecificFriendPageState();
 }
 
-class _specificFriendPage extends State<Specificfriendpage> {
+class _SpecificFriendPageState extends State<Specificfriendpage> {
   List<Map<String, dynamic>> friendDetails = [];
-  List<Map<String, dynamic>>? ExpensesRecords = [];
+  List<Map<String, dynamic>> expensesRecords = [];
   bool isLoading = true;
-  String netAmount = "0";
-  bool sign = false;
+  int totalGet = 0;
+  int totalGive = 0;
 
   Future<void> getDetails() async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone_number = sp.getString("phone_number")!;
-    friendDetails = await getSpecificFriendDetails(
-      phone_number,
-      widget.friend_number,
-    );
-    if (int.parse(friendDetails[0]["total_get"]) >
-        int.parse(friendDetails[0]["total_give"]))
-      sign = true;
-    if (friendDetails[0].containsKey("Records")) {
-      friendDetails[0]["Records"].forEach((key, value) {
-        ExpensesRecords!.add(Map<String, dynamic>.from(value));
-      });
-    }
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  Future<void> updateExpensesOnFriend(
-    String userNumber,
-    bool con,
-    int Amount,
-  ) async {
-    try {
-      DatabaseReference friendRef = FirebaseDatabase.instance.ref(
-        "Friends/$userNumber/${widget.friend_number}",
-      );
-      DataSnapshot snapshot = await friendRef.get();
-
-      int totalGive =
-          int.tryParse(snapshot.child("total_give").value?.toString() ?? "0") ??
-          0;
-
-      int totalGet =
-          int.tryParse(snapshot.child("total_get").value?.toString() ?? "0") ??
-          0;
-
-      if (con) {
-        totalGive -= Amount;
-
-        await friendRef.update({"total_give": totalGive.toString()});
-      } else {
-        totalGet -= Amount;
-
-        await friendRef.update({"total_get": totalGet.toString()});
-      }
-    } catch (e) {
-      Fluttertoast.showToast(msg: "Not Connected $e");
-    }
-    return;
-  }
-
-  Future<void> deleteRecord(String key, bool con, int amount) async {
-    setState(() {
-      isLoading = true;
-    });
     try {
       SharedPreferences sp = await SharedPreferences.getInstance();
-      String userNumber = sp.getString("phone_number")!;
+      String phoneNumber = sp.getString("phone_number") ?? "";
+      if (phoneNumber.isEmpty) {
+        if (mounted) setState(() => isLoading = false);
+        return;
+      }
 
-      DatabaseReference myref = FirebaseDatabase.instance.ref(
-        "Friends/$userNumber/${friendDetails[0]["friend_number"]}/Records/$key",
+      friendDetails = await getSpecificFriendDetails(
+        phoneNumber,
+        widget.friend_number,
       );
-      await myref.remove();
 
-      Fluttertoast.showToast(msg: "Record deleted Successfully");
-      ExpensesRecords!.clear();
-      await updateExpensesOnFriend(userNumber, con, amount);
-      getDetails();
-    } catch (e) {
-      Fluttertoast.showToast(msg: "$e");
-    } finally {
+      expensesRecords.clear();
+
+      if (friendDetails.isNotEmpty) {
+        totalGet = int.tryParse(friendDetails[0]["total_get"]?.toString() ?? '0') ?? 0;
+        totalGive = int.tryParse(friendDetails[0]["total_give"]?.toString() ?? '0') ?? 0;
+
+        if (friendDetails[0].containsKey("Records") && friendDetails[0]["Records"] is Map) {
+          friendDetails[0]["Records"].forEach((key, value) {
+            if (value is Map) {
+              expensesRecords.add(Map<String, dynamic>.from(value));
+            }
+          });
+        }
+      }
+    } catch (_) {}
+
+    if (mounted) {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> deleteRecord(String key, bool con, int amount) async {
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+      });
+    }
+    try {
+      SharedPreferences sp = await SharedPreferences.getInstance();
+      String userNumber = sp.getString("phone_number") ?? "";
+
+      if (userNumber.isNotEmpty && friendDetails.isNotEmpty && mounted) {
+        await context.read<FriendProvider>().deleteFriendTransaction(
+          userPhone: userNumber,
+          friendNumber: friendDetails[0]["friend_number"] ?? widget.friend_number,
+          recordKey: key,
+          isGive: con,
+          amount: amount,
+        );
+
+        Fluttertoast.showToast(msg: "Record deleted successfully");
+        expensesRecords.clear();
+        await getDetails();
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: "$e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -148,296 +140,281 @@ class _specificFriendPage extends State<Specificfriendpage> {
       ),
 
       body: (isLoading)
-          ? Container(
-              child: Center(
-                child: CircularProgressIndicator(color: primaryColor),
-              ),
+          ? Center(
+              child: CircularProgressIndicator(color: primaryColor),
             )
-          : Column(
-              children: [
-                // Profile Card
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(15),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF8BC24A), Color(0xFF7CB342)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(alpha: .35),
-                        blurRadius: 15,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 35,
-                        backgroundColor: Colors.white,
-                        child: Text(
-                          friendDetails[0]["friend_name"][0].toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: primaryColor,
-                          ),
+          : (friendDetails.isEmpty)
+              ? const Center(child: Text("Friend Not Found"))
+              : Column(
+                  children: [
+                    // Profile Card
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.all(15),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF8BC24A), Color(0xFF7CB342)],
                         ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      Text(
-                        friendDetails[0]["friend_name"],
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 5),
-
-                      Text(
-                        friendDetails[0]["friend_number"],
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Get / Give Cards
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(15),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: .08),
-                            borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primaryColor.withValues(alpha: .35),
+                            blurRadius: 15,
+                            offset: const Offset(0, 6),
                           ),
-                          child: Column(
-                            children: [
-                              Text(
-                                "You Get",
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 35,
+                            backgroundColor: Colors.white,
+                            child: Text(
+                              (friendDetails[0]["friend_name"] ?? "F").toString().isNotEmpty
+                                  ? (friendDetails[0]["friend_name"] ?? "F").toString()[0].toUpperCase()
+                                  : "F",
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: primaryColor,
                               ),
-                              SizedBox(height: 8),
-                              Text(
-                                NumberFormat.currency(
-                                  locale: 'en_IN',
-                                  symbol: '₹',
-                                  decimalDigits: 0,
-                                ).format(
-                                  int.tryParse(friendDetails[0]["total_get"]),
-                                ),
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
 
-                      const SizedBox(width: 12),
+                          const SizedBox(height: 12),
 
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(15),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: .08),
-                            borderRadius: BorderRadius.circular(18),
+                          Text(
+                            (friendDetails[0]["friend_name"] ?? "").toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          child: Column(
-                            children: [
-                              Text(
-                                "You Want to Give",
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                NumberFormat.currency(
-                                  locale: 'en_IN',
-                                  symbol: '₹',
-                                  decimalDigits: 0,
-                                ).format(
-                                  int.tryParse(friendDetails[0]["total_give"]),
-                                ),
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+
+                          const SizedBox(height: 5),
+
+                          Text(
+                            (friendDetails[0]["friend_number"] ?? "").toString(),
+                            style: const TextStyle(color: Colors.white70, fontSize: 14),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Net Balance
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 15),
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: .05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        "Net Balance",
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
-                      ),
-
-                      SizedBox(height: 6),
-
-                      Text(
-                        NumberFormat.currency(
-                          locale: 'en_IN',
-                          symbol: '₹',
-                          decimalDigits: 0,
-                        ).format(
-                          (int.parse(friendDetails[0]["total_get"]) -
-                              int.parse(friendDetails[0]["total_give"])),
-                        ),
-                        style: TextStyle(
-                          color: (sign) ? Colors.green : Colors.red,
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                // Transactions Header
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 15),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Transactions",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        ],
                       ),
                     ),
-                  ),
-                ),
 
-                const SizedBox(height: 10),
-
-                // Transaction List
-                Expanded(
-                  child: (!friendDetails[0].containsKey("Records"))
-                      ? Container(child: Center(child: Text("No Records")))
-                      : ListView.builder(
-                          padding: EdgeInsets.only(
-                            bottom: 25,
-                            left: 10,
-                            right: 10,
-                          ),
-                          itemCount: ExpensesRecords!.length,
-                          itemBuilder: (context, index) {
-                            return InkWell(
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
+                    // Get / Give Cards
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 15),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(15),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: .08),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    "You Get",
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    title: const Text("Delete Record"),
-                                    content: const Text(
-                                      "Are you sure you want to delete this record?",
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text("Cancel"),
-                                      ),
-
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        onPressed: () async {
-                                          Navigator.pop(context);
-                                          await deleteRecord(
-                                            ExpensesRecords![index]["key"],
-                                            ExpensesRecords![index]["Type"] ==
-                                                    "Take Money From Friend"
-                                                ? true
-                                                : false,
-                                            int.parse(
-                                              ExpensesRecords![index]["Amount"],
-                                            ),
-                                          );
-                                        },
-                                        child: const Text("Delete"),
-                                      ),
-                                    ],
                                   ),
-                                );
-                              },
-                              child: _transactionCard(
-                                amount:
+                                  const SizedBox(height: 8),
+                                  Text(
                                     NumberFormat.currency(
                                       locale: 'en_IN',
                                       symbol: '₹',
                                       decimalDigits: 0,
-                                    ).format(
-                                      int.parse(
-                                        ExpensesRecords![index]["Amount"],
-                                      ),
+                                    ).format(totalGet),
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                title: ExpensesRecords![index]["Type"],
-                                note: ExpensesRecords![index]["Description"],
-                                date: ExpensesRecords![index]["Date"],
-                                isGive:
-                                    ExpensesRecords![index]["Type"] ==
-                                        "Take Money From Friend"
-                                    ? true
-                                    : false,
+                                  ),
+                                ],
                               ),
-                            );
-                          },
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(15),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: .08),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    "You Want to Give",
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    NumberFormat.currency(
+                                      locale: 'en_IN',
+                                      symbol: '₹',
+                                      decimalDigits: 0,
+                                    ).format(totalGive),
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Net Balance
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 15),
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: .05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            "Net Balance",
+                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          Text(
+                            NumberFormat.currency(
+                              locale: 'en_IN',
+                              symbol: '₹',
+                              decimalDigits: 0,
+                            ).format((totalGet - totalGive).abs()),
+                            style: TextStyle(
+                              color: (totalGet >= totalGive) ? Colors.green : Colors.red,
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // Transactions Header
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 15),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Transactions",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Transaction List
+                    Expanded(
+                      child: expensesRecords.isEmpty
+                          ? const Center(child: Text("No Records"))
+                          : ListView.builder(
+                              padding: const EdgeInsets.only(
+                                bottom: 25,
+                                left: 10,
+                                right: 10,
+                              ),
+                              itemCount: expensesRecords.length,
+                              itemBuilder: (context, index) {
+                                final record = expensesRecords[index];
+                                final isGive = record["Type"] == "Take Money From Friend";
+                                final amount = int.tryParse(record["Amount"]?.toString() ?? '0') ?? 0;
+                                final key = (record["key"] ?? "").toString();
+
+                                return InkWell(
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        title: const Text("Delete Record"),
+                                        content: const Text(
+                                          "Are you sure you want to delete this record?",
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text("Cancel"),
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                            onPressed: () async {
+                                              Navigator.pop(context);
+                                              if (key.isNotEmpty) {
+                                                await deleteRecord(
+                                                  key,
+                                                  isGive,
+                                                  amount,
+                                                );
+                                              }
+                                            },
+                                            child: const Text("Delete"),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  child: _transactionCard(
+                                    amount: NumberFormat.currency(
+                                      locale: 'en_IN',
+                                      symbol: '₹',
+                                      decimalDigits: 0,
+                                    ).format(amount),
+                                    title: (record["Type"] ?? "").toString(),
+                                    note: (record["Description"] ?? "").toString(),
+                                    date: (record["Date"] ?? "").toString(),
+                                    isGive: isGive,
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
     );
   }
 

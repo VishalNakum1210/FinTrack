@@ -1,186 +1,202 @@
-import 'package:firebase_database/firebase_database.dart';
+import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class AddFriends extends StatefulWidget {
+  const AddFriends({super.key});
+
   @override
-  State<AddFriends> createState() => _addFriendPage();
+  State<AddFriends> createState() => _AddFriendsState();
 }
 
-class _addFriendPage extends State<AddFriends> {
-  TextEditingController cname = TextEditingController();
-  TextEditingController cphone_number = TextEditingController();
-  TextEditingController cnote = TextEditingController();
+class _AddFriendsState extends State<AddFriends> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController noteController = TextEditingController();
+  bool isLoading = false;
 
-  void setFriendDetails() async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String userPhone_number = sp.getString("phone_number")!;
-    String name = cname.text,
-        phone_number = cphone_number.text,
-        note = cnote.text;
-    if (name.isNotEmpty && phone_number.isNotEmpty) {
-      try {
-        DatabaseReference myref = FirebaseDatabase.instance.ref(
-          "Friends/$userPhone_number",
-        );
-        DateTime now = DateTime.now();
-        await myref.child(phone_number).set({
-          "friend_name": name,
-          "friend_number": phone_number,
-          "note": note,
-          "date" : DateFormat('dd/MM/yyyy').format(now),
-          "timestamp" : ServerValue.timestamp,
-          "total_get" : "0",
-          "total_give" : "0",
-          "Records" : null
-        });
+  @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    noteController.dispose();
+    super.dispose();
+  }
 
-        Fluttertoast.showToast(msg: "Friend details add Successfully");
+  Future<void> setFriendDetails() async {
+    String name = nameController.text.trim();
+    String phoneNumber = phoneController.text.trim();
+    String note = noteController.text.trim();
+
+    if (name.isEmpty || phoneNumber.isEmpty) {
+      Fluttertoast.showToast(msg: "Please enter friend's name and phone number");
+      return;
+    }
+
+    if (phoneNumber.length != 10 || int.tryParse(phoneNumber) == null) {
+      Fluttertoast.showToast(msg: "Please enter a valid 10-digit phone number");
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      String userPhoneNumber = await SessionManager.getPhoneNumber() ?? "";
+
+      if (userPhoneNumber.isEmpty) {
+        Fluttertoast.showToast(msg: "User not logged in");
+        return;
+      }
+
+      DateTime now = DateTime.now();
+      if (!mounted) return;
+      final success = await context.read<FriendProvider>().addFriend(
+        userPhone: userPhoneNumber,
+        friendName: name,
+        friendNumber: phoneNumber,
+        note: note,
+        date: DateFormat('dd/MM/yyyy').format(now),
+      );
+
+      if (success) {
+        Fluttertoast.showToast(msg: "Friend added successfully");
+        if (!mounted) return;
         Navigator.pop(context, true);
-
-      } catch (e) {
-        Fluttertoast.showToast(msg: "Not connected $e");
+      } else {
+        Fluttertoast.showToast(msg: "Failed to add friend");
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Failed to add friend: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
       }
     }
+  }
+
+  InputDecoration inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      enabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(width: 2, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(width: 2.5, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FBF2),
       appBar: AppBar(
-        title: Text(
-          "Add Friend Details",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight(800)),
+        title: const Text(
+          "Add Friend",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        iconTheme: IconThemeData(color: Colors.white),
-        backgroundColor: Color(0xFF8BC24A),
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: const Color(0xFF8BC24A),
+        elevation: 0,
       ),
       body: Stack(
         children: [
-          Container(color: Color(0xFFE4D5A3)),
-          Positioned(
-            bottom: -200,
-            child: Container(
-              height: 500,
-              width: 700,
-              decoration: BoxDecoration(
-                color: Color(0xff8BC24A),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            child: Center(
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Container(
-                height: 350,
-                margin: EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 15,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
                 ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      "Friend Details",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8BC24A),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
-                child: Container(
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          controller: cname,
-                          decoration: InputDecoration(
-                            hintText: "Friend Name",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                    TextField(
+                      controller: nameController,
+                      decoration: inputDecoration("Friend Name"),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    TextField(
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: inputDecoration("Friend Phone Number"),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    TextField(
+                      controller: noteController,
+                      decoration: inputDecoration("Note (Optional)"),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : setFriendDetails,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8BC24A),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          "Save Friend",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          controller: cphone_number,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: "Friend Phone Number",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Container(
-                        margin: EdgeInsets.only(right: 20, left: 20, top: 20),
-                        child: TextField(
-                          controller: cnote,
-                          decoration: InputDecoration(
-                            hintText: "Note (optional)",
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF8BC24A),
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Container(
-                        width: double.infinity,
-                        height: 50,
-                        margin: EdgeInsets.only(left: 40, right: 40, top: 30),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // getAllDetails();
-                            setFriendDetails();
-                          },
-                          child: Text(
-                            "Add Friend Detail",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF8BC24A),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+
+          if (isLoading)
+            Container(
+              color: Colors.black45,
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
+              ),
+            ),
         ],
       ),
     );

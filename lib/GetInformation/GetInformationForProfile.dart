@@ -1,27 +1,29 @@
 import 'package:firebase_database/firebase_database.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
-Future<List<String>> getProfieInformation(String phone_number) async {
+Future<List<String>> getProfieInformation(String phoneNumber) async {
   try {
     DatabaseReference myref = FirebaseDatabase.instance.ref(
-      "Expenses/$phone_number",
+      "Expenses/$phoneNumber",
     );
     DatabaseEvent event = await myref.once();
-    int Expenses = 0;
+    int expenses = 0;
     int count = 0;
     if (event.snapshot.value != null) {
       Map data = event.snapshot.value as Map;
 
       data.forEach((key, value) {
-        if (!(["Add CASH", "Add Online"].contains(value["Payment_Mode"]))){
-          count += 1;
-          Expenses += int.parse(value["Amount"]);
+        if (value is Map) {
+          String paymentMode = (value["Payment_Mode"] ?? "").toString();
+          if (!["Add CASH", "Add Online"].contains(paymentMode)) {
+            count += 1;
+            expenses += int.tryParse(value["Amount"]?.toString() ?? '0') ?? 0;
+          }
         }
       });
-      return[Expenses.toString(), count.toString()];
+      return [expenses.toString(), count.toString()];
     }
-  } catch (e) {
-    Fluttertoast.showToast(msg: "Not connected $e");
+  } catch (_) {
+    // Return safe default
   }
   return ["0", "0"];
 }

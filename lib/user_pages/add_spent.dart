@@ -1,7 +1,9 @@
-import 'package:firebase_database/firebase_database.dart';
+import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class AddSpent extends StatefulWidget {
   const AddSpent({super.key});
@@ -18,16 +20,16 @@ class _AddSpentState extends State<AddSpent> {
 
   DateTime selectedDate = DateTime.now();
 
-  final List<String> paymentModes = [
+  final List<String> paymentModes = const [
     "Spent Online",
     "Spent Cash",
     "Add CASH",
     "Add Online",
   ];
 
-  final List<String> categories = [
-    "Shopping",
+  final List<String> categories = const [
     "Food",
+    "Shopping",
     "Transport",
     "Education",
     "HealthCare",
@@ -36,15 +38,29 @@ class _AddSpentState extends State<AddSpent> {
     "Other",
   ];
 
-  String selectedMode = "Select Payment mode";
-  String selectedCategory = "Select Category";
+  late String selectedMode;
+  late String selectedCategory;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedMode = paymentModes.first;
+    selectedCategory = categories.first;
+  }
+
+  @override
+  void dispose() {
+    amountController.dispose();
+    descriptionController.dispose();
+    super.dispose();
+  }
 
   Future<void> pickDate() async {
     DateTime? picked = await showDatePicker(
       context: context,
       initialDate: selectedDate,
       firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
+      lastDate: DateTime(2100),
     );
 
     if (picked != null) {
@@ -54,15 +70,17 @@ class _AddSpentState extends State<AddSpent> {
     }
   }
 
-  void getAllDetails() async {
+  Future<void> getAllDetails() async {
     String amount = amountController.text.trim();
     String description = descriptionController.text.trim();
 
-    if (amount.isEmpty ||
-        description.isEmpty ||
-        selectedMode == "Select Payment mode") {
-      Fluttertoast.showToast(msg: "Please Enter All Values");
+    if (amount.isEmpty || description.isEmpty) {
+      Fluttertoast.showToast(msg: "Please fill in all fields");
+      return;
+    }
 
+    if (int.tryParse(amount) == null || (int.tryParse(amount) ?? 0) <= 0) {
+      Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
     }
 
@@ -71,85 +89,70 @@ class _AddSpentState extends State<AddSpent> {
     });
 
     try {
-      await storeSpentOnDatabase(
-        amount,
-        description,
-        selectedMode,
-        "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
-        selectedCategory,
+      final phone = await SessionManager.getPhoneNumber() ?? "";
+      if (phone.isEmpty) {
+        Fluttertoast.showToast(msg: "User session not found");
+        return;
+      }
+
+      String formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
+      if (!mounted) return;
+      final success = await context.read<ExpenseProvider>().addExpense(
+        phoneNumber: phone,
+        amount: amount,
+        description: description,
+        paymentMode: selectedMode,
+        date: formattedDate,
+        category: selectedCategory,
       );
 
-      Fluttertoast.showToast(msg: "Transaction Added Successfully");
-
-      Navigator.pop(context, true);
+      if (success) {
+        Fluttertoast.showToast(msg: "Transaction added successfully");
+        if (!mounted) return;
+        Navigator.pop(context, true);
+      } else {
+        Fluttertoast.showToast(msg: "Failed to save transaction");
+      }
     } catch (e) {
       Fluttertoast.showToast(msg: "Failed to save transaction");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
-
-    if (mounted) {
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  Future<void> storeSpentOnDatabase(
-    String amount,
-    String description,
-    String mode,
-    String date,
-    String category,
-  ) async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-
-    String phone = sp.getString("phone_number")!;
-
-    DatabaseReference ref = FirebaseDatabase.instance.ref("Expenses/$phone");
-
-    String key = ref.push().key!;
-
-    await ref.child(key).set({
-      "key": key,
-      "phone_number": phone,
-      "Amount": amount,
-      "Description": description,
-      "Payment_Mode": mode,
-      "Date": date,
-      "Category": category,
-      "timestamp": ServerValue.timestamp,
-    });
   }
 
   InputDecoration inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       enabledBorder: OutlineInputBorder(
-        borderSide: BorderSide(width: 3, color: Color(0xFF8BC24A)),
-
-        borderRadius: BorderRadius.circular(20),
+        borderSide: const BorderSide(width: 2, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
       ),
-
       focusedBorder: OutlineInputBorder(
-        borderSide: BorderSide(width: 3, color: Color(0xFF8BC24A)),
-
-        borderRadius: BorderRadius.circular(20),
+        borderSide: const BorderSide(width: 2.5, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
       ),
     );
   }
 
   InputDecorationTheme inputTheme() {
     return InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       enabledBorder: OutlineInputBorder(
-        borderSide: BorderSide(width: 3, color: Color(0xFF8BC24A)),
-
-        borderRadius: BorderRadius.circular(20),
+        borderSide: const BorderSide(width: 2, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
       ),
-
       focusedBorder: OutlineInputBorder(
-        borderSide: BorderSide(width: 3, color: Color(0xFF8BC24A)),
-
-        borderRadius: BorderRadius.circular(20),
+        borderSide: const BorderSide(width: 2.5, color: Color(0xFF8BC24A)),
+        borderRadius: BorderRadius.circular(16),
       ),
     );
   }
@@ -157,162 +160,135 @@ class _AddSpentState extends State<AddSpent> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FBF2),
       appBar: AppBar(
         title: const Text(
           "Add Transaction",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-
         iconTheme: const IconThemeData(color: Colors.white),
-
         backgroundColor: const Color(0xFF8BC24A),
+        elevation: 0,
       ),
-
       body: Stack(
         children: [
-          Container(color: const Color(0xFFE4D5A3)),
-
-          Positioned(
-            bottom: -200,
-
-            left: -50,
-
-            child: Container(
-              height: 500,
-
-              width: 700,
-
-              decoration: const BoxDecoration(
-                color: Color(0xff8BC24A),
-
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-
-          Center(
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.75,
-
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-
+          SafeArea(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
-
-              decoration: BoxDecoration(
-                color: Colors.white,
-
-                borderRadius: BorderRadius.circular(30),
-              ),
-
-              child: SingleChildScrollView(
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 15,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
+                ),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const Text(
+                      "New Transaction Details",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8BC24A),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
                     TextField(
                       controller: amountController,
-
                       keyboardType: TextInputType.number,
-
-                      decoration: inputDecoration("Enter Amount"),
+                      decoration: inputDecoration("Enter Amount (₹)"),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
                     TextField(
                       controller: descriptionController,
-
-                      decoration: inputDecoration("Enter Description"),
+                      decoration: inputDecoration("Enter Description / Note"),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
                     TextField(
                       readOnly: true,
-
                       decoration: inputDecoration(
-                        "Date : ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
+                        "Date: ${DateFormat('dd MMM yyyy').format(selectedDate)}",
                       ),
-
                       onTap: pickDate,
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
                     DropdownMenu<String>(
-                      width: MediaQuery.of(context).size.width - 80,
-
+                      width: MediaQuery.of(context).size.width - 84,
                       initialSelection: selectedCategory,
-
                       label: const Text("Select Category"),
-
                       dropdownMenuEntries: categories
                           .map(
-                            (item) =>
-                                DropdownMenuEntry(value: item, label: item),
+                            (item) => DropdownMenuEntry(
+                              value: item,
+                              label: item,
+                            ),
                           )
                           .toList(),
-
                       onSelected: (value) {
-                        setState(() {
-                          selectedCategory = value!;
-                        });
+                        if (value != null) {
+                          setState(() {
+                            selectedCategory = value;
+                          });
+                        }
                       },
-
                       inputDecorationTheme: inputTheme(),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
                     DropdownMenu<String>(
-                      width: MediaQuery.of(context).size.width - 80,
-
+                      width: MediaQuery.of(context).size.width - 84,
                       initialSelection: selectedMode,
-
                       label: const Text("Select Payment Mode"),
-
                       dropdownMenuEntries: paymentModes
                           .map(
-                            (item) =>
-                                DropdownMenuEntry(value: item, label: item),
+                            (item) => DropdownMenuEntry(
+                              value: item,
+                              label: item,
+                            ),
                           )
                           .toList(),
-
                       onSelected: (value) {
-                        setState(() {
-                          selectedMode = value!;
-                        });
+                        if (value != null) {
+                          setState(() {
+                            selectedMode = value;
+                          });
+                        }
                       },
-
                       inputDecorationTheme: inputTheme(),
                     ),
 
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 28),
 
                     SizedBox(
-                      width: double.infinity,
-
+                      height: 52,
                       child: ElevatedButton(
-                        onPressed: getAllDetails,
-
+                        onPressed: isLoading ? null : getAllDetails,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF8BC24A),
-
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-
                         child: const Text(
-                          "Save",
-
+                          "Save Transaction",
                           style: TextStyle(
                             color: Colors.white,
-
                             fontSize: 18,
-
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -326,8 +302,7 @@ class _AddSpentState extends State<AddSpent> {
 
           if (isLoading)
             Container(
-              color: Colors.black87,
-
+              color: Colors.black45,
               child: const Center(
                 child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
               ),

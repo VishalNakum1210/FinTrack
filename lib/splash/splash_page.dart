@@ -1,10 +1,16 @@
+import 'package:FinTrack/GetInformation/SessionManager.dart';
 import 'package:FinTrack/authantication/login_page.dart';
 import 'package:FinTrack/nav_bar.dart';
+import 'package:FinTrack/providers/expense_provider.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
+import 'package:FinTrack/providers/user_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
 
 class SplashPage extends StatefulWidget {
+  const SplashPage({super.key});
+
   @override
   State<SplashPage> createState() => _SplashPageState();
 }
@@ -13,29 +19,35 @@ class _SplashPageState extends State<SplashPage> {
   String appVersion = "0.0.0";
 
   Future<void> getVersion() async {
-    PackageInfo packageInfo = await PackageInfo.fromPlatform();
-
-    setState(() {
-      appVersion = packageInfo.version;
-    });
+    try {
+      PackageInfo packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          appVersion = packageInfo.version;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> getDecision() async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-
-    String? phoneNumber = sp.getString("phone_number");
+    final bool hasValidSession = await SessionManager.isSessionValid();
+    final String? phoneNumber = await SessionManager.getPhoneNumber();
 
     if (!mounted) return;
 
-    if (phoneNumber != null && phoneNumber.isNotEmpty) {
+    if (hasValidSession && phoneNumber != null && phoneNumber.isNotEmpty) {
+      context.read<UserProvider>().loadUserSession();
+      context.read<ExpenseProvider>().fetchExpenses(phoneNumber);
+      context.read<FriendProvider>().fetchFriends(phoneNumber);
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => NavPageSelector()),
+        MaterialPageRoute(builder: (context) => const NavPageSelector()),
       );
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => LoginPage()),
+        MaterialPageRoute(builder: (context) => const LoginPage()),
       );
     }
   }
@@ -44,7 +56,7 @@ class _SplashPageState extends State<SplashPage> {
   void initState() {
     super.initState();
     getVersion();
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(const Duration(milliseconds: 2200), () {
       getDecision();
     });
   }

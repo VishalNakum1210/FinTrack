@@ -5,54 +5,81 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 class RegistrationPage extends StatefulWidget {
+  const RegistrationPage({super.key});
+
   @override
-  State<RegistrationPage> createState() => _RegistrationStatePage();
+  State<RegistrationPage> createState() => _RegistrationPageState();
 }
 
-class _RegistrationStatePage extends State<RegistrationPage> {
-  TextEditingController Control_name = TextEditingController();
-  TextEditingController Control_email = TextEditingController();
-  TextEditingController Control_phone = TextEditingController();
-  TextEditingController Control_password = TextEditingController();
+class _RegistrationPageState extends State<RegistrationPage> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
   bool isLoading = false;
+  bool isPasswordVisible = false;
 
-  void check_details() async {
-    String name = Control_name.text;
-    String phone_number = Control_phone.text;
-    String email = Control_email.text;
-    String password = Control_password.text;
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> checkDetails() async {
+    String name = nameController.text.trim();
+    String phoneNumber = phoneController.text.trim();
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
 
     if (name.isEmpty ||
-        phone_number.isEmpty ||
+        phoneNumber.isEmpty ||
         email.isEmpty ||
         password.isEmpty) {
       Fluttertoast.showToast(msg: "Please fill all fields");
       return;
-    } else if (phone_number.length != 10) {
-      Fluttertoast.showToast(msg: "Enter valid phone number");
-      return;
-    } else if (!email.contains("@")) {
-      Fluttertoast.showToast(msg: "Enter valid email");
-      return;
-    } else {
-      setState(() {
-        isLoading = true;
-      });
-      try {
-        final myRef = FirebaseDatabase.instance.ref(
-          'user_details/$phone_number',
-        );
-        DatabaseEvent event = await myRef.once();
+    }
 
-        if (event.snapshot.value != null) {
-          Fluttertoast.showToast(msg: "Phone Number Already exsist");
-        } else {
-          await register_details(name, phone_number, email, password);
-        }
-      } catch (e) {
-        Fluttertoast.showToast(msg: "Database is not connected : $e");
-      } finally {
+    if (phoneNumber.length != 10 || int.tryParse(phoneNumber) == null) {
+      Fluttertoast.showToast(msg: "Please enter a valid 10-digit phone number");
+      return;
+    }
+
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(email)) {
+      Fluttertoast.showToast(msg: "Please enter a valid email address");
+      return;
+    }
+
+    if (!isPasswordStrong(password)) {
+      Fluttertoast.showToast(
+        msg: "Password must be at least 6 characters and contain letters & numbers",
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final myRef = FirebaseDatabase.instance.ref(
+        'user_details/$phoneNumber',
+      );
+      DatabaseEvent event = await myRef.once();
+
+      if (event.snapshot.value != null) {
+        Fluttertoast.showToast(msg: "Phone number is already registered!");
+      } else {
+        await registerDetails(name, phoneNumber, email, password);
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Database connection error: $e");
+    } finally {
+      if (mounted) {
         setState(() {
           isLoading = false;
         });
@@ -60,42 +87,66 @@ class _RegistrationStatePage extends State<RegistrationPage> {
     }
   }
 
-  Future<void> register_details(
+  Future<void> registerDetails(
     String name,
-    String phone_number,
+    String phoneNumber,
     String email,
     String password,
   ) async {
     try {
       final myRef = FirebaseDatabase.instance.ref("user_details");
 
-      await myRef.child(phone_number).set({
+      await myRef.child(phoneNumber).set({
         "name": name,
-        "phone_number": phone_number,
+        "phone_number": phoneNumber,
         "email": email,
-        "password": hashPassword(password),
-        "Address" : "Not Enter"
+        "password": hashPassword(password, phoneNumber),
+        "Address": "Not Entered",
+        "created_at": ServerValue.timestamp,
       });
 
-      Fluttertoast.showToast(msg: "Registration Successful");
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginPage()));
+      Fluttertoast.showToast(msg: "Registration Successful! Please login.");
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+      );
     } catch (e) {
-      Fluttertoast.showToast(msg: "Not Connected $e");
-      print(e);
+      Fluttertoast.showToast(msg: "Failed to register: $e");
     }
+  }
+
+  InputDecoration inputDecoration(String hint, {Widget? suffixIcon}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFF8BC24A)),
+      suffixIcon: suffixIcon,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          width: 2,
+          color: Color.fromARGB(255, 74, 127, 61),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          width: 2.5,
+          color: Color(0xFF8BC24A),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Stack(
           children: [
-            // Background
-            Container(color: Colors.white),
-
-            // Green Circle
+            // Background Circle
             Positioned(
               top: -180,
               left: -80,
@@ -112,7 +163,7 @@ class _RegistrationStatePage extends State<RegistrationPage> {
             // Main Scrollable Content
             SingleChildScrollView(
               padding: const EdgeInsets.only(
-                top: 70,
+                top: 30,
                 left: 20,
                 right: 20,
                 bottom: 30,
@@ -129,26 +180,34 @@ class _RegistrationStatePage extends State<RegistrationPage> {
                           Text(
                             "Hello",
                             style: TextStyle(
-                              fontSize: 40,
+                              fontSize: 38,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            "Welcome Back!",
+                            "Join Us Today!",
                             style: TextStyle(
                               fontSize: 18,
-                              color: Colors.black54,
+                              color: Color.fromARGB(255, 74, 127, 61),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
 
                       Container(
-                        height: 100,
-                        width: 100,
+                        height: 75,
+                        width: 75,
                         clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(40),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Image.asset(
                           'assets/image/AccountApplicationLogo.jpg',
@@ -158,19 +217,19 @@ class _RegistrationStatePage extends State<RegistrationPage> {
                     ],
                   ),
 
-                  const SizedBox(height: 50),
+                  const SizedBox(height: 30),
 
                   // Registration Card
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(25),
                       boxShadow: const [
                         BoxShadow(
-                          blurRadius: 15,
+                          blurRadius: 20,
                           color: Colors.black12,
-                          offset: Offset(0, 5),
+                          offset: Offset(0, 8),
                         ),
                       ],
                     ),
@@ -185,68 +244,94 @@ class _RegistrationStatePage extends State<RegistrationPage> {
                           ),
                         ),
 
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 25),
 
                         TextField(
-                          controller: Control_name,
-                          decoration: inputDecoration("Name"),
+                          controller: nameController,
+                          decoration: inputDecoration("Full Name"),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
                         TextField(
-                          controller: Control_email,
+                          controller: emailController,
                           keyboardType: TextInputType.emailAddress,
                           decoration: inputDecoration("Email"),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
                         TextField(
-                          controller: Control_phone,
+                          controller: phoneController,
                           keyboardType: TextInputType.phone,
                           decoration: inputDecoration("Phone Number"),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
                         TextField(
-                          controller: Control_password,
-                          obscureText: true,
-                          decoration: inputDecoration("Password"),
+                          controller: passwordController,
+                          obscureText: !isPasswordVisible,
+                          decoration: inputDecoration(
+                            "Password",
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                isPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: const Color(0xFF8BC24A),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  isPasswordVisible = !isPasswordVisible;
+                                });
+                              },
+                            ),
+                          ),
                         ),
-                        Container(
-                          width: double.infinity,
+
+                        const SizedBox(height: 15),
+
+                        Align(
                           alignment: Alignment.centerRight,
                           child: InkWell(
-                            child: Text("User Already Exsists"),
+                            child: const Text(
+                              "Already have an account? Sign In",
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 74, 127, 61),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             onTap: () {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => LoginPage(),
+                                  builder: (context) => const LoginPage(),
                                 ),
                               );
                             },
                           ),
                         ),
-                        const SizedBox(height: 30),
+
+                        const SizedBox(height: 25),
 
                         SizedBox(
                           width: double.infinity,
-                          height: 50,
+                          height: 52,
                           child: ElevatedButton(
-                            onPressed: () {
-                              check_details();
-                            },
+                            onPressed: isLoading ? null : checkDetails,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF8BC24A),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
                             ),
                             child: const Text(
                               "Submit",
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 20,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
@@ -257,37 +342,17 @@ class _RegistrationStatePage extends State<RegistrationPage> {
                 ],
               ),
             ),
+
             if (isLoading)
               Container(
                 height: double.infinity,
                 width: double.infinity,
-                color: Colors.black.withValues(alpha: 0.5),
-                child: Center(
-                  child: CircularProgressIndicator(color: Color(0xFF8BC24A),),
-                )
+                color: Colors.black45,
+                child: const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
+                ),
               ),
           ],
-        ),
-      ),
-    );
-  }
-
-  InputDecoration inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFF8BC24A)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          width: 3,
-          color: Color.fromARGB(255, 74, 127, 61),
-        ),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          width: 3,
-          color: Color.fromARGB(255, 74, 127, 61),
         ),
       ),
     );

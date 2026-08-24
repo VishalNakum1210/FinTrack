@@ -1,128 +1,65 @@
-import 'package:FinTrack/GetInformation/GetAllRecords.dart';
+import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/user_pages/add_spent.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class PassbookApp extends StatefulWidget {
+  const PassbookApp({super.key});
+
   @override
-  State<PassbookApp> createState() => PassbookPage();
+  State<PassbookApp> createState() => PassbookPageState();
 }
 
-class PassbookPage extends State<PassbookApp> {
-  bool isLoading = true;
-  bool noRecords = false;
-  int income = 0;
-  int expense = 0;
-  int SpentCase = 0;
-  int SpentOnline = 0;
-  String selectSort = "Newest First";
-  String current_Sort = "Newest First";
-  String last = "";
-  int recordCount = 0;
-  List<String> sortList = ["Newest First", "Last First"];
-  List<Map<String, dynamic>> records = [];
+class PassbookPageState extends State<PassbookApp> {
+  String currentSort = "Newest First";
+  final List<String> sortList = const ["Newest First", "Oldest First"];
   String selectedCategory = "All";
   static const Color green = Color(0xFF8BC24A);
 
-  Widget checkDate(String date) {
-    if (date != last) {
-      last = date;
-      return _sectionHeader('', '${formatDate(date)}');
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
+  }
+
+  Future<void> _loadData() async {
+    final phone = await SessionManager.getPhoneNumber() ?? "";
+    if (mounted && phone.isNotEmpty) {
+      context.read<ExpenseProvider>().fetchExpenses(phone);
     }
-    return const SizedBox.shrink();
   }
 
   String formatDate(String date) {
-    final inputFormat = DateFormat('d/M/yyyy');
-    final outputFormat = DateFormat('d MMM yyyy');
-
-    final parsedDate = inputFormat.parse(date);
-    return outputFormat.format(parsedDate);
-  }
-
-  Future<void> getDetails(String condition) async {
-    setState(() {
-      isLoading = true;
-    });
-    income = 0;
-    expense = 0;
-    recordCount = 0;
-    SpentCase = 0;
-    SpentOnline = 0;
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone = sp.getString("phone_number")!;
-    DatabaseReference myref = FirebaseDatabase.instance.ref("Expenses/$phone");
-
-    DatabaseEvent event = await myref.once();
-
-    if (event.snapshot.value != null) {
-      Map data = event.snapshot.value as Map;
-
-      data.forEach(((key, value) {
-        if (["Add CASH", "Add Online"].contains(value["Payment_Mode"])) {
-          income += int.parse(value["Amount"]);
-        } else {
-          expense += int.parse(value["Amount"]);
-        }
-        if (value["Category"] == condition || condition == "All") {
-          recordCount++;
-          if (value["Payment_Mode"] == "Spent Cash") {
-            SpentCase += int.parse(value["Amount"]);
-          } else if (value["Payment_Mode"] == "Spent Online") {
-            SpentOnline += int.parse(value['Amount']);
-          }
-        }
-      }));
-    }
-    getRecords(condition);
-  }
-
-  Future<void> getRecords(String condition) async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone = sp.getString("phone_number")!;
-    records = (await allRecords(phone, condition));
-    if (records.isEmpty) {
-      setState(() {
-        isLoading = false;
-        noRecords = true;
-      });
-    } else {
-      setState(() {
-        records = records.reversed.toList();
-        isLoading = false;
-        noRecords = false;
-      });
+    try {
+      final inputFormat = DateFormat('d/M/yyyy');
+      final outputFormat = DateFormat('d MMM yyyy');
+      final parsedDate = inputFormat.parse(date);
+      return outputFormat.format(parsedDate);
+    } catch (_) {
+      return date;
     }
   }
 
   void changeOrder(String? value) {
-    if (current_Sort != value) {
-      current_Sort = value!;
-      records = records.reversed.toList();
+    if (value != null && currentSort != value) {
       setState(() {
-        last = "";
+        currentSort = value;
       });
     }
   }
 
   Future<void> deleteRecord(String key) async {
-    setState(() {
-      isLoading = true;
-    });
-
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone = sp.getString("phone_number")!;
-    DatabaseReference myref = FirebaseDatabase.instance.ref(
-      "Expenses/$phone/$key",
-    );
-
-    await myref.remove();
-
-    setState(() {
-      isLoading = false;
-    });
+    final phone = await SessionManager.getPhoneNumber() ?? "";
+    if (mounted && phone.isNotEmpty) {
+      await context.read<ExpenseProvider>().deleteExpense(
+        phoneNumber: phone,
+        key: key,
+      );
+    }
   }
 
   String money(int value) {
@@ -134,182 +71,181 @@ class PassbookPage extends State<PassbookApp> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    getDetails("All");
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
+    return Consumer<ExpenseProvider>(
+      builder: (context, expenseProvider, _) {
+        final isLoading = expenseProvider.isLoading;
+        List<Map<String, dynamic>> rawFiltered = expenseProvider.getFilteredRecords(selectedCategory);
+        List<Map<String, dynamic>> records = currentSort == "Oldest First"
+            ? rawFiltered.reversed.toList()
+            : rawFiltered;
 
-        title: Row(
-          children: [
-            Container(
-              height: 50,
-              width: 50,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Image.asset(
-                "assets/image/AccountApplicationLogo.jpg",
-                fit: BoxFit.cover,
-              ),
-            ),
+        final income = expenseProvider.totalIncome;
+        final expense = expenseProvider.totalExpense;
+        final spentCash = expenseProvider.spentCash;
+        final spentOnline = expenseProvider.spentOnline;
+        final recordCount = records.length;
 
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "PassBook Page",
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: green,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 0,
+            title: Row(
+              children: [
+                Container(
+                  height: 50,
+                  width: 50,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                ],
-              ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset(
+                    "assets/image/AccountApplicationLogo.jpg",
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "PassBook Page",
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: green,
+            shape: const CircleBorder(),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddSpent()),
+              );
+            },
+            child: const Icon(Icons.add, color: Colors.white, size: 34),
+          ),
+          body: isLoading
+              ? const Center(child: CircularProgressIndicator(color: green))
+              : (records.isEmpty)
+                  ? Container(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          _categoryChips(),
+                          const SizedBox(height: 10),
+                          _balanceCard(income, expense, spentCash, spentOnline, recordCount),
+                          const SizedBox(height: 10),
+                          const Expanded(
+                            child: Center(
+                              child: Text(
+                                "No Record Found!",
+                                style: TextStyle(color: green),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _categoryChips(),
+                          const SizedBox(height: 10),
+                          _balanceCard(income, expense, spentCash, spentOnline, recordCount),
+                          const SizedBox(height: 10),
+                          _sortRow(),
+                          const SizedBox(height: 10),
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: records.length,
+                            itemBuilder: (context, index) {
+                              final item = records[index];
+                              final date = (item["Date"] ?? "").toString();
+                              final showHeader = index == 0 ||
+                                  date != (records[index - 1]["Date"] ?? "").toString();
+                              final category = (item["Category"] ?? "Other").toString();
+                              final desc = (item["Description"] ?? "").toString();
+                              final method = (item["Payment_Mode"] ?? "").toString();
+                              final amount = int.tryParse(item["Amount"]?.toString() ?? '0') ?? 0;
+                              final isIncome = ["Add CASH", "Add Online"].contains(method);
 
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: green,
-        shape: const CircleBorder(),
-        onPressed: () async {
-          final bool change = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddSpent()),
-          );
-          if (change) {
-            getDetails("All");
-          }
-        },
-        child: const Icon(Icons.add, color: Colors.white, size: 34),
-      ),
-      body: isLoading
-          ? Container(
-              child: Center(child: CircularProgressIndicator(color: green)),
-            )
-          : (noRecords)
-          ? Container(
-              padding: EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  _categoryChips(),
-                  const SizedBox(height: 10),
-                  _balanceCard(),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        "No Record Found!",
-                        style: TextStyle(color: green),
+                              return InkWell(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (showHeader && date.isNotEmpty)
+                                      _sectionHeader('', formatDate(date)),
+                                    _transactionTile(
+                                      icon: icon_name(category),
+                                      iconColor: iconColor(category),
+                                      bgColor: backgroundColor(category),
+                                      title: category,
+                                      subtitle: desc,
+                                      method: method,
+                                      time: date,
+                                      amount: money(amount),
+                                      isIncome: isIncome,
+                                    ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      title: const Text("Delete Record"),
+                                      content: const Text(
+                                        "Are you sure you want to delete this record?",
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                          },
+                                          child: const Text("Cancel"),
+                                        ),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: () async {
+                                            Navigator.pop(context);
+                                            if (item["key"] != null) {
+                                              await deleteRecord(item["key"]);
+                                            }
+                                          },
+                                          child: const Text("Delete"),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // _searchRow(),
-                  // const SizedBox(height: 10),
-                  _categoryChips(),
-                  const SizedBox(height: 10),
-                  _balanceCard(),
-                  const SizedBox(height: 10),
-                  _sortRow(),
-                  const SizedBox(height: 10),
-
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: records.length,
-
-                    itemBuilder: (context, index) {
-                      return InkWell(
-                        child: Column(
-                          children: [
-                            checkDate(records[index]["Date"]),
-                            _transactionTile(
-                              icon: icon_name(records[index]["Category"]),
-                              iconColor: iconColor(records[index]["Category"]),
-                              bgColor: backgroundColor(
-                                records[index]["Category"],
-                              ),
-                              title: records[index]["Category"]!,
-                              subtitle: records[index]["Description"]!,
-                              method: records[index]["Payment_Mode"]!,
-                              time: records[index]["Date"]!,
-                              amount: money(
-                                int.parse(records[index]["Amount"]!),
-                              ),
-                              isIncome:
-                                  [
-                                    "Add CASH",
-                                    "Add Online",
-                                  ].contains(records[index]["Payment_Mode"])
-                                  ? true
-                                  : false,
-                            ),
-                          ],
-                        ),
-
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              title: const Text("Delete Record"),
-                              content: const Text(
-                                "Are you sure you want to delete this record?",
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                  child: const Text("Cancel"),
-                                ),
-
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  onPressed: () async {
-                                    Navigator.pop(context);
-                                    await deleteRecord(records[index]["key"]);
-                                  },
-                                  child: const Text("Delete"),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
+        );
+      },
     );
   }
 
@@ -340,8 +276,7 @@ class PassbookPage extends State<PassbookApp> {
     bool selected = selectedCategory == label;
 
     return GestureDetector(
-      onTap: () async {
-        await getDetails(label);
+      onTap: () {
         setState(() {
           selectedCategory = label;
         });
@@ -374,7 +309,7 @@ class PassbookPage extends State<PassbookApp> {
     );
   }
 
-  Widget _balanceCard() {
+  Widget _balanceCard(int income, int expense, int spentCash, int spentOnline, int recordCount) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -469,7 +404,7 @@ class PassbookPage extends State<PassbookApp> {
                       Icons.payments_rounded,
                       Colors.orangeAccent,
                       "Cash Exp.",
-                      money(SpentCase),
+                      money(spentCash),
                     ),
                   ),
 
@@ -480,7 +415,7 @@ class PassbookPage extends State<PassbookApp> {
                       Icons.payment_rounded,
                       Colors.lightBlueAccent,
                       "Online Exp.",
-                      money(SpentOnline),
+                      money(spentOnline),
                     ),
                   ),
                 ],
@@ -504,7 +439,7 @@ class PassbookPage extends State<PassbookApp> {
           child: Row(
             children: [
               DropdownMenu<String>(
-                initialSelection: selectSort,
+                initialSelection: currentSort,
                 dropdownMenuEntries: sortList
                     .map((item) => DropdownMenuEntry(value: item, label: item))
                     .toList(),
@@ -624,7 +559,7 @@ class PassbookPage extends State<PassbookApp> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        '$method',
+                        method,
                         style: const TextStyle(
                           color: Colors.grey,
                           fontSize: 14,
@@ -680,7 +615,7 @@ Widget balanceItem(
       const SizedBox(height: 6),
 
       Text(
-        isMoney ? "${value}" : value.toString(),
+        isMoney ? "$value" : value.toString(),
         style: const TextStyle(
           color: Colors.white,
           fontSize: 18,

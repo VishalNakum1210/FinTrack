@@ -62,11 +62,13 @@ class _FeedbackPageState extends State<FeedbackPage> {
       Fluttertoast.showToast(msg: "Thank you for your feedback ❤️");
     } catch (e) {
       Fluttertoast.showToast(msg: "Error : $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
-
-    setState(() {
-      isLoading = false;
-    });
   }
 
   Widget buildStar(int index) {

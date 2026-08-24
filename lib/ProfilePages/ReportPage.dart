@@ -1,212 +1,46 @@
-import 'package:firebase_database/firebase_database.dart';
+import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/providers/expense_provider.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class Reportpage extends StatefulWidget {
+  const Reportpage({super.key});
+
   @override
-  State<Reportpage> createState() => _reportPage();
+  State<Reportpage> createState() => _ReportPageState();
 }
 
-class _reportPage extends State<Reportpage> {
-  bool isLoading = false;
-  double totalIncome = 0;
-  double totalExpense = 0;
-  double currentBalance = 0;
-  double cashBalance = 0;
-  double onlineBalance = 0;
-  String topCategory = "";
-  double friendGiven = 0;
-  double friendTaken = 0;
-  double highestIncome = 0;
+class _ReportPageState extends State<Reportpage> {
+  final Color themeColor = const Color(0xFF8BC24A);
 
-  int transactionCount = 0;
-
-  Map<String, double> categoryTotals = {};
-
-  List<Map> recentTransactions = [];
-
-  Future<void> loadReportData() async {
-    setState(() {
-      isLoading = true;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
     });
-    try {
-      SharedPreferences sp = await SharedPreferences.getInstance();
+  }
 
-      String phone = sp.getString("phone_number") ?? "";
-
-      totalIncome = 0;
-      totalExpense = 0;
-
-      cashBalance = 0;
-      onlineBalance = 0;
-
-      friendGiven = 0;
-      friendTaken = 0;
-
-      transactionCount = 0;
-
-      categoryTotals.clear();
-      recentTransactions.clear();
-
-      // Change Expenses to Records if needed
-      DatabaseReference expenseRef = FirebaseDatabase.instance.ref(
-        "Expenses/$phone",
-      );
-
-      DataSnapshot expenseSnap = await expenseRef.get();
-
-      if (expenseSnap.exists) {
-        Map<dynamic, dynamic> data = expenseSnap.value as Map<dynamic, dynamic>;
-
-        data.forEach((key, value) {
-          try {
-            Map<String, dynamic> record = Map<String, dynamic>.from(value);
-
-            double amount = double.parse(record["Amount"]);
-
-            String paymentMode = record["Payment_Mode"]?.toString() ?? "";
-
-            String category = record["Category"]?.toString() ?? "Other";
-
-            transactionCount++;
-
-            // Save for recent activity
-            recentTransactions.add({
-              "amount": amount,
-              "category": category,
-              "payment": paymentMode,
-              "timestamp": record["timestamp"] ?? 0,
-            });
-
-            // Income
-            if (paymentMode.contains("Add")) {
-              totalIncome += amount;
-
-              if (amount > highestIncome) {
-                highestIncome = amount;
-              }
-            }
-
-            // Expense
-            if (paymentMode.contains("Spent")) {
-              totalExpense += amount;
-            }
-
-            // Cash
-            if (paymentMode == "Add CASH") {
-              cashBalance += amount;
-            }
-
-            if (paymentMode == "Spent Cash") {
-              cashBalance -= amount;
-            }
-
-            // Online
-            if (paymentMode == "Add Online") {
-              onlineBalance += amount;
-            }
-
-            if (paymentMode == "Spent Online") {
-              onlineBalance -= amount;
-            }
-
-            // Categories
-            if (paymentMode.contains("Spent")) {
-              categoryTotals[category] =
-                  (categoryTotals[category] ?? 0) + amount;
-            }
-            if (paymentMode.contains("Add")) {
-              totalIncome += amount;
-
-              if (amount > highestIncome) {
-                highestIncome = amount;
-              }
-            }
-          } catch (e) {
-            print(e);
-          }
-        });
-      }
-
-      // Current Balance
-      currentBalance = cashBalance + onlineBalance;
-
-      // Top Category
-      if (categoryTotals.isNotEmpty) {
-        topCategory = categoryTotals.entries
-            .reduce((a, b) => (a.value > b.value) ? a : b)
-            .key;
-      }
-
-      // Recent Transactions
-      recentTransactions.sort(
-        (a, b) => (b["timestamp"] ?? 0).compareTo(a["timestamp"] ?? 0),
-      );
-
-      // Friends
-      DatabaseReference friendRef = FirebaseDatabase.instance.ref(
-        "Friends/$phone",
-      );
-
-      DataSnapshot friendSnap = await friendRef.get();
-
-      if (friendSnap.exists) {
-        Map<dynamic, dynamic> friends =
-            friendSnap.value as Map<dynamic, dynamic>;
-
-        friends.forEach((key, value) {
-          try {
-            Map<String, dynamic> friend = Map<String, dynamic>.from(value);
-
-            friendGiven += double.tryParse(friend["total_get"].toString()) ?? 0;
-
-            friendTaken +=
-                double.tryParse(friend["total_give"].toString()) ?? 0;
-          } catch (e) {
-            print(e);
-          }
-        });
-      }
-
-      setState(() {
-        isLoading = false;
-      });
-    } catch (e) {
-      print("Report Error: $e");
-
-      setState(() {
-        isLoading = false;
-      });
+  Future<void> _loadData() async {
+    final phone = await SessionManager.getPhoneNumber() ?? "";
+    if (mounted && phone.isNotEmpty) {
+      context.read<ExpenseProvider>().fetchExpenses(phone);
+      context.read<FriendProvider>().fetchFriends(phone);
     }
   }
 
-  double get healthScore {
+  double calculateHealthScore(double totalIncome, double totalExpense) {
     if (totalIncome <= 0) return 0;
-
     return ((totalIncome - totalExpense) / totalIncome).clamp(0.0, 1.0);
   }
 
-  String get healthText {
-    if (healthScore >= .8) {
-      return "Excellent";
-    }
-
-    if (healthScore >= .6) {
-      return "Good";
-    }
-
-    if (healthScore >= .4) {
-      return "Average";
-    }
-
+  String getHealthText(double healthScore) {
+    if (healthScore >= .8) return "Excellent";
+    if (healthScore >= .6) return "Good";
+    if (healthScore >= .4) return "Average";
     return "Needs Improvement";
-  }
-
-  double get highestCategoryAmount {
-    if (categoryTotals.isEmpty) return 0;
-
-    return categoryTotals.values.reduce((a, b) => a > b ? a : b);
   }
 
   String money(num value) {
@@ -218,42 +52,62 @@ class _reportPage extends State<Reportpage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    loadReportData();
-  }
-
-  final Color themeColor = const Color(0xFF8BC24A);
-
-  @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF8FBF2),
-        body: Center(child: CircularProgressIndicator(color: themeColor)),
-      );
-    }
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FBF2),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FBF2),
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          "Reports",
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: (isLoading)
-          ? Container(
-              child: Center(
-                child: CircularProgressIndicator(color: themeColor),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
+    return Consumer2<ExpenseProvider, FriendProvider>(
+      builder: (context, expenseProvider, friendProvider, _) {
+        final isLoading = expenseProvider.isLoading || friendProvider.isLoading;
+        final totalIncome = expenseProvider.totalIncome.toDouble();
+        final totalExpense = expenseProvider.totalExpense.toDouble();
+        final currentBalance = expenseProvider.currentBalance.toDouble();
+        final cashBalance = (expenseProvider.addCash - expenseProvider.spentCash).toDouble();
+        final onlineBalance = (expenseProvider.addOnline - expenseProvider.spentOnline).toDouble();
+        final friendGiven = friendProvider.totalGet.toDouble();
+        final friendTaken = friendProvider.totalGive.toDouble();
+        final categoryTotals = expenseProvider.categoryTotals.map((k, v) => MapEntry(k, v.toDouble()));
+        final recentTransactions = expenseProvider.records;
+        final transactionCount = recentTransactions.length;
+
+        final healthScore = calculateHealthScore(totalIncome, totalExpense);
+        final healthText = getHealthText(healthScore);
+
+        String topCategory = "No Data";
+        if (categoryTotals.isNotEmpty) {
+          topCategory = categoryTotals.entries
+              .reduce((a, b) => (a.value > b.value) ? a : b)
+              .key;
+        }
+
+        double highestIncome = 0;
+        for (var r in recentTransactions) {
+          final mode = (r["Payment_Mode"] ?? "").toString();
+          final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
+          if (mode.startsWith("Add") && amt > highestIncome) {
+            highestIncome = amt;
+          }
+        }
+
+        if (isLoading) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF8FBF2),
+            body: Center(child: CircularProgressIndicator(color: themeColor)),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FBF2),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFFF8FBF2),
+            elevation: 0,
+            centerTitle: true,
+            title: const Text(
+              "Reports",
+              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+            ),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
                   // Balance Card
                   Container(
                     width: double.infinity,
@@ -274,14 +128,14 @@ class _reportPage extends State<Reportpage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           "Current Balance",
                           style: TextStyle(color: Colors.white70),
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         Text(
-                          "${money(currentBalance)}",
-                          style: TextStyle(
+                          money(currentBalance),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 34,
                             fontWeight: FontWeight.bold,
@@ -377,6 +231,16 @@ class _reportPage extends State<Reportpage> {
                     mainAxisSpacing: 12,
                     children: [
                       _insightCard(
+                        icon: Icons.payments_rounded,
+                        title: "Cash Balance",
+                        value: money(cashBalance),
+                      ),
+                      _insightCard(
+                        icon: Icons.account_balance_wallet_rounded,
+                        title: "Online Balance",
+                        value: money(onlineBalance),
+                      ),
+                      _insightCard(
                         icon: Icons.shopping_bag,
                         title: "Biggest Expense",
                         value: topCategory,
@@ -384,7 +248,7 @@ class _reportPage extends State<Reportpage> {
                       _insightCard(
                         icon: Icons.monetization_on,
                         title: "Highest Income",
-                        value: "${money(highestIncome)}",
+                        value: money(highestIncome),
                       ),
                       _insightCard(
                         icon: Icons.receipt_long,
@@ -393,7 +257,7 @@ class _reportPage extends State<Reportpage> {
                       ),
                       _insightCard(
                         icon: Icons.calendar_month,
-                        title: "Active Days",
+                        title: "Total Records",
                         value: recentTransactions.length.toString(),
                       ),
                     ],
@@ -420,8 +284,10 @@ class _reportPage extends State<Reportpage> {
                       themeColor: themeColor,
                       icon: Icons.category,
                       title: e.key,
-                      amount: "${money(e.value)}",
-                      value: e.value / totalExpense,
+                      amount: money(e.value),
+                      value: totalExpense > 0
+                          ? (e.value / totalExpense).clamp(0.0, 1.0)
+                          : 0.0,
                     );
                   }),
 
@@ -452,9 +318,9 @@ class _reportPage extends State<Reportpage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text("Money You Get"),
+                            const Text("Money You Get"),
                             Text(
-                              "${money(friendGiven)}",
+                              money(friendGiven),
                               style: TextStyle(
                                 color: themeColor,
                                 fontWeight: FontWeight.bold,
@@ -470,8 +336,8 @@ class _reportPage extends State<Reportpage> {
                           children: [
                             const Text("Money You Want To Give"),
                             Text(
-                              "${money(friendTaken)}",
-                              style: TextStyle(
+                              money(friendTaken),
+                              style: const TextStyle(
                                 color: Colors.red,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -523,17 +389,18 @@ class _reportPage extends State<Reportpage> {
                         const SizedBox(height: 15),
 
                         ...recentTransactions.take(5).map((record) {
-                          bool isExpense = record["payment"]
-                              .toString()
-                              .contains("Spent");
+                          final payment = (record["Payment_Mode"] ?? record["payment"] ?? "").toString();
+                          final category = (record["Category"] ?? record["category"] ?? "Other").toString();
+                          final amt = double.tryParse(record["Amount"]?.toString() ?? record["amount"]?.toString() ?? '0') ?? 0.0;
+                          bool isExpense = payment.contains("Spent");
 
                           return _activityTile(
                             themeColor,
                             isExpense
                                 ? Icons.arrow_upward
                                 : Icons.arrow_downward,
-                            record["category"].toString(),
-                            "${isExpense ? "-" : "+"}${money(record["amount"])}",
+                            category,
+                            "${isExpense ? "-" : "+"}${money(amt)}",
                             isExpense ? Colors.red : themeColor,
                           );
                         }),
@@ -545,6 +412,8 @@ class _reportPage extends State<Reportpage> {
                 ],
               ),
             ),
+        );
+      },
     );
   }
 

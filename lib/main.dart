@@ -1,9 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'firebase_options.dart';
+import 'package:FinTrack/providers/expense_provider.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
+import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/splash/splash_page.dart';
-
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,13 +21,20 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: "FinTrack",
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: GoogleFonts.poppins().fontFamily,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => ExpenseProvider()),
+        ChangeNotifierProvider(create: (_) => FriendProvider()),
+      ],
+      child: MaterialApp(
+        title: "FinTrack",
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          fontFamily: GoogleFonts.poppins().fontFamily,
+        ),
+        home: const SplashPage(),
       ),
-      home: SplashPage(),
     );
   }
 }

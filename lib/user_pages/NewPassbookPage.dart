@@ -7,16 +7,18 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Passbookpage extends StatefulWidget {
+  const Passbookpage({super.key});
+
   @override
-  State<Passbookpage> createState() => _passbookPage();
+  State<Passbookpage> createState() => _PassbookPageState();
 }
 
-class _passbookPage extends State<Passbookpage> {
+class _PassbookPageState extends State<Passbookpage> {
   bool isLoading = false;
   String totalAmount = "0";
 
   String selectedType = "All";
-  List<Map<String, dynamic>>? records = null;
+  List<Map<String, dynamic>>? records;
 
   Widget categoryChip(String title) {
     return Padding(
@@ -32,18 +34,25 @@ class _passbookPage extends State<Passbookpage> {
   }
 
   Future<void> filterExpenses(String type) async {
-    setState(() {
-      isLoading = true;
-      records = null;
-      totalAmount = "0";
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+        records = null;
+        totalAmount = "0";
+      });
+    }
     SharedPreferences sp = await SharedPreferences.getInstance();
-    records = (await allRecords(sp.getString("phone_number")!, type));
-    totalAmount = await getTotalExpenses(sp.getString("phone_number")!, type);
-    setState(() {
-      isLoading = false;
-      selectedType = type;
-    });
+    String phone = sp.getString("phone_number") ?? "";
+    if (phone.isNotEmpty) {
+      records = await allRecords(phone, type);
+      totalAmount = await getTotalExpenses(phone, type);
+    }
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+        selectedType = type;
+      });
+    }
   }
 
   String formatIndianNumber(int number) {
@@ -51,26 +60,32 @@ class _passbookPage extends State<Passbookpage> {
   }
 
   Future<void> deleteRecord(String key) async {
-    setState(() {
-      isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+      });
+    }
     try {
       SharedPreferences sp = await SharedPreferences.getInstance();
-      String phone_number = sp.getString("phone_number")!;
-      DatabaseReference myref = FirebaseDatabase.instance.ref(
-        "Expenses/$phone_number/$key",
-      );
+      String phone = sp.getString("phone_number") ?? "";
+      if (phone.isNotEmpty) {
+        DatabaseReference myref = FirebaseDatabase.instance.ref(
+          "Expenses/$phone/$key",
+        );
 
-      await myref.remove();
-      records!.clear();
-      await filterExpenses(selectedType);
-      Fluttertoast.showToast(msg: "Recored Deleted Successfully");
+        await myref.remove();
+        records?.clear();
+        await filterExpenses(selectedType);
+        Fluttertoast.showToast(msg: "Record deleted successfully");
+      }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Not Connected $e");
+      Fluttertoast.showToast(msg: "Failed to delete: $e");
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -321,7 +336,7 @@ class _passbookPage extends State<Passbookpage> {
                               children: [
                                 Text(records![index]["Date"]),
                                 Text(
-                                  "Desc : " + records![index]["Description"],
+                                  "Desc : ${records![index]["Description"]}",
                                 ),
                                 Text(
                                   "Payment: ${records![index]["Payment_Mode"]}",
@@ -333,7 +348,7 @@ class _passbookPage extends State<Passbookpage> {
                                 locale: 'en_IN',
                                 symbol: '₹',
                                 decimalDigits: 0,
-                              ).format(int.tryParse(records![index]["Amount"])),
+                              ).format(int.tryParse(records![index]["Amount"]?.toString() ?? '0') ?? 0),
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -352,28 +367,18 @@ class _passbookPage extends State<Passbookpage> {
                     },
                   )
                 : isLoading
-                ? Container(
-                    height: double.infinity,
-                    width: double.infinity,
-                    color: Colors.white70,
-
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF8BC24A),
-                      ),
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF8BC24A),
                     ),
                   )
-                : Container(
-                    height: double.infinity,
-                    width: double.infinity,
-                    child: Center(
-                      child: Text(
-                        "No Data Found",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 30,
-                          color: Colors.green,
-                        ),
+                : const Center(
+                    child: Text(
+                      "No Data Found",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24,
+                        color: Colors.green,
                       ),
                     ),
                   ),

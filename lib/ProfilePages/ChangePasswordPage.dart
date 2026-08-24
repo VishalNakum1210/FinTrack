@@ -55,6 +55,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
+    if (!isPasswordStrong(newPassword)) {
+      Fluttertoast.showToast(
+        msg: "New password must be at least 6 characters and contain letters & numbers",
+      );
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
@@ -84,7 +91,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       String currentPassword =
           data["password"] ?? "";
 
-      if (currentPassword != hashPassword(oldPassword)) {
+      if (!verifyPassword(oldPassword, currentPassword, phoneNumber)) {
         Fluttertoast.showToast(
           msg: "Old password is incorrect",
         );
@@ -92,9 +99,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       }
 
       await myRef.update({
-        "password": hashPassword(newPassword),
+        "password": hashPassword(newPassword, phoneNumber),
       });
 
+      if (!mounted) return;
       Fluttertoast.showToast(
         msg: "Password changed successfully",
       );
@@ -105,9 +113,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         msg: e.toString(),
       );
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 

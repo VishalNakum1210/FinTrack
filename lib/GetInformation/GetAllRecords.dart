@@ -2,59 +2,81 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 
 Future<List<Map<String, dynamic>>> allRecords(
-  String phone_number,
-  String Specific,
+  String phoneNumber,
+  String specific,
 ) async {
-  DatabaseReference myref = FirebaseDatabase.instance.ref(
-    "Expenses/$phone_number",
-  );
-  DatabaseEvent event = await myref.once();
-  List<Map<String, dynamic>> result = [];
-  if (event.snapshot.value != null) {
-    Map Data = event.snapshot.value as Map;
-    if ([
-      "Food",
-      "Shopping",
-      "Transport",
-      "Education",
-      "HealthCare",
-      "Entertainment",
-      "Add Money",
-    ].contains(Specific)) {
-      Data.forEach((key, value) {
-        if (value["Category"] == Specific) {
-          result.add(Map<String, dynamic>.from(value));
-        }
-      });
-    } else if ([
-      "Spent Cash",
-      "Spent Online",
-      "Spent Cash For ADA",
-      "Spent Online For ADA",
-      "Add CASH",
-      "Add Online",
-    ].contains(Specific)) {
-      Data.forEach((key, value) {
-        if (value["Payment_Mode"] == Specific) {
-          result.add(Map<String, dynamic>.from(value));
-        }
-      });
-    } else if (Specific == "All") {
-      Data.forEach((key, value) {
-        result.add(Map<String, dynamic>.from(value));
-      });
-    }
-    if (result.isEmpty) {
-      return [];
-    }
-    final formatter = DateFormat("d/M/yyyy");
+  try {
+    DatabaseReference myref = FirebaseDatabase.instance.ref(
+      "Expenses/$phoneNumber",
+    );
+    DatabaseEvent event = await myref.once();
+    List<Map<String, dynamic>> result = [];
+    if (event.snapshot.value != null) {
+      Map data = event.snapshot.value as Map;
+      const categories = [
+        "Food",
+        "Shopping",
+        "Transport",
+        "Education",
+        "HealthCare",
+        "Entertainment",
+        "Add Money",
+        "Other",
+      ];
+      const paymentModes = [
+        "Spent Cash",
+        "Spent Online",
+        "Spent Cash For ADA",
+        "Spent Online For ADA",
+        "Add CASH",
+        "Add Online",
+      ];
 
-    result.sort((a, b) {
-      DateTime dateA = formatter.parse(a["Date"]!);
-      DateTime dateB = formatter.parse(b["Date"]!);
-      return dateA.compareTo(dateB);
-    });
-    return result;
+      data.forEach((key, value) {
+        if (value is Map) {
+          Map<String, dynamic> item = Map<String, dynamic>.from(value);
+          if (specific == "All") {
+            result.add(item);
+          } else if (categories.contains(specific)) {
+            if (item["Category"] == specific) {
+              result.add(item);
+            }
+          } else if (paymentModes.contains(specific)) {
+            if (item["Payment_Mode"] == specific) {
+              result.add(item);
+            }
+          } else {
+            if (item["Category"] == specific || item["Payment_Mode"] == specific) {
+              result.add(item);
+            }
+          }
+        }
+      });
+
+      if (result.isEmpty) {
+        return [];
+      }
+
+      final formatter = DateFormat("d/M/yyyy");
+
+      result.sort((a, b) {
+        if (a["timestamp"] != null && b["timestamp"] != null) {
+          return (a["timestamp"] as num).compareTo(b["timestamp"] as num);
+        }
+        try {
+          String dateStrA = (a["Date"] ?? "").toString();
+          String dateStrB = (b["Date"] ?? "").toString();
+          DateTime dateA = formatter.parse(dateStrA);
+          DateTime dateB = formatter.parse(dateStrB);
+          return dateA.compareTo(dateB);
+        } catch (_) {
+          return 0;
+        }
+      });
+      return result;
+    }
+  } catch (e) {
+    // Return empty list on error
   }
   return [];
 }

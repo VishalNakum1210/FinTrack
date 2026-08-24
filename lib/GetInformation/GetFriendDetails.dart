@@ -14,9 +14,8 @@ Future<List<Map<String, dynamic>>?> getFriendDetails (String phone_number) async
       });
       return result;
     }
-  }catch(e){
+  } catch (e) {
     Fluttertoast.showToast(msg: "Not connected $e");
-    print(e);
   }
   return null;
 }

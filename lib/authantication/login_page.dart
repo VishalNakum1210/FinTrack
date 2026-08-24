@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'package:FinTrack/GetInformation/HashPassword.dart';
+import 'package:FinTrack/GetInformation/SessionManager.dart';
 import 'package:FinTrack/authantication/registration_page.dart';
 import 'package:FinTrack/nav_bar.dart';
+import 'package:FinTrack/providers/expense_provider.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
+import 'package:FinTrack/providers/user_provider.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,21 +19,64 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  TextEditingController username = TextEditingController();
-  TextEditingController password = TextEditingController();
+  final TextEditingController username = TextEditingController();
+  final TextEditingController password = TextEditingController();
 
   bool isLoading = false;
+  bool isPasswordVisible = false;
 
-  void check_user_details() async {
-    String phoneNumber = username.text;
-    String passwordUser = password.text;
+  // Brute-force protection
+  int failedAttempts = 0;
+  int lockoutSeconds = 0;
+  Timer? lockoutTimer;
 
-    if (phoneNumber == "" || passwordUser == "") {
-      Fluttertoast.showToast(msg: "Enter All Requried Details");
+  @override
+  void dispose() {
+    username.dispose();
+    password.dispose();
+    lockoutTimer?.cancel();
+    super.dispose();
+  }
+
+  void startLockoutTimer() {
+    setState(() {
+      lockoutSeconds = 30;
+    });
+    lockoutTimer?.cancel();
+    lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          if (lockoutSeconds > 1) {
+            lockoutSeconds--;
+          } else {
+            lockoutSeconds = 0;
+            failedAttempts = 0;
+            timer.cancel();
+          }
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> checkUserDetails() async {
+    if (lockoutSeconds > 0) {
+      Fluttertoast.showToast(
+        msg: "Too many failed attempts. Please wait $lockoutSeconds seconds.",
+      );
+      return;
+    }
+
+    String phoneNumber = username.text.trim();
+    String passwordUser = password.text.trim();
+
+    if (phoneNumber.isEmpty || passwordUser.isEmpty) {
+      Fluttertoast.showToast(msg: "Please enter all required details");
       return;
     }
     if (phoneNumber.length != 10) {
-      Fluttertoast.showToast(msg: "Invalid Phone number !!!");
+      Fluttertoast.showToast(msg: "Please enter a valid 10-digit phone number");
       return;
     }
 
@@ -37,27 +85,63 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final MyRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
-      DatabaseEvent event = await MyRef.once();
+      final myRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
+      DatabaseEvent event = await myRef.once();
 
-      if (event.snapshot.value != null) {
+      bool isAuthenticated = false;
+
+      if (event.snapshot.value != null && event.snapshot.value is Map) {
         Map values = event.snapshot.value as Map;
-        passwordUser = hashPassword(passwordUser);
-        if (passwordUser == values["password"]) {
-          Fluttertoast.showToast(msg: "Login successfully");
-          await Save_data(values["name"], phoneNumber, values["email"]);
+        String storedPassword = (values["password"] ?? "").toString();
+
+        if (verifyPassword(passwordUser, storedPassword, phoneNumber)) {
+          isAuthenticated = true;
+
+          // Transparently upgrade legacy hashes to salted v2
+          if (!storedPassword.startsWith("v2_")) {
+            await myRef.update({
+              "password": hashPassword(passwordUser, phoneNumber),
+            });
+          }
+
+          failedAttempts = 0;
+          await SessionManager.saveSession(
+            phoneNumber: phoneNumber,
+            username: (values["name"] ?? "").toString(),
+            email: (values["email"] ?? "").toString(),
+          );
+
+          if (mounted) {
+            context.read<UserProvider>().loadUserSession();
+            context.read<ExpenseProvider>().fetchExpenses(phoneNumber);
+            context.read<FriendProvider>().fetchFriends(phoneNumber);
+          }
+
+          Fluttertoast.showToast(msg: "Login successful");
+          if (!mounted) return;
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => NavPageSelector()),
+            MaterialPageRoute(builder: (context) => const NavPageSelector()),
+          );
+        }
+      }
+
+      if (!isAuthenticated) {
+        failedAttempts++;
+        if (failedAttempts >= 5) {
+          startLockoutTimer();
+          Fluttertoast.showToast(
+            msg: "Too many failed attempts. Locked for 30 seconds.",
           );
         } else {
-          Fluttertoast.showToast(msg: "Wrong Password !!!");
+          // Anti-enumeration: Generic message
+          Fluttertoast.showToast(
+            msg: "Invalid phone number or password (${5 - failedAttempts} attempts remaining)",
+          );
         }
-      } else {
-        Fluttertoast.showToast(msg: "User Don't exsists !!!");
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Database Not Connected $e");
+      Fluttertoast.showToast(msg: "Database connection failed: $e");
     } finally {
       if (mounted) {
         setState(() {
@@ -67,22 +151,35 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> Save_data(String username, String phone_number, String email) async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    await sp.setString("username", username);
-    await sp.setString("phone_number", phone_number);
-    await sp.setString("email", email);
+  InputDecoration inputDecoration(String hint, {Widget? suffixIcon}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFF8BC24A)),
+      suffixIcon: suffixIcon,
+      enabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(
+          width: 2,
+          color: Color.fromARGB(255, 74, 127, 61),
+        ),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(
+          width: 2.5,
+          color: Color(0xFF8BC24A),
+        ),
+        borderRadius: BorderRadius.circular(15),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Background
-          Container(color: Colors.white),
-
-          // Big green/yellow circle
+          // Decorative background circle
           Positioned(
             top: -180,
             left: -80,
@@ -96,183 +193,186 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
 
-          // Welcome text
-          Positioned(
-            top: 80,
-            left: 40,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  "Hello",
-                  style: TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                Text(
-                  "Welcome Back!",
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: const Color.fromARGB(255, 74, 127, 61),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Logo
-          Positioned(
-            top: 70,
-            right: 30,
-            child: Container(
-              height: 100,
-              width: 100,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: Image.asset(
-                'assets/image/AccountApplicationLogo.jpg',
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-
-          // Login Card
-          Positioned(
-            top: 220,
-            left: 20,
-            right: 20,
-            child: Container(
-              height: 500,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: const [
-                  BoxShadow(
-                    blurRadius: 15,
-                    color: Colors.black12,
-                    offset: Offset(0, 5),
-                  ),
-                ],
-              ),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    margin: EdgeInsets.only(top: 50),
-                    child: Text(
-                      "Login Account",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF8BC24A),
+                  const SizedBox(height: 20),
+
+                  // Header with welcome text and logo
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Hello",
+                            style: TextStyle(
+                              fontSize: 38,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          Text(
+                            "Welcome Back!",
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Color.fromARGB(255, 74, 127, 61),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+
+                      Container(
+                        height: 75,
+                        width: 75,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/image/AccountApplicationLogo.jpg',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
                   ),
 
-                  Container(
-                    margin: EdgeInsets.only(top: 70),
-                    child: TextField(
-                      style: TextStyle(color: Color(0xFF8BC24A)),
-                      controller: username,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        hint: Text(
-                          "Phone Number",
-                          style: TextStyle(color: Color(0xFF8BC24A)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            width: 3,
-                            color: const Color.fromARGB(255, 74, 127, 61),
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            width: 3,
-                            color: const Color.fromARGB(255, 74, 127, 61),
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 40),
 
+                  // Login Card
                   Container(
-                    margin: EdgeInsets.only(top: 20),
-                    child: TextField(
-                      style: const TextStyle(color: Color(0xFF8BC24A)),
-                      controller: password,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        hint: Text(
-                          "Password",
-                          style: TextStyle(color: Color(0xFF8BC24A)),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(25),
+                      boxShadow: const [
+                        BoxShadow(
+                          blurRadius: 20,
+                          color: Colors.black12,
+                          offset: Offset(0, 8),
                         ),
-                        // hintText: "Password",
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            width: 3,
-                            color: const Color.fromARGB(255, 74, 127, 61),
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            width: 3,
-                            color: const Color.fromARGB(255, 74, 127, 61),
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                      ],
                     ),
-                  ),
-
-                  InkWell(
-                    child: Container(
-                      alignment: Alignment.centerRight,
-                      child: Text("User Don't Exsists"),
-                    ),
-                    onTap: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => RegistrationPage(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Center(
+                          child: Text(
+                            "Login Account",
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF8BC24A),
+                            ),
+                          ),
                         ),
-                      );
-                    },
-                  ),
 
-                  Container(
-                    width: double.infinity,
-                    height: 50,
-                    margin: EdgeInsets.only(top: 70),
-                    child: ElevatedButton(
-                      onPressed: () {
-                        check_user_details();
-                      },
-                      child: Text(
-                        "Submit",
-                        style: TextStyle(color: Colors.white, fontSize: 20),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF8BC24A),
-                      ),
+                        const SizedBox(height: 30),
+
+                        TextField(
+                          controller: username,
+                          keyboardType: TextInputType.phone,
+                          style: const TextStyle(color: Colors.black87),
+                          decoration: inputDecoration("Phone Number"),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        TextField(
+                          controller: password,
+                          obscureText: !isPasswordVisible,
+                          style: const TextStyle(color: Colors.black87),
+                          decoration: inputDecoration(
+                            "Password",
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                isPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: const Color(0xFF8BC24A),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  isPasswordVisible = !isPasswordVisible;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const RegistrationPage(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "Don't have an account? Sign Up",
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 74, 127, 61),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 30),
+
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: (isLoading || lockoutSeconds > 0) ? null : checkUserDetails,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF8BC24A),
+                              disabledBackgroundColor: Colors.grey.shade400,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                            child: Text(
+                              lockoutSeconds > 0
+                                  ? "Locked (${lockoutSeconds}s)"
+                                  : "Submit",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
           if (isLoading)
             Container(
               width: double.infinity,
               height: double.infinity,
-              color: Colors.black.withValues(alpha: 0.5),
+              color: Colors.black45,
               child: const Center(
                 child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
               ),

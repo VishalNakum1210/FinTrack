@@ -1,0 +1,75 @@
+{
+  "rules": {
+    "user_details": {
+      "$phoneNumber": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['phone_number', 'password']) && newData.child('phone_number').val().length == 10",
+        "phone_number": {
+          ".validate": "newData.isString() && newData.val().length == 10"
+        },
+        "password": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "email": {
+          ".validate": "newData.isString()"
+        },
+        "name": {
+          ".validate": "newData.isString()"
+        }
+      }
+    },
+    "Expenses": {
+      "$phoneNumber": {
+        ".read": true,
+        ".write": true,
+        "$recordKey": {
+          ".validate": "newData.hasChildren(['Amount', 'Category', 'Date', 'Payment_Mode'])",
+          "Amount": {
+            ".validate": "newData.isString()"
+          },
+          "Category": {
+            ".validate": "newData.isString()"
+          },
+          "Date": {
+            ".validate": "newData.isString()"
+          },
+          "Payment_Mode": {
+            ".validate": "newData.isString()"
+          }
+        }
+      }
+    },
+    "Friends": {
+      "$phoneNumber": {
+        ".read": true,
+        ".write": true,
+        "$friendNumber": {
+          "friend_name": {
+            ".validate": "newData.isString()"
+          },
+          "friend_number": {
+            ".validate": "newData.isString() && newData.val().length == 10"
+          },
+          "total_get": {
+            ".validate": "newData.isString()"
+          },
+          "total_give": {
+            ".validate": "newData.isString()"
+          },
+          "Records": {
+            "$recordKey": {
+              ".validate": "newData.hasChildren(['Amount', 'Type', 'Date'])"
+            }
+          }
+        }
+      }
+    },
+    "userUpdates": {
+      "$phoneNumber": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}

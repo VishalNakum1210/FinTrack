@@ -1,7 +1,8 @@
 import 'package:FinTrack/GetInformation/GetUserDetail.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:FinTrack/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class EditInformationPage extends StatefulWidget {
@@ -78,31 +79,37 @@ class _EditInformationPageState extends State<EditInformationPage> {
 
   Future<void> updateInformation(
     String name,
-    String phone_number,
+    String phoneNumber,
     String email,
     String address,
   ) async {
-    DatabaseReference myref = FirebaseDatabase.instance.ref(
-      "user_details/$phone_number",
-    );
-    await myref.update({
-      "name": name,
-      "phone_number": phone_number,
-      "email": email,
-      "address": address,
-    });
+    try {
+      await context.read<UserProvider>().updateProfile(
+        name: name,
+        email: email,
+        address: address,
+      );
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Failed to update profile: $e");
+    }
   }
 
   void getDetails() async {
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String phone_number = sp.getString("phone_number")!;
-    details = await getUserInformation(phone_number);
-    setState(() {
-      nameController.text = details["name"]!;
-      mobileController.text = details["phone_number"]!;
-      emailController.text = details["email"]!;
-      addressController.text = details["address"] ?? "Not Updated";
-    });
+    try {
+      SharedPreferences sp = await SharedPreferences.getInstance();
+      String phoneNumber = sp.getString("phone_number") ?? "";
+      if (phoneNumber.isNotEmpty) {
+        details = await getUserInformation(phoneNumber);
+        if (mounted) {
+          setState(() {
+            nameController.text = details["name"] ?? "";
+            mobileController.text = details["phone_number"] ?? phoneNumber;
+            emailController.text = details["email"] ?? "";
+            addressController.text = details["address"] ?? details["Address"] ?? "";
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -115,14 +122,12 @@ class _EditInformationPageState extends State<EditInformationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-
       appBar: AppBar(
         title: const Text("Edit Information"),
         centerTitle: true,
         backgroundColor: themeColor,
         foregroundColor: Colors.white,
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -141,11 +146,25 @@ class _EditInformationPageState extends State<EditInformationPage> {
               controller: nameController,
             ),
 
-            customField(
-              label: "Mobile Number",
-              icon: Icons.phone_outlined,
-              controller: mobileController,
-              keyboardType: TextInputType.phone,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: TextField(
+                controller: mobileController,
+                readOnly: true,
+                style: TextStyle(color: Colors.grey.shade700),
+                decoration: InputDecoration(
+                  labelText: "Mobile Number (Cannot be changed)",
+                  labelStyle: const TextStyle(color: Colors.grey),
+                  prefixIcon: Icon(Icons.phone_outlined, color: Colors.grey.shade600),
+                  filled: true,
+                  fillColor: Colors.grey.shade200,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+              ),
             ),
 
             customField(
@@ -170,12 +189,14 @@ class _EditInformationPageState extends State<EditInformationPage> {
               child: ElevatedButton.icon(
                 onPressed: () async {
                   String name = nameController.text.trim();
-
                   String mobile = mobileController.text.trim();
-
                   String email = emailController.text.trim();
-
                   String address = addressController.text.trim();
+
+                  if (name.isEmpty || email.isEmpty) {
+                    Fluttertoast.showToast(msg: "Name and Email cannot be empty");
+                    return;
+                  }
 
                   await updateInformation(name, mobile, email, address);
 
@@ -183,6 +204,7 @@ class _EditInformationPageState extends State<EditInformationPage> {
                     msg: "Information Updated Successfully",
                   );
 
+                  if (!context.mounted) return;
                   Navigator.pop(context, true);
                 },
                 icon: const Icon(Icons.save),

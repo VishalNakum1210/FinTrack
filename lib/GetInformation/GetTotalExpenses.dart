@@ -1,30 +1,34 @@
 import 'package:firebase_database/firebase_database.dart';
 
-Future<String> getTotalExpenses(String phone_number, String Specific) async {
+Future<String> getTotalExpenses(String phoneNumber, String specific) async {
   int count = 0;
-  Map<dynamic, dynamic> value = {};
+  try {
+    DatabaseReference myref = FirebaseDatabase.instance.ref(
+      "Expenses/$phoneNumber",
+    );
+    DatabaseEvent event = await myref.once();
 
-  DatabaseReference myref = FirebaseDatabase.instance.ref(
-    "Expenses/$phone_number",
-  );
-  DatabaseEvent event = await myref.once();
+    if (event.snapshot.value != null) {
+      Map value = event.snapshot.value as Map;
 
-  if (event.snapshot.value != null) {
-    value = event.snapshot.value as Map;
-
-    if ([
-      "All",
-      "Spent Cash",
-      "Spent Online",
-      "Add CASH",
-      "Add Online"
-    ].contains(Specific)) {
       value.forEach((key, data) {
-        if ((Specific == "All" && !["Add CASH", "Add Online"].contains(data["Payment_Mode"])) || data["Payment_Mode"] == Specific) {
-          count += int.parse(data["Amount"].toString());
+        if (data is Map) {
+          String paymentMode = (data["Payment_Mode"] ?? "").toString();
+          String category = (data["Category"] ?? "").toString();
+          int amount = int.tryParse(data["Amount"]?.toString() ?? '0') ?? 0;
+
+          if (specific == "All") {
+            if (!["Add CASH", "Add Online"].contains(paymentMode)) {
+              count += amount;
+            }
+          } else if (paymentMode == specific || category == specific) {
+            count += amount;
+          }
         }
       });
     }
+  } catch (_) {
+    // Return safe default
   }
   return count.toString();
 }

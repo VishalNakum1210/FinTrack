@@ -1,56 +1,41 @@
 import 'package:FinTrack/FriendsPages/addFriends.dart';
 import 'package:FinTrack/FriendsPages/specificFriendPage.dart';
-import 'package:FinTrack/GetInformation/GetFriendDetails.dart';
-import 'package:FinTrack/GetInformation/GetTotalFriendExpenses.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class FriendPage extends StatefulWidget {
+  const FriendPage({super.key});
+
   @override
-  State<FriendPage> createState() => _friendPage();
+  State<FriendPage> createState() => _FriendPageState();
 }
 
-class _friendPage extends State<FriendPage> {
-  bool isLoading = false;
-  List<Map<String, dynamic>>? friendRecord = null;
-  List<String> allExpenses = ["0", "0"];
+class _FriendPageState extends State<FriendPage> {
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = "";
 
-  Future<void> getDetails() async {
-    setState(() {
-      isLoading = true;
-    });
-    SharedPreferences sp = await SharedPreferences.getInstance();
-    String? phone_number = sp.getString("phone_number");
-    friendRecord = (await getFriendDetails(phone_number!));
-    allExpenses = (await getTotalFriendExpenses(phone_number));
-    setState(() {
-      isLoading = false;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFriends();
     });
   }
 
-  Future<void> deleteFriend(String friend_number) async {
-    try {
-      setState(() {
-        isLoading = true;
-      });
-      SharedPreferences sp = await SharedPreferences.getInstance();
-      String phone_number = sp.getString("phone_number")!;
-      DatabaseReference deleteRef = FirebaseDatabase.instance.ref(
-        "Friends/$phone_number/$friend_number",
-      );
-      await deleteRef.remove();
-      friendRecord!.clear();
-      await getDetails();
-    } catch (e) {
-      Fluttertoast.showToast(msg: "Not connected $e");
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
+  Future<void> _loadFriends() async {
+    final phone = await SessionManager.getPhoneNumber() ?? "";
+    if (mounted && phone.isNotEmpty) {
+      context.read<FriendProvider>().fetchFriends(phone);
     }
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   String formatIndianNumber(int number) {
@@ -58,376 +43,384 @@ class _friendPage extends State<FriendPage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    getDetails();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    Color primaryColor = const Color(0xFF8BC24A);
+    const Color primaryColor = Color(0xFF8BC24A);
 
-    return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 230, 230, 230),
+    return Consumer<FriendProvider>(
+      builder: (context, friendProvider, _) {
+        final allFriends = friendProvider.friends;
+        final displayedFriends = searchQuery.trim().isEmpty
+            ? allFriends
+            : allFriends.where((friend) {
+                final name = (friend["friend_name"] ?? "").toString().toLowerCase();
+                final number = (friend["friend_number"] ?? "").toString();
+                final query = searchQuery.toLowerCase();
+                return name.contains(query) || number.contains(query);
+              }).toList();
 
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: primaryColor,
-        title: const Text(
-          "Friend Ledger",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-      ),
+        final totalGet = friendProvider.totalGet;
+        final totalGive = friendProvider.totalGive;
+        final isLoading = friendProvider.isLoading;
 
-      body: Column(
-        children: [
-          // Summary Card
-          Container(
-            margin: const EdgeInsets.all(15),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8BC24A), Color(0xFF7CB342)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: .35),
-                  blurRadius: 15,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+        return Scaffold(
+          backgroundColor: const Color.fromARGB(255, 245, 245, 245),
+          appBar: AppBar(
+            elevation: 0,
+            backgroundColor: primaryColor,
+            title: const Text(
+              "Friend Ledger",
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
             ),
-            child: Row(
+          ),
+          body: RefreshIndicator(
+            color: primaryColor,
+            onRefresh: _loadFriends,
+            child: Column(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Summary Card
+                Container(
+                  margin: const EdgeInsets.all(15),
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF8BC24A), Color(0xFF7CB342)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: .35),
+                        blurRadius: 15,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "You Will Get",
+                              style: TextStyle(color: Colors.white70, fontSize: 13),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              NumberFormat.currency(
+                                locale: 'en_IN',
+                                symbol: '₹',
+                                decimalDigits: 0,
+                              ).format(totalGet),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(height: 45, width: 1, color: Colors.white30),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              "You Will Give",
+                              style: TextStyle(color: Colors.white70, fontSize: 13),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              NumberFormat.currency(
+                                locale: 'en_IN',
+                                symbol: '₹',
+                                decimalDigits: 0,
+                              ).format(totalGive),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Search
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: (val) {
+                      setState(() {
+                        searchQuery = val;
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: "Search friend...",
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                searchController.clear();
+                                setState(() {
+                                  searchQuery = "";
+                                });
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 15),
+
+                // Friends Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  child: Row(
                     children: [
                       const Text(
-                        "You Will Get",
-                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                        "Friends",
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
-
-                      const SizedBox(height: 5),
-
-                      Text(
-                        NumberFormat.currency(
-                          locale: 'en_IN',
-                          symbol: '₹',
-                          decimalDigits: 0,
-                        ).format(int.tryParse(allExpenses[0])),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                Container(height: 45, width: 1, color: Colors.white30),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        "You Will Give",
-                        style: TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
-
-                      SizedBox(height: 5),
-
-                      Text(
-                        NumberFormat.currency(
-                          locale: 'en_IN',
-                          symbol: '₹',
-                          decimalDigits: 0,
-                        ).format(int.tryParse(allExpenses[1])),
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Search
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: "Search friend...",
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.zero,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 15),
-
-          // Friends Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            child: Row(
-              children: [
-                const Text(
-                  "Friends",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-
-                const Spacer(),
-
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => AddFriends()),
-                    ) ?? false;
-
-                    if (result == true) {
-                      getDetails();
-                    }
-                  },
-                  icon: const Icon(Icons.person_add_alt_1, size: 18),
-                  label: const Text("Add"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Friend List
-          Expanded(
-            child: (friendRecord != null)
-                ? ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    itemCount: friendRecord!.length,
-                    itemBuilder: (context, index) {
-                      return InkWell(
-                        onLongPress: () async {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              title: const Text("Delete Record"),
-                              content: const Text(
-                                "Are you sure you want to delete this record?",
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                  child: const Text("Cancel"),
-                                ),
-
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  onPressed: () async {
-                                    Navigator.pop(context);
-                                    deleteFriend(friendRecord![index]["friend_number"]);
-                                  },
-                                  child: const Text("Delete"),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        onTap: () async {
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (context) => Specificfriendpage(
-                                friend_number:
-                                    friendRecord![index]["friend_number"],
-                              ),
-                            ),
-                          ).then((_) {
-                            getDetails();
-                          });
+                            MaterialPageRoute(builder: (context) => const AddFriends()),
+                          );
                         },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(15),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: .05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
+                        icon: const Icon(Icons.person_add_alt_1, size: 18),
+                        label: const Text("Add"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
                           ),
-
-                          child: Row(
-                            children: [
-                              // Avatar
-                              CircleAvatar(
-                                radius: 28,
-                                backgroundColor: primaryColor.withValues(alpha: .15),
-                                child: Text(
-                                  (friendRecord![index]["friend_name"][0])
-                                      .toUpperCase(),
-                                  style: TextStyle(
-                                    color: primaryColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(width: 12),
-
-                              // Name & Number
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      friendRecord![index]["friend_name"],
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-
-                                    const SizedBox(height: 4),
-
-                                    Text(
-                                      friendRecord![index]["friend_number"],
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // Get & Give
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withValues(alpha: .10),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      NumberFormat.currency(
-                                        locale: 'en_IN',
-                                        symbol: 'Get ₹',
-                                        decimalDigits: 0,
-                                      ).format(
-                                        int.parse(
-                                          friendRecord![index]["total_get"],
-                                        ),
-                                      ),
-                                      style: const TextStyle(
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 6),
-
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withValues(alpha: .10),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      NumberFormat.currency(
-                                        locale: 'en_IN',
-                                        symbol: 'Give ₹',
-                                        decimalDigits: 0,
-                                      ).format(
-                                        int.parse(
-                                          friendRecord![index]["total_give"],
-                                        ),
-                                      ),
-                                      style: const TextStyle(
-                                        color: Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ),
-                      );
-                    },
-                  )
-                : (isLoading)
-                ? Container(
-                    child: Center(
-                      child: CircularProgressIndicator(color: Colors.green),
-                    ),
-                  )
-                : Container(
-                    height: double.infinity,
-                    width: double.infinity,
-                    child: Center(
-                      child: Text(
-                        "No Data Found",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 30,
-                          color: Colors.green,
                         ),
                       ),
-                    ),
+                    ],
                   ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Friend List
+                Expanded(
+                  child: (isLoading)
+                      ? Center(
+                          child: CircularProgressIndicator(color: primaryColor),
+                        )
+                      : (displayedFriends.isNotEmpty)
+                          ? ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 15),
+                              itemCount: displayedFriends.length,
+                              itemBuilder: (context, index) {
+                                final friend = displayedFriends[index];
+                                final friendName = (friend["friend_name"] ?? "Friend").toString();
+                                final friendNumber = (friend["friend_number"] ?? "").toString();
+                                final fGet = int.tryParse(friend["total_get"]?.toString() ?? '0') ?? 0;
+                                final fGive = int.tryParse(friend["total_give"]?.toString() ?? '0') ?? 0;
+
+                                return InkWell(
+                                  onLongPress: () async {
+                                    showDialog(
+                                      context: context,
+                                      builder: (dialogCtx) => AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        title: const Text("Delete Friend"),
+                                        content: Text(
+                                          "Are you sure you want to remove $friendName from ledger?",
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(dialogCtx),
+                                            child: const Text("Cancel"),
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                            onPressed: () async {
+                                              Navigator.pop(dialogCtx);
+                                              final phone = await SessionManager.getPhoneNumber() ?? "";
+                                              if (phone.isNotEmpty && context.mounted) {
+                                                await context.read<FriendProvider>().deleteFriend(
+                                                  userPhone: phone,
+                                                  friendNumber: friendNumber,
+                                                );
+                                              }
+                                            },
+                                            child: const Text("Delete"),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => Specificfriendpage(
+                                          friend_number: friendNumber,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.all(15),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(18),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: .05),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        // Avatar
+                                        CircleAvatar(
+                                          radius: 28,
+                                          backgroundColor: primaryColor.withValues(alpha: .15),
+                                          child: Text(
+                                            friendName.isNotEmpty
+                                                ? friendName[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                              color: primaryColor,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+
+                                        // Name & Number
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                friendName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                friendNumber,
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade600,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // Get & Give
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.green.withValues(alpha: .10),
+                                                borderRadius: BorderRadius.circular(20),
+                                              ),
+                                              child: Text(
+                                                NumberFormat.currency(
+                                                  locale: 'en_IN',
+                                                  symbol: 'Get ₹',
+                                                  decimalDigits: 0,
+                                                ).format(fGet),
+                                                style: const TextStyle(
+                                                  color: Colors.green,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red.withValues(alpha: .10),
+                                                borderRadius: BorderRadius.circular(20),
+                                              ),
+                                              child: Text(
+                                                NumberFormat.currency(
+                                                  locale: 'en_IN',
+                                                  symbol: 'Give ₹',
+                                                  decimalDigits: 0,
+                                                ).format(fGive),
+                                                style: const TextStyle(
+                                                  color: Colors.red,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : Center(
+                              child: Text(
+                                searchQuery.isNotEmpty
+                                    ? "No friends matching '$searchQuery'"
+                                    : "No Friends Added Yet",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

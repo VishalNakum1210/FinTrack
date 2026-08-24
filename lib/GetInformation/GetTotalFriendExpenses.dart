@@ -1,23 +1,25 @@
 import 'package:firebase_database/firebase_database.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
-Future<List<String>> getTotalFriendExpenses (String phone_number) async {
-  try{
-    DatabaseReference myref = FirebaseDatabase.instance.ref("Friends/$phone_number");
+Future<List<String>> getTotalFriendExpenses(String phoneNumber) async {
+  try {
+    DatabaseReference myref = FirebaseDatabase.instance.ref("Friends/$phoneNumber");
     DatabaseEvent event = await myref.once();
 
-    if(event.snapshot.value != null){
-      int total_get = 0, total_give = 0;
+    if (event.snapshot.value != null) {
+      int totalGet = 0;
+      int totalGive = 0;
       Map data = event.snapshot.value as Map;
 
       data.forEach((key, value) {
-        total_get += int.parse(value["total_get"]);
-        total_give += int.parse(value["total_give"]);
+        if (value is Map) {
+          totalGet += int.tryParse(value["total_get"]?.toString() ?? '0') ?? 0;
+          totalGive += int.tryParse(value["total_give"]?.toString() ?? '0') ?? 0;
+        }
       });
-      return[total_get.toString(), total_give.toString()];
+      return [totalGet.toString(), totalGive.toString()];
     }
-  }catch (e) {
-    Fluttertoast.showToast(msg: "Not connected : $e");
+  } catch (_) {
+    // Return safe default
   }
-  return ["0","0"];
+  return ["0", "0"];
 }
