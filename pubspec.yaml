@@ -43,6 +43,11 @@ dependencies:
   package_info_plus: ^9.0.0
   google_fonts: ^6.3.2
   provider: ^6.1.5+1
+  pdf: ^3.11.1
+  printing: ^5.13.2
+  csv: ^6.0.0
+  share_plus: ^10.1.4
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

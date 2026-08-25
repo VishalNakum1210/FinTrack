@@ -1,6 +1,8 @@
 import 'package:FinTrack/FriendsPages/addFriendSpent.dart';
 import 'package:FinTrack/GetInformation/GetSpecificFriendDetails.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
+import 'package:FinTrack/providers/user_provider.dart';
+import 'package:FinTrack/services/export_service.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -93,6 +95,93 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
     }
   }
 
+  void showExportLedgerDialog() {
+    if (friendDetails.isEmpty) return;
+    final friendName = friendDetails[0]["friend_name"] ?? "Friend";
+    final friendNum = friendDetails[0]["friend_number"] ?? widget.friend_number;
+    final userProvider = context.read<UserProvider>();
+    final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (bottomCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Export $friendName's Ledger",
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "${expensesRecords.length} records found",
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.red.shade50,
+                    child: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                  ),
+                  title: const Text("Export as PDF Ledger", style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text("Formatted PDF statement with balances"),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () async {
+                    Navigator.pop(bottomCtx);
+                    Fluttertoast.showToast(msg: "Generating PDF...");
+                    await ExportService.exportFriendLedgerPdf(
+                      userName: userName,
+                      friendName: friendName,
+                      friendNumber: friendNum,
+                      totalGet: totalGet,
+                      totalGive: totalGive,
+                      records: expensesRecords,
+                    );
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.green.shade50,
+                    child: const Icon(Icons.table_chart, color: Colors.green),
+                  ),
+                  title: const Text("Export as CSV / Excel", style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text("Spreadsheet file of transactions"),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () async {
+                    Navigator.pop(bottomCtx);
+                    Fluttertoast.showToast(msg: "Generating CSV...");
+                    await ExportService.exportFriendLedgerCsv(
+                      userName: userName,
+                      friendName: friendName,
+                      friendNumber: friendNum,
+                      records: expensesRecords,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   String formatIndianNumber(int number) {
     return NumberFormat('#,##,##0', 'en_IN').format(number);
   }
@@ -109,14 +198,21 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-
       appBar: AppBar(
         elevation: 0,
         backgroundColor: primaryColor,
         title: Text(
-          (!isLoading) ? friendDetails[0]["friend_name"] : "Friend",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          (!isLoading && friendDetails.isNotEmpty) ? (friendDetails[0]["friend_name"] ?? "Friend") : "Friend",
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
+        actions: [
+          IconButton(
+            tooltip: "Export Ledger",
+            icon: const Icon(Icons.ios_share, color: Colors.white),
+            onPressed: showExportLedgerDialog,
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
 
       floatingActionButton: FloatingActionButton.extended(

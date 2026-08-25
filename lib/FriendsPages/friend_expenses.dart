@@ -2,7 +2,10 @@ import 'package:FinTrack/FriendsPages/addFriends.dart';
 import 'package:FinTrack/FriendsPages/specificFriendPage.dart';
 import 'package:FinTrack/GetInformation/SessionManager.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
+import 'package:FinTrack/providers/user_provider.dart';
+import 'package:FinTrack/services/export_service.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -38,6 +41,85 @@ class _FriendPageState extends State<FriendPage> {
     super.dispose();
   }
 
+  void showFriendsExportDialog(List<Map<String, dynamic>> friends) {
+    if (friends.isEmpty) {
+      Fluttertoast.showToast(msg: "No friends in ledger to export");
+      return;
+    }
+
+    final userProvider = context.read<UserProvider>();
+    final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (bottomCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Export All Friends Ledger",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "${friends.length} friends in your ledger",
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.green.shade50,
+                    child: const Icon(Icons.table_chart, color: Colors.green),
+                  ),
+                  title: const Text("Export Friend List as CSV / Excel", style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text("Spreadsheet with Friend names, phones, and dues"),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () async {
+                    Navigator.pop(bottomCtx);
+                    Fluttertoast.showToast(msg: "Generating CSV...");
+                    List<Map<String, dynamic>> formattedList = friends.map((f) {
+                      final fGet = int.tryParse(f["total_get"]?.toString() ?? '0') ?? 0;
+                      final fGive = int.tryParse(f["total_give"]?.toString() ?? '0') ?? 0;
+                      return {
+                        "Date": f["date"] ?? "-",
+                        "Type": fGet > fGive ? "Will Receive" : "Will Give",
+                        "Description": "Friend Ledger Balance",
+                        "Payment_Mode": "Ledger",
+                        "Amount": (fGet - fGive).abs().toString(),
+                      };
+                    }).toList();
+
+                    await ExportService.exportFriendLedgerCsv(
+                      userName: userName,
+                      friendName: "All_Friends",
+                      friendNumber: "Summary",
+                      records: formattedList,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   String formatIndianNumber(int number) {
     return NumberFormat('#,##,##0', 'en_IN').format(number);
   }
@@ -71,6 +153,14 @@ class _FriendPageState extends State<FriendPage> {
               "Friend Ledger",
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
             ),
+            actions: [
+              IconButton(
+                tooltip: "Export Ledger",
+                icon: const Icon(Icons.ios_share, color: Colors.white),
+                onPressed: () => showFriendsExportDialog(allFriends),
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
           body: RefreshIndicator(
             color: primaryColor,

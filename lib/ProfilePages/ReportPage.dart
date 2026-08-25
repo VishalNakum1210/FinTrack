@@ -1,7 +1,10 @@
 import 'package:FinTrack/GetInformation/SessionManager.dart';
 import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
+import 'package:FinTrack/providers/user_provider.dart';
+import 'package:FinTrack/services/export_service.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -41,6 +44,105 @@ class _ReportPageState extends State<Reportpage> {
     if (healthScore >= .6) return "Good";
     if (healthScore >= .4) return "Average";
     return "Needs Improvement";
+  }
+
+  void showExportReportDialog({
+    required BuildContext context,
+    required List<Map<String, dynamic>> records,
+    required int income,
+    required int expense,
+    required int balance,
+    required int cash,
+    required int online,
+  }) {
+    if (records.isEmpty) {
+      Fluttertoast.showToast(msg: "No report data available to export");
+      return;
+    }
+
+    final userProvider = context.read<UserProvider>();
+    final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
+    final phone = userProvider.phoneNumber;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (bottomCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Export Financial Statement",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Statement includes ${records.length} records & summaries",
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.red.shade50,
+                    child: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                  ),
+                  title: const Text("Export PDF Statement", style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text("Full detailed PDF with category summaries"),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () async {
+                    Navigator.pop(bottomCtx);
+                    Fluttertoast.showToast(msg: "Generating PDF...");
+                    await ExportService.exportPassbookPdf(
+                      userName: userName,
+                      phoneNumber: phone,
+                      records: records,
+                      totalIncome: income,
+                      totalExpense: expense,
+                      currentBalance: balance,
+                      cashBalance: cash,
+                      onlineBalance: online,
+                      filterCategory: "Full Financial Report",
+                    );
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.green.shade50,
+                    child: const Icon(Icons.table_chart, color: Colors.green),
+                  ),
+                  title: const Text("Export CSV / Excel", style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text("Raw spreadsheet data for tax & accountant review"),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () async {
+                    Navigator.pop(bottomCtx);
+                    Fluttertoast.showToast(msg: "Generating CSV...");
+                    await ExportService.exportPassbookCsv(
+                      userName: userName,
+                      records: records,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   String money(num value) {
@@ -103,6 +205,24 @@ class _ReportPageState extends State<Reportpage> {
               "Reports",
               style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
             ),
+            actions: [
+              IconButton(
+                tooltip: "Export Statement",
+                icon: Icon(Icons.ios_share, color: themeColor),
+                onPressed: () {
+                  showExportReportDialog(
+                    context: context,
+                    records: recentTransactions,
+                    income: totalIncome.toInt(),
+                    expense: totalExpense.toInt(),
+                    balance: currentBalance.toInt(),
+                    cash: cashBalance.toInt(),
+                    online: onlineBalance.toInt(),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
