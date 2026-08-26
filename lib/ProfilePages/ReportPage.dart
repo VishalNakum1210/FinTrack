@@ -3,10 +3,13 @@ import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/services/export_service.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
+enum ReportPeriod { thisMonth, lastMonth, thisYear, allTime }
 
 class Reportpage extends StatefulWidget {
   const Reportpage({super.key});
@@ -16,7 +19,9 @@ class Reportpage extends StatefulWidget {
 }
 
 class _ReportPageState extends State<Reportpage> {
-  final Color themeColor = const Color(0xFF8BC24A);
+  final Color themeColor = const Color(0xFF689F38);
+  ReportPeriod selectedPeriod = ReportPeriod.thisMonth;
+  int _touchedPieIndex = -1;
 
   @override
   void initState() {
@@ -34,6 +39,63 @@ class _ReportPageState extends State<Reportpage> {
     }
   }
 
+  DateTime? _parseRecordDate(dynamic dateVal) {
+    if (dateVal == null) return null;
+    final str = dateVal.toString().trim();
+    if (str.isEmpty || str == "-") return null;
+
+    final formats = [
+      'd/M/yyyy',
+      'dd/MM/yyyy',
+      'd-M-yyyy',
+      'dd-MM-yyyy',
+      'yyyy-MM-dd',
+      'yyyy/MM/dd',
+      'd MMM yyyy',
+      'dd MMM yyyy',
+      'MM/dd/yyyy',
+      'M/d/yyyy',
+    ];
+
+    for (var f in formats) {
+      try {
+        return DateFormat(f).parseStrict(str);
+      } catch (_) {}
+    }
+    return DateTime.tryParse(str);
+  }
+
+  bool _matchesPeriod(DateTime? date, ReportPeriod period) {
+    if (period == ReportPeriod.allTime) return true;
+    if (date == null) return false;
+
+    final now = DateTime.now();
+    switch (period) {
+      case ReportPeriod.thisMonth:
+        return date.year == now.year && date.month == now.month;
+      case ReportPeriod.lastMonth:
+        final lastMonthDate = DateTime(now.year, now.month - 1);
+        return date.year == lastMonthDate.year && date.month == lastMonthDate.month;
+      case ReportPeriod.thisYear:
+        return date.year == now.year;
+      case ReportPeriod.allTime:
+        return true;
+    }
+  }
+
+  String _getPeriodLabel(ReportPeriod period) {
+    switch (period) {
+      case ReportPeriod.thisMonth:
+        return "This Month";
+      case ReportPeriod.lastMonth:
+        return "Last Month";
+      case ReportPeriod.thisYear:
+        return "This Year";
+      case ReportPeriod.allTime:
+        return "All Time";
+    }
+  }
+
   double calculateHealthScore(double totalIncome, double totalExpense) {
     if (totalIncome <= 0) return 0;
     return ((totalIncome - totalExpense) / totalIncome).clamp(0.0, 1.0);
@@ -46,102 +108,39 @@ class _ReportPageState extends State<Reportpage> {
     return "Needs Improvement";
   }
 
-  void showExportReportDialog({
+  Future<void> exportReportToPdf({
     required BuildContext context,
     required List<Map<String, dynamic>> records,
     required int income,
     required int expense,
     required int balance,
-    required int cash,
-    required int online,
-  }) {
-    if (records.isEmpty) {
-      Fluttertoast.showToast(msg: "No report data available to export");
-      return;
-    }
-
+    required int addCash,
+    required int spentCash,
+    required int addOnline,
+    required int spentOnline,
+    required int friendGet,
+    required int friendGive,
+    required Map<String, double> categoryTotals,
+  }) async {
     final userProvider = context.read<UserProvider>();
     final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
     final phone = userProvider.phoneNumber;
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (bottomCtx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Export Financial Statement",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "Statement includes ${records.length} records & summaries",
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.red.shade50,
-                    child: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                  ),
-                  title: const Text("Export PDF Statement", style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text("Full detailed PDF with category summaries"),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () async {
-                    Navigator.pop(bottomCtx);
-                    Fluttertoast.showToast(msg: "Generating PDF...");
-                    await ExportService.exportPassbookPdf(
-                      userName: userName,
-                      phoneNumber: phone,
-                      records: records,
-                      totalIncome: income,
-                      totalExpense: expense,
-                      currentBalance: balance,
-                      cashBalance: cash,
-                      onlineBalance: online,
-                      filterCategory: "Full Financial Report",
-                    );
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.green.shade50,
-                    child: const Icon(Icons.table_chart, color: Colors.green),
-                  ),
-                  title: const Text("Export CSV / Excel", style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text("Raw spreadsheet data for tax & accountant review"),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () async {
-                    Navigator.pop(bottomCtx);
-                    Fluttertoast.showToast(msg: "Generating CSV...");
-                    await ExportService.exportPassbookCsv(
-                      userName: userName,
-                      records: records,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    Fluttertoast.showToast(msg: "Generating Financial Report PDF...");
+    await ExportService.exportReportPdf(
+      userName: userName,
+      phoneNumber: phone,
+      totalIncome: income,
+      totalExpense: expense,
+      currentBalance: balance,
+      addCash: addCash,
+      spentCash: spentCash,
+      addOnline: addOnline,
+      spentOnline: spentOnline,
+      friendGet: friendGet,
+      friendGive: friendGive,
+      categoryTotals: categoryTotals,
+      records: records,
     );
   }
 
@@ -158,35 +157,67 @@ class _ReportPageState extends State<Reportpage> {
     return Consumer2<ExpenseProvider, FriendProvider>(
       builder: (context, expenseProvider, friendProvider, _) {
         final isLoading = expenseProvider.isLoading || friendProvider.isLoading;
-        final totalIncome = expenseProvider.totalIncome.toDouble();
-        final totalExpense = expenseProvider.totalExpense.toDouble();
-        final currentBalance = expenseProvider.currentBalance.toDouble();
-        final cashBalance = (expenseProvider.addCash - expenseProvider.spentCash).toDouble();
-        final onlineBalance = (expenseProvider.addOnline - expenseProvider.spentOnline).toDouble();
-        final friendGiven = friendProvider.totalGet.toDouble();
-        final friendTaken = friendProvider.totalGive.toDouble();
-        final categoryTotals = expenseProvider.categoryTotals.map((k, v) => MapEntry(k, v.toDouble()));
-        final recentTransactions = expenseProvider.records;
-        final transactionCount = recentTransactions.length;
+        final allRecords = expenseProvider.records;
 
-        final healthScore = calculateHealthScore(totalIncome, totalExpense);
+        // 1. Filter Records based on Period
+        final filteredRecords = allRecords.where((r) {
+          final d = _parseRecordDate(r["Date"]);
+          return _matchesPeriod(d, selectedPeriod);
+        }).toList();
+
+        // 2. Compute Filtered Metrics
+        double periodIncome = 0;
+        double periodExpense = 0;
+        int periodCashSpent = 0;
+        int periodOnlineSpent = 0;
+        int periodCashAdded = 0;
+        int periodOnlineAdded = 0;
+        double highestIncome = 0;
+        final Map<String, double> periodCategoryTotals = {};
+
+        for (var r in filteredRecords) {
+          final mode = (r["Payment_Mode"] ?? "").toString();
+          final category = (r["Category"] ?? "Other").toString();
+          final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
+
+          if (mode == "Add CASH") {
+            periodIncome += amt;
+            periodCashAdded += amt.toInt();
+            if (amt > highestIncome) highestIncome = amt;
+          } else if (mode == "Add Online") {
+            periodIncome += amt;
+            periodOnlineAdded += amt.toInt();
+            if (amt > highestIncome) highestIncome = amt;
+          } else if (mode == "Spent Cash") {
+            periodExpense += amt;
+            periodCashSpent += amt.toInt();
+            periodCategoryTotals[category] = (periodCategoryTotals[category] ?? 0) + amt;
+          } else if (mode == "Spent Online") {
+            periodExpense += amt;
+            periodOnlineSpent += amt.toInt();
+            periodCategoryTotals[category] = (periodCategoryTotals[category] ?? 0) + amt;
+          } else {
+            periodExpense += amt;
+            periodCategoryTotals[category] = (periodCategoryTotals[category] ?? 0) + amt;
+          }
+        }
+
+        final periodBalance = periodIncome - periodExpense;
+        final healthScore = calculateHealthScore(periodIncome, periodExpense);
         final healthText = getHealthText(healthScore);
+        final savingsRate = periodIncome > 0
+            ? (((periodIncome - periodExpense) / periodIncome) * 100).clamp(0, 100)
+            : 0.0;
 
-        String topCategory = "No Data";
-        if (categoryTotals.isNotEmpty) {
-          topCategory = categoryTotals.entries
+        String topCategory = "None";
+        if (periodCategoryTotals.isNotEmpty) {
+          topCategory = periodCategoryTotals.entries
               .reduce((a, b) => (a.value > b.value) ? a : b)
               .key;
         }
 
-        double highestIncome = 0;
-        for (var r in recentTransactions) {
-          final mode = (r["Payment_Mode"] ?? "").toString();
-          final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
-          if (mode.startsWith("Add") && amt > highestIncome) {
-            highestIncome = amt;
-          }
-        }
+        final friendGiven = friendProvider.totalGet.toDouble();
+        final friendTaken = friendProvider.totalGive.toDouble();
 
         if (isLoading) {
           return Scaffold(
@@ -202,22 +233,27 @@ class _ReportPageState extends State<Reportpage> {
             elevation: 0,
             centerTitle: true,
             title: const Text(
-              "Reports",
+              "Financial Reports",
               style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
             ),
             actions: [
               IconButton(
-                tooltip: "Export Statement",
-                icon: Icon(Icons.ios_share, color: themeColor),
+                tooltip: "Export Statement (PDF)",
+                icon: Icon(Icons.picture_as_pdf, color: themeColor),
                 onPressed: () {
-                  showExportReportDialog(
+                  exportReportToPdf(
                     context: context,
-                    records: recentTransactions,
-                    income: totalIncome.toInt(),
-                    expense: totalExpense.toInt(),
-                    balance: currentBalance.toInt(),
-                    cash: cashBalance.toInt(),
-                    online: onlineBalance.toInt(),
+                    records: filteredRecords,
+                    income: periodIncome.toInt(),
+                    expense: periodExpense.toInt(),
+                    balance: periodBalance.toInt(),
+                    addCash: periodCashAdded,
+                    spentCash: periodCashSpent,
+                    addOnline: periodOnlineAdded,
+                    spentOnline: periodOnlineSpent,
+                    friendGet: friendGiven.toInt(),
+                    friendGive: friendTaken.toInt(),
+                    categoryTotals: periodCategoryTotals,
                   );
                 },
               ),
@@ -225,316 +261,726 @@ class _ReportPageState extends State<Reportpage> {
             ],
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  // Balance Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(30),
-                      gradient: LinearGradient(
-                        colors: [themeColor, themeColor.withValues(alpha: .75)],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: themeColor.withValues(alpha: .25),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
+                // 1. Period Selector Chips
+                _buildPeriodSelector(),
+
+                const SizedBox(height: 16),
+
+                // 2. Hero Gradient Balance Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(26),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [themeColor, themeColor.withValues(alpha: 0.82)],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Current Balance",
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          money(currentBalance),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 34,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(Icons.trending_up, color: Colors.white),
-                            SizedBox(width: 5),
-                            Text(
-                              "${((healthScore) * 100).toStringAsFixed(0)}% healthy",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: _cardDecoration(),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 70,
-                          height: 70,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              CircularProgressIndicator(
-                                value: healthScore,
-                                color: themeColor,
-                                strokeWidth: 8,
-                              ),
-                              Text(
-                                "${(healthScore * 100).toStringAsFixed(0)}%",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Financial Health",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 17,
-                                ),
-                              ),
-                              SizedBox(height: 5),
-                              Text(healthText),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-                  const SizedBox(height: 20),
-
-                  // Quick Insights
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Quick Insights",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.35,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    children: [
-                      _insightCard(
-                        icon: Icons.payments_rounded,
-                        title: "Cash Balance",
-                        value: money(cashBalance),
-                      ),
-                      _insightCard(
-                        icon: Icons.account_balance_wallet_rounded,
-                        title: "Online Balance",
-                        value: money(onlineBalance),
-                      ),
-                      _insightCard(
-                        icon: Icons.shopping_bag,
-                        title: "Biggest Expense",
-                        value: topCategory,
-                      ),
-                      _insightCard(
-                        icon: Icons.monetization_on,
-                        title: "Highest Income",
-                        value: money(highestIncome),
-                      ),
-                      _insightCard(
-                        icon: Icons.receipt_long,
-                        title: "Transactions",
-                        value: transactionCount.toString(),
-                      ),
-                      _insightCard(
-                        icon: Icons.calendar_month,
-                        title: "Total Records",
-                        value: recentTransactions.length.toString(),
+                    boxShadow: [
+                      BoxShadow(
+                        color: themeColor.withValues(alpha: 0.28),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 20),
-
-                  // Top Categories
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Top Categories",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  ...categoryTotals.entries.take(3).map((e) {
-                    return _categoryTile(
-                      themeColor: themeColor,
-                      icon: Icons.category,
-                      title: e.key,
-                      amount: money(e.value),
-                      value: totalExpense > 0
-                          ? (e.value / totalExpense).clamp(0.0, 1.0)
-                          : 0.0,
-                    );
-                  }),
-
-                  const SizedBox(height: 20),
-
-                  // Friend Summary
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: _cardDecoration(),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.people, color: themeColor),
-                            const SizedBox(width: 10),
-                            const Text(
-                              "Friend Summary",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 17,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 18),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text("Money You Get"),
-                            Text(
-                              money(friendGiven),
-                              style: TextStyle(
-                                color: themeColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text("Money You Want To Give"),
-                            Text(
-                              money(friendTaken),
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const Divider(height: 25),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              "Net Balance",
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              money(friendGiven - friendTaken),
-                              style: TextStyle(
-                                color: (friendGiven < friendTaken)
-                                    ? Colors.red
-                                    : themeColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Recent Activity
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: _cardDecoration(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Recent Activity",
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "${_getPeriodLabel(selectedPeriod)} Net Balance",
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
                           ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              "${filteredRecords.length} records",
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        money(periodBalance),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(
+                            periodBalance >= 0 ? Icons.trending_up : Icons.trending_down,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            "Savings Rate: ${savingsRate.toStringAsFixed(0)}% ($healthText)",
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
 
-                        const SizedBox(height: 15),
+                const SizedBox(height: 16),
 
-                        ...recentTransactions.take(5).map((record) {
-                          final payment = (record["Payment_Mode"] ?? record["payment"] ?? "").toString();
-                          final category = (record["Category"] ?? record["category"] ?? "Other").toString();
-                          final amt = double.tryParse(record["Amount"]?.toString() ?? record["amount"]?.toString() ?? '0') ?? 0.0;
-                          bool isExpense = payment.contains("Spent");
+                // 3. Health Score Gauge Card
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: _cardDecoration(),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 68,
+                        height: 68,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              value: healthScore,
+                              backgroundColor: themeColor.withValues(alpha: 0.15),
+                              color: healthScore >= 0.5 ? themeColor : Colors.orange,
+                              strokeWidth: 7,
+                            ),
+                            Text(
+                              "${(healthScore * 100).toStringAsFixed(0)}%",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Financial Health Score",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "$healthText - ${healthScore >= 0.6 ? 'Healthy savings & low expense ratio' : 'Consider reviewing major expense categories'}",
+                              style: TextStyle(color: Colors.grey.shade700, fontSize: 12.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // 4. Interactive Cashflow Comparison Bar Chart
+                _buildCashflowBarChart(
+                  income: periodIncome,
+                  expense: periodExpense,
+                  cashIn: periodCashAdded,
+                  cashOut: periodCashSpent,
+                  onlineIn: periodOnlineAdded,
+                  onlineOut: periodOnlineSpent,
+                ),
+
+                const SizedBox(height: 20),
+
+                // 5. Quick Insights Grid
+                const Text(
+                  "Quick Insights",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  childAspectRatio: 1.35,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  children: [
+                    _insightCard(
+                      icon: Icons.payments_rounded,
+                      title: "Cash Spent",
+                      value: money(periodCashSpent),
+                    ),
+                    _insightCard(
+                      icon: Icons.account_balance_wallet_rounded,
+                      title: "Online Spent",
+                      value: money(periodOnlineSpent),
+                    ),
+                    _insightCard(
+                      icon: Icons.shopping_bag_outlined,
+                      title: "Top Category",
+                      value: topCategory,
+                    ),
+                    _insightCard(
+                      icon: Icons.arrow_upward_rounded,
+                      title: "Highest Income",
+                      value: money(highestIncome),
+                    ),
+                    _insightCard(
+                      icon: Icons.savings_outlined,
+                      title: "Savings Rate",
+                      value: "${savingsRate.toStringAsFixed(0)}%",
+                    ),
+                    _insightCard(
+                      icon: Icons.receipt_long_outlined,
+                      title: "Transactions",
+                      value: "${filteredRecords.length} records",
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // 6. Interactive Category Donut / Breakdown Chart
+                _buildCategoryDonutSection(periodCategoryTotals, periodExpense),
+
+                const SizedBox(height: 20),
+
+                // 7. Friend Ledger Summary
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: _cardDecoration(),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.people_alt_rounded, color: themeColor),
+                          const SizedBox(width: 10),
+                          const Text(
+                            "Friend Ledger Overview",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Money You Will Receive"),
+                          Text(
+                            money(friendGiven),
+                            style: TextStyle(
+                              color: themeColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Money You Owe (To Give)"),
+                          Text(
+                            money(friendTaken),
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Net Friend Settlement",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            money(friendGiven - friendTaken),
+                            style: TextStyle(
+                              color: (friendGiven < friendTaken) ? Colors.red : themeColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // 8. Recent Transactions Stream
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: _cardDecoration(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Period Activity",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            "${filteredRecords.take(5).length} of ${filteredRecords.length}",
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      if (filteredRecords.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Center(
+                            child: Text(
+                              "No transactions recorded for this period.",
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            ),
+                          ),
+                        )
+                      else
+                        ...filteredRecords.take(5).map((record) {
+                          final payment = (record["Payment_Mode"] ?? "").toString();
+                          final category = (record["Category"] ?? "Other").toString();
+                          final date = (record["Date"] ?? "-").toString();
+                          final amt = double.tryParse(record["Amount"]?.toString() ?? '0') ?? 0.0;
+                          final isIncome = payment.startsWith("Add");
 
                           return _activityTile(
-                            themeColor,
-                            isExpense
-                                ? Icons.arrow_upward
-                                : Icons.arrow_downward,
-                            category,
-                            "${isExpense ? "-" : "+"}${money(amt)}",
-                            isExpense ? Colors.red : themeColor,
+                            themeColor: themeColor,
+                            icon: isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                            title: category,
+                            subtitle: "$date • $payment",
+                            amount: "${isIncome ? '+' : '-'}${money(amt)}",
+                            amountColor: isIncome ? themeColor : Colors.red,
                           );
                         }),
-                      ],
-                    ),
+                    ],
                   ),
+                ),
 
-                  const SizedBox(height: 30),
-                ],
-              ),
+                const SizedBox(height: 30),
+              ],
             ),
+          ),
         );
       },
     );
+  }
+
+  // ===========================================================================
+  // 📊 VISUAL CHARTS BUILDERS
+  // ===========================================================================
+
+  Widget _buildCashflowBarChart({
+    required double income,
+    required double expense,
+    required int cashIn,
+    required int cashOut,
+    required int onlineIn,
+    required int onlineOut,
+  }) {
+    final maxVal = [income, expense, cashIn.toDouble(), cashOut.toDouble(), onlineIn.toDouble(), onlineOut.toDouble()]
+        .reduce((a, b) => a > b ? a : b);
+    final double maxY = maxVal > 0 ? maxVal * 1.25 : 1000;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Cashflow Comparison",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              Row(
+                children: [
+                  _legendDot(themeColor, "Inflow"),
+                  const SizedBox(width: 10),
+                  _legendDot(const Color(0xFFEF5350), "Outflow"),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 180,
+            child: BarChart(
+              BarChartData(
+                maxY: maxY,
+                alignment: BarChartAlignment.spaceAround,
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (group) => Colors.grey.shade900,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final title = groupIndex == 0
+                          ? "Total"
+                          : groupIndex == 1
+                              ? "Cash"
+                              : "Online";
+                      final isIncome = rodIndex == 0;
+                      return BarTooltipItem(
+                        "$title ${isIncome ? 'In' : 'Out'}\n",
+                        const TextStyle(color: Colors.white70, fontSize: 11),
+                        children: [
+                          TextSpan(
+                            text: money(rod.toY),
+                            style: TextStyle(
+                              color: isIncome ? Colors.greenAccent : const Color(0xFFFF8A80),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 28,
+                      getTitlesWidget: (value, meta) {
+                        String text = "";
+                        switch (value.toInt()) {
+                          case 0:
+                            text = "Overall";
+                            break;
+                          case 1:
+                            text = "Cash";
+                            break;
+                          case 2:
+                            text = "Online";
+                            break;
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            text,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: maxY / 4,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Colors.grey.shade200,
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: [
+                  _makeBarGroup(0, income, expense),
+                  _makeBarGroup(1, cashIn.toDouble(), cashOut.toDouble()),
+                  _makeBarGroup(2, onlineIn.toDouble(), onlineOut.toDouble()),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  BarChartGroupData _makeBarGroup(int x, double inVal, double outVal) {
+    return BarChartGroupData(
+      x: x,
+      barsSpace: 6,
+      barRods: [
+        BarChartRodData(
+          toY: inVal,
+          color: themeColor,
+          width: 14,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+        ),
+        BarChartRodData(
+          toY: outVal,
+          color: const Color(0xFFEF5350),
+          width: 14,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryDonutSection(Map<String, double> categoryTotals, double totalExpense) {
+    if (categoryTotals.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        width: double.infinity,
+        decoration: _cardDecoration(),
+        child: Center(
+          child: Text(
+            "No category expenses for ${_getPeriodLabel(selectedPeriod).toLowerCase()}.",
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    final entries = categoryTotals.entries.toList();
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Expense Distribution",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
+          // Donut Pie Chart with Interactive Center Label
+          SizedBox(
+            height: 180,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: PieChart(
+                    PieChartData(
+                      pieTouchData: PieTouchData(
+                        touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                          setState(() {
+                            if (!event.isInterestedForInteractions ||
+                                pieTouchResponse == null ||
+                                pieTouchResponse.touchedSection == null) {
+                              _touchedPieIndex = -1;
+                              return;
+                            }
+                            _touchedPieIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                          });
+                        },
+                      ),
+                      borderData: FlBorderData(show: false),
+                      sectionsSpace: 2.5,
+                      centerSpaceRadius: 38,
+                      sections: List.generate(entries.length, (i) {
+                        final isTouched = i == _touchedPieIndex;
+                        final double fontSize = isTouched ? 13 : 10;
+                        final double radius = isTouched ? 48 : 40;
+                        final entry = entries[i];
+                        final share = totalExpense > 0 ? (entry.value / totalExpense) * 100 : 0.0;
+                        final color = _getCategoryColor(entry.key);
+
+                        return PieChartSectionData(
+                          color: color,
+                          value: entry.value,
+                          title: "${share.toStringAsFixed(0)}%",
+                          radius: radius,
+                          titleStyle: TextStyle(
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: entries.take(4).map((e) {
+                      final share = totalExpense > 0 ? (e.value / totalExpense) * 100 : 0.0;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3.5),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _getCategoryColor(e.key),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                e.key,
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              "${share.toStringAsFixed(0)}%",
+                              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+
+          // Category Progress Bars List
+          ...entries.map((e) {
+            final share = totalExpense > 0 ? (e.value / totalExpense).clamp(0.0, 1.0) : 0.0;
+            return _categoryTile(
+              themeColor: _getCategoryColor(e.key),
+              icon: _getCategoryIcon(e.key),
+              title: e.key,
+              amount: money(e.value),
+              percentage: (share * 100).toStringAsFixed(1),
+              value: share,
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPeriodSelector() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: ReportPeriod.values.map((period) {
+          final isSelected = selectedPeriod == period;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(_getPeriodLabel(period)),
+              selected: isSelected,
+              selectedColor: themeColor,
+              backgroundColor: Colors.white,
+              checkmarkColor: Colors.white,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : Colors.black87,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 12.5,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? themeColor : Colors.grey.shade300,
+                  width: 1,
+                ),
+              ),
+              onSelected: (_) {
+                setState(() {
+                  selectedPeriod = period;
+                });
+              },
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case "food":
+        return const Color(0xFFFF9800);
+      case "shopping":
+        return Colors.deepOrange;
+      case "transport":
+        return const Color(0xFF2196F3);
+      case "education":
+        return const Color(0xFF3F51B5);
+      case "healthcare":
+        return const Color(0xFFE53935);
+      case "entertainment":
+        return const Color(0xFFEC407A);
+      case "add money":
+        return const Color(0xFF43A047);
+      default:
+        return const Color(0xFF78909C);
+    }
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case "food":
+        return Icons.restaurant;
+      case "shopping":
+        return Icons.shopping_bag;
+      case "transport":
+        return Icons.directions_car;
+      case "education":
+        return Icons.school;
+      case "healthcare":
+        return Icons.local_hospital;
+      case "entertainment":
+        return Icons.movie;
+      case "add money":
+        return Icons.add_card;
+      default:
+        return Icons.category;
+    }
   }
 
   BoxDecoration _cardDecoration() {
@@ -543,9 +989,9 @@ class _ReportPageState extends State<Reportpage> {
       borderRadius: BorderRadius.circular(22),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: .05),
-          blurRadius: 12,
-          offset: const Offset(0, 4),
+          color: Colors.black.withValues(alpha: .04),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
         ),
       ],
     );
@@ -557,20 +1003,22 @@ class _ReportPageState extends State<Reportpage> {
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: _cardDecoration(),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Icon(icon, color: themeColor, size: 30),
+          Icon(icon, color: themeColor, size: 26),
           Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
+            style: const TextStyle(fontSize: 11.5, color: Colors.black54),
           ),
         ],
       ),
@@ -582,35 +1030,39 @@ class _ReportPageState extends State<Reportpage> {
     required IconData icon,
     required String title,
     required String amount,
+    required String percentage,
     required double value,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: _cardDecoration(),
       child: Column(
         children: [
           Row(
             children: [
               CircleAvatar(
-                radius: 18,
+                radius: 17,
                 backgroundColor: themeColor.withValues(alpha: .15),
-                child: Icon(icon, color: themeColor, size: 18),
+                child: Icon(icon, color: themeColor, size: 16),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                 ),
               ),
-              Text(amount, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                "$amount ($percentage%)",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           LinearProgressIndicator(
             value: value,
-            minHeight: 8,
+            minHeight: 7,
             borderRadius: BorderRadius.circular(20),
             backgroundColor: themeColor.withValues(alpha: .15),
             valueColor: AlwaysStoppedAnimation(themeColor),
@@ -620,32 +1072,43 @@ class _ReportPageState extends State<Reportpage> {
     );
   }
 
-  Widget _activityTile(
-    Color themeColor,
-    IconData icon,
-    String title,
-    String amount,
-    Color amountColor,
-  ) {
+  Widget _activityTile({
+    required Color themeColor,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String amount,
+    required Color amountColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 22,
-            backgroundColor: themeColor.withValues(alpha: .15),
-            child: Icon(icon, color: themeColor),
+            radius: 20,
+            backgroundColor: amountColor.withValues(alpha: .12),
+            child: Icon(icon, color: amountColor, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w500),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 11.5),
+                ),
+              ],
             ),
           ),
           Text(
             amount,
-            style: TextStyle(color: amountColor, fontWeight: FontWeight.bold),
+            style: TextStyle(color: amountColor, fontWeight: FontWeight.bold, fontSize: 13.5),
           ),
         ],
       ),

@@ -50,6 +50,33 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
               expensesRecords.add(Map<String, dynamic>.from(value));
             }
           });
+
+          expensesRecords.sort((a, b) {
+            DateTime? parseDate(String? d) {
+              if (d == null || d.isEmpty) return null;
+              try {
+                return DateFormat('d/M/yyyy').parse(d);
+              } catch (_) {
+                return DateTime.tryParse(d);
+              }
+            }
+
+            final dateA = parseDate(a["Date"]);
+            final dateB = parseDate(b["Date"]);
+
+            if (dateA != null && dateB != null) {
+              final cmp = dateB.compareTo(dateA);
+              if (cmp != 0) return cmp;
+            } else if (dateA != null) {
+              return -1;
+            } else if (dateB != null) {
+              return 1;
+            }
+
+            final tA = a["timestamp"] is int ? a["timestamp"] as int : 0;
+            final tB = b["timestamp"] is int ? b["timestamp"] as int : 0;
+            return tB.compareTo(tA);
+          });
         }
       }
     } catch (_) {}
@@ -95,90 +122,24 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
     }
   }
 
-  void showExportLedgerDialog() {
-    if (friendDetails.isEmpty) return;
+  Future<void> exportFriendLedgerToPdf() async {
+    if (friendDetails.isEmpty) {
+      Fluttertoast.showToast(msg: "No friend details to export");
+      return;
+    }
     final friendName = friendDetails[0]["friend_name"] ?? "Friend";
     final friendNum = friendDetails[0]["friend_number"] ?? widget.friend_number;
     final userProvider = context.read<UserProvider>();
     final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (bottomCtx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Export $friendName's Ledger",
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "${expensesRecords.length} records found",
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.red.shade50,
-                    child: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                  ),
-                  title: const Text("Export as PDF Ledger", style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text("Formatted PDF statement with balances"),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () async {
-                    Navigator.pop(bottomCtx);
-                    Fluttertoast.showToast(msg: "Generating PDF...");
-                    await ExportService.exportFriendLedgerPdf(
-                      userName: userName,
-                      friendName: friendName,
-                      friendNumber: friendNum,
-                      totalGet: totalGet,
-                      totalGive: totalGive,
-                      records: expensesRecords,
-                    );
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.green.shade50,
-                    child: const Icon(Icons.table_chart, color: Colors.green),
-                  ),
-                  title: const Text("Export as CSV / Excel", style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text("Spreadsheet file of transactions"),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () async {
-                    Navigator.pop(bottomCtx);
-                    Fluttertoast.showToast(msg: "Generating CSV...");
-                    await ExportService.exportFriendLedgerCsv(
-                      userName: userName,
-                      friendName: friendName,
-                      friendNumber: friendNum,
-                      records: expensesRecords,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    Fluttertoast.showToast(msg: "Generating PDF Statement...");
+    await ExportService.exportFriendLedgerPdf(
+      userName: userName,
+      friendName: friendName,
+      friendNumber: friendNum,
+      totalGet: totalGet,
+      totalGive: totalGive,
+      records: expensesRecords,
     );
   }
 
@@ -207,9 +168,9 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
         ),
         actions: [
           IconButton(
-            tooltip: "Export Ledger",
-            icon: const Icon(Icons.ios_share, color: Colors.white),
-            onPressed: showExportLedgerDialog,
+            tooltip: "Export PDF Ledger",
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+            onPressed: exportFriendLedgerToPdf,
           ),
           const SizedBox(width: 8),
         ],

@@ -1,5 +1,7 @@
+import 'package:FinTrack/FriendsPages/split_bill_page.dart';
 import 'package:FinTrack/GetInformation/SessionManager.dart';
 import 'package:FinTrack/providers/expense_provider.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -41,11 +43,33 @@ class _AddSpentState extends State<AddSpent> {
   late String selectedMode;
   late String selectedCategory;
 
+  // 👥 1-Tap Split with Friend State
+  bool isSplitWithFriend = false;
+  String? selectedFriendNumber;
+  String? selectedFriendName;
+
   @override
   void initState() {
     super.initState();
     selectedMode = paymentModes.first;
     selectedCategory = categories.first;
+
+    amountController.addListener(() {
+      if (isSplitWithFriend && mounted) {
+        setState(() {});
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFriends();
+    });
+  }
+
+  Future<void> _loadFriends() async {
+    final phone = await SessionManager.getPhoneNumber() ?? "";
+    if (phone.isNotEmpty && mounted) {
+      context.read<FriendProvider>().fetchFriends(phone);
+    }
   }
 
   @override
@@ -56,11 +80,12 @@ class _AddSpentState extends State<AddSpent> {
   }
 
   Future<void> pickDate() async {
+    final now = DateTime.now();
     DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: selectedDate,
+      initialDate: selectedDate.isAfter(now) ? now : selectedDate,
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: now,
     );
 
     if (picked != null) {
@@ -71,16 +96,23 @@ class _AddSpentState extends State<AddSpent> {
   }
 
   Future<void> getAllDetails() async {
-    String amount = amountController.text.trim();
+    String rawAmount = amountController.text.trim();
     String description = descriptionController.text.trim();
 
-    if (amount.isEmpty || description.isEmpty) {
+    if (rawAmount.isEmpty || description.isEmpty) {
       Fluttertoast.showToast(msg: "Please fill in all fields");
       return;
     }
 
-    if (int.tryParse(amount) == null || (int.tryParse(amount) ?? 0) <= 0) {
+    final totalAmount = int.tryParse(rawAmount);
+    if (totalAmount == null || totalAmount <= 0) {
       Fluttertoast.showToast(msg: "Please enter a valid amount");
+      return;
+    }
+
+    final isSpending = selectedMode.startsWith("Spent");
+    if (isSplitWithFriend && isSpending && selectedFriendNumber == null) {
+      Fluttertoast.showToast(msg: "Please select a friend to split the bill with");
       return;
     }
 
@@ -97,21 +129,62 @@ class _AddSpentState extends State<AddSpent> {
 
       String formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
       if (!mounted) return;
-      final success = await context.read<ExpenseProvider>().addExpense(
-        phoneNumber: phone,
-        amount: amount,
-        description: description,
-        paymentMode: selectedMode,
-        date: formattedDate,
-        category: selectedCategory,
-      );
 
-      if (success) {
-        Fluttertoast.showToast(msg: "Transaction added successfully");
-        if (!mounted) return;
-        Navigator.pop(context, true);
+      final expenseProvider = context.read<ExpenseProvider>();
+      final friendProvider = context.read<FriendProvider>();
+
+      if (isSplitWithFriend && isSpending && selectedFriendNumber != null) {
+        final friendShare = (totalAmount * 0.5).round();
+        final myShare = totalAmount - friendShare;
+
+        // 1. Record personal expense in Passbook
+        final passbookSuccess = await expenseProvider.addExpense(
+          phoneNumber: phone,
+          amount: myShare.toString(),
+          description: "$description (Your 50% split of ₹$totalAmount)",
+          paymentMode: selectedMode,
+          date: formattedDate,
+          category: selectedCategory,
+        );
+
+        // 2. Record friend ledger (Money You Will Receive)
+        final friendSuccess = await friendProvider.addFriendTransaction(
+          userPhone: phone,
+          friendNumber: selectedFriendNumber!,
+          amount: friendShare.toString(),
+          description: "Split: $description (Total ₹$totalAmount)",
+          paymentMode: selectedMode,
+          date: formattedDate,
+          categoryType: "Give Money To Friend",
+        );
+
+        if (passbookSuccess && friendSuccess) {
+          Fluttertoast.showToast(
+            msg: "Saved! ₹$myShare in Passbook & ₹$friendShare added to $selectedFriendName's ledger",
+          );
+          if (!mounted) return;
+          Navigator.pop(context, true);
+        } else {
+          Fluttertoast.showToast(msg: "Failed to save split transaction");
+        }
       } else {
-        Fluttertoast.showToast(msg: "Failed to save transaction");
+        // Standard single transaction
+        final success = await expenseProvider.addExpense(
+          phoneNumber: phone,
+          amount: rawAmount,
+          description: description,
+          paymentMode: selectedMode,
+          date: formattedDate,
+          category: selectedCategory,
+        );
+
+        if (success) {
+          Fluttertoast.showToast(msg: "Transaction added successfully");
+          if (!mounted) return;
+          Navigator.pop(context, true);
+        } else {
+          Fluttertoast.showToast(msg: "Failed to save transaction");
+        }
       }
     } catch (e) {
       Fluttertoast.showToast(msg: "Failed to save transaction");
@@ -159,6 +232,13 @@ class _AddSpentState extends State<AddSpent> {
 
   @override
   Widget build(BuildContext context) {
+    final friendProvider = context.watch<FriendProvider>();
+    final friends = friendProvider.friends;
+    final isSpending = selectedMode.startsWith("Spent");
+    final currentAmount = int.tryParse(amountController.text.trim()) ?? 0;
+    final mySharePreview = (currentAmount * 0.5).round();
+    final friendSharePreview = currentAmount - mySharePreview;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FBF2),
       appBar: AppBar(
@@ -204,7 +284,7 @@ class _AddSpentState extends State<AddSpent> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
-                      decoration: inputDecoration("Enter Amount (₹)"),
+                      decoration: inputDecoration("Enter Total Amount (₹)"),
                     ),
 
                     const SizedBox(height: 18),
@@ -220,6 +300,8 @@ class _AddSpentState extends State<AddSpent> {
                       readOnly: true,
                       decoration: inputDecoration(
                         "Date: ${DateFormat('dd MMM yyyy').format(selectedDate)}",
+                      ).copyWith(
+                        suffixIcon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BC24A)),
                       ),
                       onTap: pickDate,
                     ),
@@ -272,6 +354,164 @@ class _AddSpentState extends State<AddSpent> {
                       inputDecorationTheme: inputTheme(),
                     ),
 
+                    // 👥 1-Tap Bill Split Section (Available for Expense transactions)
+                    if (isSpending) ...[
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isSplitWithFriend ? const Color(0xFFF1F8E9) : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: isSplitWithFriend ? const Color(0xFF8BC24A) : Colors.grey.shade300,
+                            width: isSplitWithFriend ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: isSplitWithFriend ? const Color(0xFF8BC24A).withValues(alpha: 0.2) : Colors.grey.shade200,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.group_rounded,
+                                        size: 20,
+                                        color: isSplitWithFriend ? const Color(0xFF558B2F) : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      "Split Bill with Friend",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14.5,
+                                        color: isSplitWithFriend ? const Color(0xFF33691E) : Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Switch.adaptive(
+                                  value: isSplitWithFriend,
+                                  activeTrackColor: const Color(0xFF8BC24A),
+                                  activeThumbColor: Colors.white,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      isSplitWithFriend = val;
+                                      if (val && friends.isNotEmpty && selectedFriendNumber == null) {
+                                        selectedFriendNumber = friends.first["friend_number"];
+                                        selectedFriendName = friends.first["friend_name"];
+                                      }
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            if (isSplitWithFriend) ...[
+                              const SizedBox(height: 12),
+                              const Divider(height: 1),
+                              const SizedBox(height: 12),
+
+                              if (friends.isEmpty)
+                                Text(
+                                  "No friends found. Add friends in the Friends tab to split bills.",
+                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5),
+                                )
+                              else ...[
+                                DropdownMenu<String>(
+                                  width: MediaQuery.of(context).size.width - 116,
+                                  initialSelection: selectedFriendNumber ?? friends.first["friend_number"],
+                                  label: const Text("Select Friend"),
+                                  dropdownMenuEntries: friends.map((f) {
+                                    final name = (f["friend_name"] ?? "Friend").toString();
+                                    final number = (f["friend_number"] ?? "").toString();
+                                    return DropdownMenuEntry(
+                                      value: number,
+                                      label: "$name ($number)",
+                                    );
+                                  }).toList(),
+                                  onSelected: (val) {
+                                    if (val != null) {
+                                      final matched = friends.firstWhere(
+                                        (f) => f["friend_number"] == val,
+                                        orElse: () => {"friend_name": "Friend"},
+                                      );
+                                      setState(() {
+                                        selectedFriendNumber = val;
+                                        selectedFriendName = matched["friend_name"];
+                                      });
+                                    }
+                                  },
+                                  inputDecorationTheme: inputTheme(),
+                                ),
+
+                                if (currentAmount > 0) ...[
+                                  const SizedBox(height: 14),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFF8BC24A).withValues(alpha: 0.5)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "Your Expense: ₹$mySharePreview",
+                                          style: const TextStyle(
+                                            color: Color(0xFF558B2F),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                        Text(
+                                          "Friend Owes: ₹$friendSharePreview",
+                                          style: const TextStyle(
+                                            color: Color(0xFFE65100),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Center(
+                                    child: TextButton.icon(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const SplitBillPage()),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.group_work_rounded, size: 16, color: Color(0xFF558B2F)),
+                                      label: const Text(
+                                        "Split with 2+ friends? Open Group Splitter ➔",
+                                        style: TextStyle(
+                                          color: Color(0xFF558B2F),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 28),
 
                     SizedBox(
@@ -284,9 +524,9 @@ class _AddSpentState extends State<AddSpent> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: const Text(
-                          "Save Transaction",
-                          style: TextStyle(
+                        child: Text(
+                          isSplitWithFriend ? "Save & Split Bill" : "Save Transaction",
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,

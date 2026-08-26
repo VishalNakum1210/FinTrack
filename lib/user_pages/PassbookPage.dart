@@ -36,15 +36,39 @@ class PassbookPageState extends State<PassbookApp> {
     }
   }
 
-  String formatDate(String date) {
-    try {
-      final inputFormat = DateFormat('d/M/yyyy');
-      final outputFormat = DateFormat('d MMM yyyy');
-      final parsedDate = inputFormat.parse(date);
-      return outputFormat.format(parsedDate);
-    } catch (_) {
-      return date;
+  DateTime? _parseRecordDate(dynamic dateVal) {
+    if (dateVal == null) return null;
+    final str = dateVal.toString().trim();
+    if (str.isEmpty || str == "-") return null;
+
+    final formats = [
+      'd/M/yyyy',
+      'dd/MM/yyyy',
+      'd-M-yyyy',
+      'dd-MM-yyyy',
+      'yyyy-MM-dd',
+      'yyyy/MM/dd',
+      'd MMM yyyy',
+      'dd MMM yyyy',
+      'MM/dd/yyyy',
+      'M/d/yyyy',
+    ];
+
+    for (var f in formats) {
+      try {
+        return DateFormat(f).parseStrict(str);
+      } catch (_) {}
     }
+    return DateTime.tryParse(str);
+  }
+
+  String formatDate(String date) {
+    if (date.trim().isEmpty || date == "-") return "";
+    final parsed = _parseRecordDate(date);
+    if (parsed != null) {
+      return DateFormat('d MMM yyyy').format(parsed);
+    }
+    return date;
   }
 
   void changeOrder(String? value) {
@@ -65,14 +89,14 @@ class PassbookPageState extends State<PassbookApp> {
     }
   }
 
-  void showExportDialog({
+  Future<void> exportToPdf({
     required BuildContext context,
     required List<Map<String, dynamic>> records,
     required int income,
     required int expense,
     required int spentCash,
     required int spentOnline,
-  }) {
+  }) async {
     if (records.isEmpty) {
       Fluttertoast.showToast(msg: "No records to export");
       return;
@@ -81,88 +105,24 @@ class PassbookPageState extends State<PassbookApp> {
     final userProvider = context.read<UserProvider>();
     final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
     final phone = userProvider.phoneNumber;
+    final expenseProv = context.read<ExpenseProvider>();
+    final addCash = expenseProv.addCash;
+    final addOnline = expenseProv.addOnline;
     final currentBalance = income - expense;
-    final cashBalance = context.read<ExpenseProvider>().addCash - spentCash;
-    final onlineBalance = context.read<ExpenseProvider>().addOnline - spentOnline;
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (bottomCtx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Export Statement",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "Export ${records.length} records ($selectedCategory)",
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.red.shade50,
-                    child: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                  ),
-                  title: const Text("Export as PDF Report", style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text("Download or print a formatted PDF statement"),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () async {
-                    Navigator.pop(bottomCtx);
-                    Fluttertoast.showToast(msg: "Generating PDF...");
-                    await ExportService.exportPassbookPdf(
-                      userName: userName,
-                      phoneNumber: phone,
-                      records: records,
-                      totalIncome: income,
-                      totalExpense: expense,
-                      currentBalance: currentBalance,
-                      cashBalance: cashBalance,
-                      onlineBalance: onlineBalance,
-                      filterCategory: selectedCategory,
-                    );
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.green.shade50,
-                    child: const Icon(Icons.table_chart, color: Colors.green),
-                  ),
-                  title: const Text("Export as CSV / Excel", style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text("Spreadsheet format for Excel or Google Sheets"),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () async {
-                    Navigator.pop(bottomCtx);
-                    Fluttertoast.showToast(msg: "Generating CSV...");
-                    await ExportService.exportPassbookCsv(
-                      userName: userName,
-                      records: records,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    Fluttertoast.showToast(msg: "Generating PDF Statement...");
+    await ExportService.exportPassbookPdf(
+      userName: userName,
+      phoneNumber: phone,
+      records: records,
+      totalIncome: income,
+      totalExpense: expense,
+      currentBalance: currentBalance,
+      addCash: addCash,
+      spentCash: spentCash,
+      addOnline: addOnline,
+      spentOnline: spentOnline,
+      filterCategory: selectedCategory,
     );
   }
 
@@ -180,9 +140,32 @@ class PassbookPageState extends State<PassbookApp> {
       builder: (context, expenseProvider, _) {
         final isLoading = expenseProvider.isLoading;
         List<Map<String, dynamic>> rawFiltered = expenseProvider.getFilteredRecords(selectedCategory);
-        List<Map<String, dynamic>> records = currentSort == "Oldest First"
-            ? rawFiltered.reversed.toList()
-            : rawFiltered;
+        List<Map<String, dynamic>> records = List<Map<String, dynamic>>.from(rawFiltered);
+
+        // Group & sort primarily by transaction Date, and secondarily by timestamp
+        records.sort((a, b) {
+          final dateA = _parseRecordDate(a["Date"]);
+          final dateB = _parseRecordDate(b["Date"]);
+
+          int cmp = 0;
+          if (dateA != null && dateB != null) {
+            cmp = currentSort == "Oldest First"
+                ? dateA.compareTo(dateB)
+                : dateB.compareTo(dateA);
+          } else if (dateA != null) {
+            cmp = -1;
+          } else if (dateB != null) {
+            cmp = 1;
+          }
+
+          if (cmp != 0) return cmp;
+
+          final tA = a["timestamp"] is int ? a["timestamp"] as int : 0;
+          final tB = b["timestamp"] is int ? b["timestamp"] as int : 0;
+          return currentSort == "Oldest First"
+              ? tA.compareTo(tB)
+              : tB.compareTo(tA);
+        });
 
         final income = expenseProvider.totalIncome;
         final expense = expenseProvider.totalExpense;
@@ -230,10 +213,10 @@ class PassbookPageState extends State<PassbookApp> {
             ),
             actions: [
               IconButton(
-                tooltip: "Export Statement",
-                icon: const Icon(Icons.ios_share, color: green),
+                tooltip: "Export PDF Statement",
+                icon: const Icon(Icons.picture_as_pdf, color: green),
                 onPressed: () {
-                  showExportDialog(
+                  exportToPdf(
                     context: context,
                     records: records,
                     income: income,
@@ -297,8 +280,11 @@ class PassbookPageState extends State<PassbookApp> {
                             itemBuilder: (context, index) {
                               final item = records[index];
                               final date = (item["Date"] ?? "").toString();
-                              final showHeader = index == 0 ||
-                                  date != (records[index - 1]["Date"] ?? "").toString();
+                              final formattedCurrentDate = formatDate(date);
+                              final formattedPrevDate = index > 0
+                                  ? formatDate((records[index - 1]["Date"] ?? "").toString())
+                                  : "";
+                              final showHeader = index == 0 || formattedCurrentDate != formattedPrevDate;
                               final category = (item["Category"] ?? "Other").toString();
                               final desc = (item["Description"] ?? "").toString();
                               final method = (item["Payment_Mode"] ?? "").toString();
@@ -309,8 +295,8 @@ class PassbookPageState extends State<PassbookApp> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (showHeader && date.isNotEmpty)
-                                      _sectionHeader('', formatDate(date)),
+                                    if (showHeader && formattedCurrentDate.isNotEmpty)
+                                      _sectionHeader('', formattedCurrentDate),
                                     _transactionTile(
                                       icon: icon_name(category),
                                       iconColor: iconColor(category),
@@ -486,7 +472,7 @@ class PassbookPageState extends State<PassbookApp> {
                 children: [
                   Expanded(
                     child: balanceItem(
-                      Icons.arrow_upward_rounded,
+                      Icons.trending_up_rounded,
                       Colors.greenAccent,
                       "Income",
                       money(income),
@@ -497,8 +483,8 @@ class PassbookPageState extends State<PassbookApp> {
 
                   Expanded(
                     child: balanceItem(
-                      Icons.arrow_downward_rounded,
-                      Colors.redAccent.shade100,
+                      Icons.trending_down_rounded,
+                      const Color(0xFFFF8A80),
                       "Expense",
                       money(expense),
                     ),
@@ -523,7 +509,7 @@ class PassbookPageState extends State<PassbookApp> {
                   Expanded(
                     child: balanceItem(
                       Icons.payments_rounded,
-                      Colors.orangeAccent,
+                      const Color(0xFFFFD180),
                       "Cash Exp.",
                       money(spentCash),
                     ),
@@ -533,8 +519,8 @@ class PassbookPageState extends State<PassbookApp> {
 
                   Expanded(
                     child: balanceItem(
-                      Icons.payment_rounded,
-                      Colors.lightBlueAccent,
+                      Icons.credit_card_rounded,
+                      const Color(0xFF80D8FF),
                       "Online Exp.",
                       money(spentOnline),
                     ),
@@ -645,11 +631,11 @@ class PassbookPageState extends State<PassbookApp> {
       child: Row(
         children: [
           CircleAvatar(
-            radius: 30,
+            radius: 22,
             backgroundColor: bgColor,
-            child: Icon(icon, color: iconColor, size: 30),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,13 +643,13 @@ class PassbookPageState extends State<PassbookApp> {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(subtitle, style: const TextStyle(fontSize: 15)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(fontSize: 13.5, color: Colors.grey.shade700)),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Icon(
@@ -675,16 +661,16 @@ class PassbookPageState extends State<PassbookApp> {
                           // ? Icons.account_balance
                           : Icons.add_card_rounded,
                       color: Colors.grey,
-                      size: 18,
+                      size: 16,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Flexible(
                       child: Text(
                         method,
                         style: const TextStyle(
                           color: Colors.grey,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -701,7 +687,7 @@ class PassbookPageState extends State<PassbookApp> {
                 : "-$amount",
             style: TextStyle(
               color: isIncome ? green : Colors.red.shade700,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -720,26 +706,37 @@ Widget balanceItem(
 }) {
   return Column(
     children: [
-      Icon(icon, color: iconColor, size: 22),
+      Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.25),
+            width: 1,
+          ),
+        ),
+        child: Icon(icon, color: iconColor, size: 16),
+      ),
 
-      const SizedBox(height: 10),
+      const SizedBox(height: 8),
 
       Text(
         title,
         style: const TextStyle(
           color: Colors.white70,
-          fontSize: 13,
+          fontSize: 12.5,
           fontWeight: FontWeight.w500,
         ),
       ),
 
-      const SizedBox(height: 6),
+      const SizedBox(height: 4),
 
       Text(
         isMoney ? "$value" : value.toString(),
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 18,
+          fontSize: 17,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -747,20 +744,20 @@ Widget balanceItem(
   );
 }
 
-IconData icon_name(String Payment_Mode) {
-  switch (Payment_Mode) {
+IconData icon_name(String category) {
+  switch (category) {
     case "Shopping":
       return Icons.shopping_bag_rounded;
     case "Food":
-      return Icons.fastfood;
+      return Icons.restaurant_rounded;
     case "Transport":
-      return Icons.directions_bus_rounded;
+      return Icons.directions_car_filled_rounded;
     case "Education":
       return Icons.school_rounded;
     case "HealthCare":
-      return Icons.local_hospital_rounded;
+      return Icons.medical_services_rounded;
     case "Entertainment":
-      return Icons.movie_rounded;
+      return Icons.movie_filter_rounded;
     case "Add Money":
       return Icons.account_balance_wallet_rounded;
     default:

@@ -1,5 +1,6 @@
 import 'package:FinTrack/FriendsPages/addFriends.dart';
 import 'package:FinTrack/FriendsPages/specificFriendPage.dart';
+import 'package:FinTrack/FriendsPages/split_bill_page.dart';
 import 'package:FinTrack/GetInformation/SessionManager.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
@@ -41,7 +42,7 @@ class _FriendPageState extends State<FriendPage> {
     super.dispose();
   }
 
-  void showFriendsExportDialog(List<Map<String, dynamic>> friends) {
+  Future<void> exportAllFriendsToPdf(List<Map<String, dynamic>> friends, int totalGet, int totalGive) async {
     if (friends.isEmpty) {
       Fluttertoast.showToast(msg: "No friends in ledger to export");
       return;
@@ -50,73 +51,12 @@ class _FriendPageState extends State<FriendPage> {
     final userProvider = context.read<UserProvider>();
     final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (bottomCtx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Export All Friends Ledger",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "${friends.length} friends in your ledger",
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.green.shade50,
-                    child: const Icon(Icons.table_chart, color: Colors.green),
-                  ),
-                  title: const Text("Export Friend List as CSV / Excel", style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text("Spreadsheet with Friend names, phones, and dues"),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () async {
-                    Navigator.pop(bottomCtx);
-                    Fluttertoast.showToast(msg: "Generating CSV...");
-                    List<Map<String, dynamic>> formattedList = friends.map((f) {
-                      final fGet = int.tryParse(f["total_get"]?.toString() ?? '0') ?? 0;
-                      final fGive = int.tryParse(f["total_give"]?.toString() ?? '0') ?? 0;
-                      return {
-                        "Date": f["date"] ?? "-",
-                        "Type": fGet > fGive ? "Will Receive" : "Will Give",
-                        "Description": "Friend Ledger Balance",
-                        "Payment_Mode": "Ledger",
-                        "Amount": (fGet - fGive).abs().toString(),
-                      };
-                    }).toList();
-
-                    await ExportService.exportFriendLedgerCsv(
-                      userName: userName,
-                      friendName: "All_Friends",
-                      friendNumber: "Summary",
-                      records: formattedList,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    Fluttertoast.showToast(msg: "Generating Friends PDF Summary...");
+    await ExportService.exportAllFriendsPdf(
+      userName: userName,
+      friends: friends,
+      totalGet: totalGet,
+      totalGive: totalGive,
     );
   }
 
@@ -155,9 +95,9 @@ class _FriendPageState extends State<FriendPage> {
             ),
             actions: [
               IconButton(
-                tooltip: "Export Ledger",
-                icon: const Icon(Icons.ios_share, color: Colors.white),
-                onPressed: () => showFriendsExportDialog(allFriends),
+                tooltip: "Export PDF Summary",
+                icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+                onPressed: () => exportAllFriendsToPdf(allFriends, totalGet, totalGive),
               ),
               const SizedBox(width: 8),
             ],
@@ -286,6 +226,28 @@ class _FriendPageState extends State<FriendPage> {
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       const Spacer(),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const SplitBillPage()),
+                          );
+                        },
+                        icon: const Icon(Icons.call_split_rounded, size: 17),
+                        label: const Text("Split Bill"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primaryColor,
+                          side: const BorderSide(color: primaryColor, width: 1.5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: () {
                           Navigator.push(

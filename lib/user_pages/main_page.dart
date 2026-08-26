@@ -192,25 +192,25 @@ class _UserMainPageState extends State<UserMainPage> {
                           _statCard(
                             "Income",
                             totalIncome,
-                            Icons.arrow_downward,
+                            Icons.trending_up_rounded,
                             Colors.green,
                           ),
                           _statCard(
                             "Expense",
                             totalExpense,
-                            Icons.arrow_upward,
+                            Icons.trending_down_rounded,
                             Colors.red,
                           ),
                           _statCard(
                             "Cash",
                             cashBalance,
-                            Icons.account_balance_wallet,
+                            Icons.payments_rounded,
                             Colors.blue,
                           ),
                           _statCard(
                             "Online",
                             onlineBalance,
-                            Icons.credit_card,
+                            Icons.credit_card_rounded,
                             Colors.orange,
                           ),
                         ],
@@ -241,22 +241,22 @@ class _UserMainPageState extends State<UserMainPage> {
                         childAspectRatio: 1.25,
                         children: [
                           _insightCard(
-                            Icons.category,
+                            Icons.shopping_bag_outlined,
                             "Biggest Expense",
                             biggestCategory,
                           ),
                           _insightCard(
-                            Icons.currency_rupee,
+                            Icons.arrow_upward_rounded,
                             "Highest Transaction",
                             money(highestTransaction),
                           ),
                           _insightCard(
-                            Icons.receipt_long,
+                            Icons.receipt_long_outlined,
                             "Transactions",
                             "${records.length}",
                           ),
                           _insightCard(
-                            Icons.account_balance,
+                            Icons.account_balance_wallet_outlined,
                             "Balance",
                             money(currentBalance),
                           ),

@@ -34,6 +34,32 @@ class ExpenseProvider extends ChangeNotifier {
     return totals;
   }
 
+  DateTime? _parseDate(dynamic dateVal) {
+    if (dateVal == null) return null;
+    final str = dateVal.toString().trim();
+    if (str.isEmpty || str == "-") return null;
+
+    final formats = [
+      'd/M/yyyy',
+      'dd/MM/yyyy',
+      'd-M-yyyy',
+      'dd-MM-yyyy',
+      'yyyy-MM-dd',
+      'yyyy/MM/dd',
+      'd MMM yyyy',
+      'dd MMM yyyy',
+      'MM/dd/yyyy',
+      'M/d/yyyy',
+    ];
+
+    for (var f in formats) {
+      try {
+        return DateFormat(f).parseStrict(str);
+      } catch (_) {}
+    }
+    return DateTime.tryParse(str);
+  }
+
   /// Fetches all expense records for the user and calculates totals
   Future<void> fetchExpenses(String phoneNumber) async {
     if (phoneNumber.isEmpty) return;
@@ -74,19 +100,23 @@ class ExpenseProvider extends ChangeNotifier {
           }
         });
 
-        // Sort descending by date/timestamp
+        // Sort primarily by transaction Date (descending), and secondarily by creation timestamp
         _records.sort((a, b) {
+          final dateA = _parseDate(a["Date"]);
+          final dateB = _parseDate(b["Date"]);
+
+          if (dateA != null && dateB != null) {
+            final dateCmp = dateB.compareTo(dateA);
+            if (dateCmp != 0) return dateCmp;
+          } else if (dateA != null) {
+            return -1;
+          } else if (dateB != null) {
+            return 1;
+          }
+
           final tA = a["timestamp"] is int ? a["timestamp"] as int : 0;
           final tB = b["timestamp"] is int ? b["timestamp"] as int : 0;
-          if (tA != 0 && tB != 0) return tB.compareTo(tA);
-
-          try {
-            final fA = DateFormat('d/M/yyyy').parse(a["Date"] ?? '');
-            final fB = DateFormat('d/M/yyyy').parse(b["Date"] ?? '');
-            return fB.compareTo(fA);
-          } catch (_) {
-            return 0;
-          }
+          return tB.compareTo(tA);
         });
       }
     } catch (_) {}
