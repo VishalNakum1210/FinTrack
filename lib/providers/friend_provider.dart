@@ -35,8 +35,8 @@ class FriendProvider extends ChangeNotifier {
             final map = Map<String, dynamic>.from(value);
             _friends.add(map);
 
-            final getVal = int.tryParse(map["total_get"]?.toString() ?? '0') ?? 0;
-            final giveVal = int.tryParse(map["total_give"]?.toString() ?? '0') ?? 0;
+            final getVal = (double.tryParse(map["total_get"]?.toString() ?? '0') ?? 0.0).round();
+            final giveVal = (double.tryParse(map["total_give"]?.toString() ?? '0') ?? 0.0).round();
             _totalGet += getVal;
             _totalGive += giveVal;
           }
@@ -90,7 +90,20 @@ class FriendProvider extends ChangeNotifier {
     }
   }
 
-  /// Adds a transaction to a specific friend's ledger
+  /// Helper for atomic increment of ledger fields
+  Future<void> _atomicUpdateLedger(
+    DatabaseReference friendRef,
+    String field,
+    int delta,
+  ) async {
+    await friendRef.child(field).runTransaction((Object? currentData) {
+      final currentVal = (double.tryParse(currentData?.toString() ?? '0') ?? 0.0).round();
+      final newVal = (currentVal + delta).clamp(0, 999999999);
+      return Transaction.success(newVal.toString());
+    });
+  }
+
+  /// Adds a transaction to a specific friend's ledger atomically
   Future<bool> addFriendTransaction({
     required String userPhone,
     required String friendNumber,
@@ -103,7 +116,7 @@ class FriendProvider extends ChangeNotifier {
     try {
       final recordRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber/Records");
       final key = recordRef.push().key!;
-      final parsedAmount = int.tryParse(amount) ?? 0;
+      final parsedAmount = (double.tryParse(amount) ?? 0.0).round();
 
       await recordRef.child(key).set({
         "key": key,
@@ -116,17 +129,10 @@ class FriendProvider extends ChangeNotifier {
       });
 
       final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-      final snapshot = await friendRef.get();
-
-      int currentGive = int.tryParse(snapshot.child("total_give").value?.toString() ?? "0") ?? 0;
-      int currentGet = int.tryParse(snapshot.child("total_get").value?.toString() ?? "0") ?? 0;
-
       if (categoryType == "Take Money From Friend") {
-        currentGive += parsedAmount;
-        await friendRef.update({"total_give": currentGive.toString()});
+        await _atomicUpdateLedger(friendRef, "total_give", parsedAmount);
       } else {
-        currentGet += parsedAmount;
-        await friendRef.update({"total_get": currentGet.toString()});
+        await _atomicUpdateLedger(friendRef, "total_get", parsedAmount);
       }
 
       await fetchFriends(userPhone);
@@ -136,7 +142,49 @@ class FriendProvider extends ChangeNotifier {
     }
   }
 
-  /// Deletes a specific transaction record from a friend's ledger
+  /// Atomically batches multiple friend ledger transactions (e.g. for Multi-Friend Bill Splitting)
+  Future<int> batchAddFriendTransactions({
+    required String userPhone,
+    required List<String> friendNumbers,
+    required String amountPerFriend,
+    required String description,
+    required String paymentMode,
+    required String date,
+    required String categoryType,
+  }) async {
+    int successCount = 0;
+    final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
+
+    for (final friendNumber in friendNumbers) {
+      try {
+        final recordRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber/Records");
+        final key = recordRef.push().key!;
+
+        await recordRef.child(key).set({
+          "key": key,
+          "Amount": amountPerFriend,
+          "Description": description,
+          "Payment_Mode": paymentMode,
+          "Date": date,
+          "Type": categoryType,
+          "timestamp": ServerValue.timestamp,
+        });
+
+        final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
+        if (categoryType == "Take Money From Friend") {
+          await _atomicUpdateLedger(friendRef, "total_give", parsedAmount);
+        } else {
+          await _atomicUpdateLedger(friendRef, "total_get", parsedAmount);
+        }
+        successCount++;
+      } catch (_) {}
+    }
+
+    await fetchFriends(userPhone);
+    return successCount;
+  }
+
+  /// Deletes a specific transaction record from a friend's ledger atomically
   Future<bool> deleteFriendTransaction({
     required String userPhone,
     required String friendNumber,
@@ -151,17 +199,10 @@ class FriendProvider extends ChangeNotifier {
       await recordRef.remove();
 
       final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-      final snapshot = await friendRef.get();
-
-      int currentGive = int.tryParse(snapshot.child("total_give").value?.toString() ?? "0") ?? 0;
-      int currentGet = int.tryParse(snapshot.child("total_get").value?.toString() ?? "0") ?? 0;
-
       if (isGive) {
-        currentGive = (currentGive - amount).clamp(0, 999999999);
-        await friendRef.update({"total_give": currentGive.toString()});
+        await _atomicUpdateLedger(friendRef, "total_give", -amount);
       } else {
-        currentGet = (currentGet - amount).clamp(0, 999999999);
-        await friendRef.update({"total_get": currentGet.toString()});
+        await _atomicUpdateLedger(friendRef, "total_get", -amount);
       }
 
       await fetchFriends(userPhone);
@@ -170,4 +211,13 @@ class FriendProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Clears friends state on logout
+  void clearFriends() {
+    _friends.clear();
+    _totalGet = 0;
+    _totalGive = 0;
+    notifyListeners();
+  }
 }
+

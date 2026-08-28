@@ -135,16 +135,20 @@ class _FriendPageState extends State<FriendPage> {
                               style: TextStyle(color: Colors.white70, fontSize: 13),
                             ),
                             const SizedBox(height: 5),
-                            Text(
-                              NumberFormat.currency(
-                                locale: 'en_IN',
-                                symbol: '₹',
-                                decimalDigits: 0,
-                              ).format(totalGet),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                NumberFormat.currency(
+                                  locale: 'en_IN',
+                                  symbol: '₹',
+                                  decimalDigits: 0,
+                                ).format(totalGet),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -160,16 +164,20 @@ class _FriendPageState extends State<FriendPage> {
                               style: TextStyle(color: Colors.white70, fontSize: 13),
                             ),
                             const SizedBox(height: 5),
-                            Text(
-                              NumberFormat.currency(
-                                locale: 'en_IN',
-                                symbol: '₹',
-                                decimalDigits: 0,
-                              ).format(totalGive),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                NumberFormat.currency(
+                                  locale: 'en_IN',
+                                  symbol: '₹',
+                                  decimalDigits: 0,
+                                ).format(totalGive),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -290,8 +298,8 @@ class _FriendPageState extends State<FriendPage> {
                                 final friend = displayedFriends[index];
                                 final friendName = (friend["friend_name"] ?? "Friend").toString();
                                 final friendNumber = (friend["friend_number"] ?? "").toString();
-                                final fGet = int.tryParse(friend["total_get"]?.toString() ?? '0') ?? 0;
-                                final fGive = int.tryParse(friend["total_give"]?.toString() ?? '0') ?? 0;
+                                final fGet = (double.tryParse(friend["total_get"]?.toString() ?? '0') ?? 0.0).round();
+                                final fGive = (double.tryParse(friend["total_give"]?.toString() ?? '0') ?? 0.0).round();
 
                                 return InkWell(
                                   onLongPress: () async {
@@ -336,7 +344,8 @@ class _FriendPageState extends State<FriendPage> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => Specificfriendpage(
-                                          friend_number: friendNumber,
+                                          friendNumber: friendNumber,
+                                          friendName: friendName,
                                         ),
                                       ),
                                     );

@@ -5,6 +5,7 @@ import 'package:FinTrack/ProfilePages/PersonalInformationPage.dart';
 import 'package:FinTrack/ProfilePages/ReportPage.dart';
 import 'package:FinTrack/authantication/login_page.dart';
 import 'package:FinTrack/providers/expense_provider.dart';
+import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -33,7 +34,11 @@ class _ProfilePageState extends State<ProfilePage> {
         isActionLoading = true;
       });
     }
-    context.read<UserProvider>().clearUser();
+    if (mounted) {
+      context.read<UserProvider>().clearUser();
+      context.read<ExpenseProvider>().clearExpenses();
+      context.read<FriendProvider>().clearFriends();
+    }
     await SessionManager.clearSession();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
@@ -58,7 +63,11 @@ class _ProfilePageState extends State<ProfilePage> {
         await FirebaseDatabase.instance.ref("user_details/$phone").remove();
       }
       Fluttertoast.showToast(msg: "Account deleted successfully");
-      if (mounted) context.read<UserProvider>().clearUser();
+      if (mounted) {
+        context.read<UserProvider>().clearUser();
+        context.read<ExpenseProvider>().clearExpenses();
+        context.read<FriendProvider>().clearFriends();
+      }
       await SessionManager.clearSession();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(

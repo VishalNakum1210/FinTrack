@@ -40,12 +40,14 @@ class _SplitBillPageState extends State<SplitBillPage> {
   final Set<String> selectedFriendNumbers = {};
   bool isLoading = false;
 
+  void _onAmountChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
-    amountController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    amountController.addListener(_onAmountChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadFriends();
@@ -61,6 +63,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
   @override
   void dispose() {
+    amountController.removeListener(_onAmountChanged);
     amountController.dispose();
     descriptionController.dispose();
     super.dispose();
@@ -91,7 +94,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
       return;
     }
 
-    final totalAmount = int.tryParse(rawAmount);
+    final totalAmount = double.tryParse(rawAmount.replaceAll(',', '').trim());
     if (totalAmount == null || totalAmount <= 0) {
       Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
@@ -119,39 +122,38 @@ class _SplitBillPageState extends State<SplitBillPage> {
       final friendProvider = context.read<FriendProvider>();
 
       final totalPeople = selectedFriendNumbers.length + 1; // You + Selected Friends
-      final sharePerPerson = (totalAmount / totalPeople).round();
-      final myShare = totalAmount - (sharePerPerson * selectedFriendNumbers.length);
+      final sharePerPerson = ((totalAmount / totalPeople) * 100).round() / 100;
+      final myShare = ((totalAmount - (sharePerPerson * selectedFriendNumbers.length)) * 100).round() / 100;
       final formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
+
+      final myShareStr = myShare.truncateToDouble() == myShare ? myShare.toInt().toString() : myShare.toStringAsFixed(2);
+      final sharePerPersonStr = sharePerPerson.truncateToDouble() == sharePerPerson ? sharePerPerson.toInt().toString() : sharePerPerson.toStringAsFixed(2);
+      final totalAmountStr = totalAmount.truncateToDouble() == totalAmount ? totalAmount.toInt().toString() : totalAmount.toStringAsFixed(2);
 
       // 1. Add Personal Expense (Your Share) into Passbook
       final passbookSuccess = await expenseProvider.addExpense(
         phoneNumber: userPhone,
-        amount: myShare.toString(),
-        description: "$description (Your 1/$totalPeople share of ₹$totalAmount)",
+        amount: myShareStr,
+        description: "$description (Your 1/$totalPeople share of ₹$totalAmountStr)",
         paymentMode: selectedMode,
         date: formattedDate,
         category: selectedCategory,
       );
 
-      // 2. Add each friend's share into their respective ledger
-      int friendSuccessCount = 0;
-      for (final friendNumber in selectedFriendNumbers) {
-        final success = await friendProvider.addFriendTransaction(
-          userPhone: userPhone,
-          friendNumber: friendNumber,
-          amount: sharePerPerson.toString(),
-          description: "Split: $description (Total ₹$totalAmount across $totalPeople people)",
-          paymentMode: selectedMode,
-          date: formattedDate,
-          categoryType: "Give Money To Friend",
-        );
-
-        if (success) friendSuccessCount++;
-      }
+      // 2. Add each friend's share in an optimized batch
+      final friendSuccessCount = await friendProvider.batchAddFriendTransactions(
+        userPhone: userPhone,
+        friendNumbers: selectedFriendNumbers.toList(),
+        amountPerFriend: sharePerPersonStr,
+        description: "Split: $description (Total ₹$totalAmountStr across $totalPeople people)",
+        paymentMode: selectedMode,
+        date: formattedDate,
+        categoryType: "Give Money To Friend",
+      );
 
       if (passbookSuccess) {
         Fluttertoast.showToast(
-          msg: "Split Complete! Added ₹$myShare to your passbook & ₹$sharePerPerson to $friendSuccessCount friends' ledgers.",
+          msg: "Split Complete! Added ₹$myShareStr to your passbook & ₹$sharePerPersonStr to $friendSuccessCount friends' ledgers.",
         );
         if (!mounted) return;
         Navigator.pop(context, true);
@@ -192,10 +194,17 @@ class _SplitBillPageState extends State<SplitBillPage> {
     final friendProvider = context.watch<FriendProvider>();
     final friends = friendProvider.friends;
 
-    final totalAmount = int.tryParse(amountController.text.trim()) ?? 0;
+    final totalAmount = double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
     final totalPeople = selectedFriendNumbers.length + 1;
-    final sharePerPerson = totalAmount > 0 ? (totalAmount / totalPeople).round() : 0;
-    final myShare = totalAmount > 0 ? totalAmount - (sharePerPerson * selectedFriendNumbers.length) : 0;
+    final sharePerPerson = totalAmount > 0 ? ((totalAmount / totalPeople) * 100).round() / 100 : 0.0;
+    final myShare = totalAmount > 0 ? ((totalAmount - (sharePerPerson * selectedFriendNumbers.length)) * 100).round() / 100 : 0.0;
+
+    final myShareStr = myShare.truncateToDouble() == myShare ? myShare.toInt().toString() : myShare.toStringAsFixed(2);
+    final sharePerPersonStr = sharePerPerson.truncateToDouble() == sharePerPerson ? sharePerPerson.toInt().toString() : sharePerPerson.toStringAsFixed(2);
+    final totalAmountStr = totalAmount.truncateToDouble() == totalAmount ? totalAmount.toInt().toString() : totalAmount.toStringAsFixed(2);
+    final totalCollectStr = (sharePerPerson * selectedFriendNumbers.length).truncateToDouble() == (sharePerPerson * selectedFriendNumbers.length)
+        ? (sharePerPerson * selectedFriendNumbers.length).toInt().toString()
+        : (sharePerPerson * selectedFriendNumbers.length).toStringAsFixed(2);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FBF2),
@@ -496,7 +505,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                             children: [
                               const Text("🧾 Your Personal Share (Passbook):", style: TextStyle(fontSize: 13)),
                               Text(
-                                "₹$myShare",
+                                "₹$myShareStr",
                                 style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E7D32), fontSize: 14),
                               ),
                             ],
@@ -510,7 +519,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                 style: const TextStyle(fontSize: 13),
                               ),
                               Text(
-                                "₹$sharePerPerson",
+                                "₹$sharePerPersonStr",
                                 style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFE65100), fontSize: 14),
                               ),
                             ],
@@ -521,7 +530,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                             children: [
                               const Text("💰 Total You Will Collect:", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                               Text(
-                                "₹${sharePerPerson * selectedFriendNumbers.length}",
+                                "₹$totalCollectStr",
                                 style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1565C0), fontSize: 14),
                               ),
                             ],
@@ -539,7 +548,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       onPressed: isLoading ? null : handleSplitBill,
                       icon: const Icon(Icons.call_split_rounded, color: Colors.white),
                       label: Text(
-                        "Split ₹$totalAmount with $totalPeople People",
+                        "Split ₹$totalAmountStr with $totalPeople People",
                         style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(

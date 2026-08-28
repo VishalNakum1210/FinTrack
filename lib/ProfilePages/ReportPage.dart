@@ -3,6 +3,7 @@ import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/services/export_service.dart';
+import 'package:FinTrack/utils/date_helper.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -37,32 +38,6 @@ class _ReportPageState extends State<Reportpage> {
       context.read<ExpenseProvider>().fetchExpenses(phone);
       context.read<FriendProvider>().fetchFriends(phone);
     }
-  }
-
-  DateTime? _parseRecordDate(dynamic dateVal) {
-    if (dateVal == null) return null;
-    final str = dateVal.toString().trim();
-    if (str.isEmpty || str == "-") return null;
-
-    final formats = [
-      'd/M/yyyy',
-      'dd/MM/yyyy',
-      'd-M-yyyy',
-      'dd-MM-yyyy',
-      'yyyy-MM-dd',
-      'yyyy/MM/dd',
-      'd MMM yyyy',
-      'dd MMM yyyy',
-      'MM/dd/yyyy',
-      'M/d/yyyy',
-    ];
-
-    for (var f in formats) {
-      try {
-        return DateFormat(f).parseStrict(str);
-      } catch (_) {}
-    }
-    return DateTime.tryParse(str);
   }
 
   bool _matchesPeriod(DateTime? date, ReportPeriod period) {
@@ -161,7 +136,7 @@ class _ReportPageState extends State<Reportpage> {
 
         // 1. Filter Records based on Period
         final filteredRecords = allRecords.where((r) {
-          final d = _parseRecordDate(r["Date"]);
+          final d = (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
           return _matchesPeriod(d, selectedPeriod);
         }).toList();
 

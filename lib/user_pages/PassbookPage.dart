@@ -3,6 +3,7 @@ import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/services/export_service.dart';
 import 'package:FinTrack/user_pages/add_spent.dart';
+import 'package:FinTrack/utils/date_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -36,39 +37,8 @@ class PassbookPageState extends State<PassbookApp> {
     }
   }
 
-  DateTime? _parseRecordDate(dynamic dateVal) {
-    if (dateVal == null) return null;
-    final str = dateVal.toString().trim();
-    if (str.isEmpty || str == "-") return null;
-
-    final formats = [
-      'd/M/yyyy',
-      'dd/MM/yyyy',
-      'd-M-yyyy',
-      'dd-MM-yyyy',
-      'yyyy-MM-dd',
-      'yyyy/MM/dd',
-      'd MMM yyyy',
-      'dd MMM yyyy',
-      'MM/dd/yyyy',
-      'M/d/yyyy',
-    ];
-
-    for (var f in formats) {
-      try {
-        return DateFormat(f).parseStrict(str);
-      } catch (_) {}
-    }
-    return DateTime.tryParse(str);
-  }
-
   String formatDate(String date) {
-    if (date.trim().isEmpty || date == "-") return "";
-    final parsed = _parseRecordDate(date);
-    if (parsed != null) {
-      return DateFormat('d MMM yyyy').format(parsed);
-    }
-    return date;
+    return DateHelper.formatDisplay(date);
   }
 
   void changeOrder(String? value) {
@@ -142,10 +112,10 @@ class PassbookPageState extends State<PassbookApp> {
         List<Map<String, dynamic>> rawFiltered = expenseProvider.getFilteredRecords(selectedCategory);
         List<Map<String, dynamic>> records = List<Map<String, dynamic>>.from(rawFiltered);
 
-        // Group & sort primarily by transaction Date, and secondarily by timestamp
+        // Fast sort primarily by pre-parsed transaction Date, secondarily by timestamp
         records.sort((a, b) {
-          final dateA = _parseRecordDate(a["Date"]);
-          final dateB = _parseRecordDate(b["Date"]);
+          final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
+          final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
 
           int cmp = 0;
           if (dateA != null && dateB != null) {
@@ -160,8 +130,8 @@ class PassbookPageState extends State<PassbookApp> {
 
           if (cmp != 0) return cmp;
 
-          final tA = a["timestamp"] is int ? a["timestamp"] as int : 0;
-          final tB = b["timestamp"] is int ? b["timestamp"] as int : 0;
+          final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
+          final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
           return currentSort == "Oldest First"
               ? tA.compareTo(tB)
               : tB.compareTo(tA);
@@ -288,7 +258,7 @@ class PassbookPageState extends State<PassbookApp> {
                               final category = (item["Category"] ?? "Other").toString();
                               final desc = (item["Description"] ?? "").toString();
                               final method = (item["Payment_Mode"] ?? "").toString();
-                              final amount = int.tryParse(item["Amount"]?.toString() ?? '0') ?? 0;
+                              final amount = (double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0).round();
                               final isIncome = ["Add CASH", "Add Online"].contains(method);
 
                               return InkWell(
@@ -298,7 +268,7 @@ class PassbookPageState extends State<PassbookApp> {
                                     if (showHeader && formattedCurrentDate.isNotEmpty)
                                       _sectionHeader('', formattedCurrentDate),
                                     _transactionTile(
-                                      icon: icon_name(category),
+                                      icon: iconName(category),
                                       iconColor: iconColor(category),
                                       bgColor: backgroundColor(category),
                                       title: category,
@@ -362,17 +332,17 @@ class PassbookPageState extends State<PassbookApp> {
       child: Row(
         children: [
           _chip(Icons.grid_view_rounded, 'All', green),
-          _chip(icon_name("Food"), 'Food', iconColor("Food")),
-          _chip(icon_name("Shopping"), 'Shopping', iconColor("Shopping")),
-          _chip(icon_name("Transport"), 'Transport', iconColor("Transport")),
-          _chip(icon_name("Education"), 'Education', iconColor("Education")),
-          _chip(icon_name("HealthCare"), 'HealthCare', iconColor("HealthCare")),
+          _chip(iconName("Food"), 'Food', iconColor("Food")),
+          _chip(iconName("Shopping"), 'Shopping', iconColor("Shopping")),
+          _chip(iconName("Transport"), 'Transport', iconColor("Transport")),
+          _chip(iconName("Education"), 'Education', iconColor("Education")),
+          _chip(iconName("HealthCare"), 'HealthCare', iconColor("HealthCare")),
           _chip(
-            icon_name("Entertainment"),
+            iconName("Entertainment"),
             'Entertainment',
             iconColor("Entertainment"),
           ),
-          _chip(icon_name("Add Money"), 'Add Money', iconColor("Add Money")),
+          _chip(iconName("Add Money"), 'Add Money', iconColor("Add Money")),
           _chip(Icons.more_horiz, 'Other', iconColor("other")),
         ],
       ),
@@ -732,19 +702,22 @@ Widget balanceItem(
 
       const SizedBox(height: 4),
 
-      Text(
-        isMoney ? "$value" : value.toString(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 17,
-          fontWeight: FontWeight.bold,
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          isMoney ? "$value" : value.toString(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     ],
   );
 }
 
-IconData icon_name(String category) {
+IconData iconName(String category) {
   switch (category) {
     case "Shopping":
       return Icons.shopping_bag_rounded;

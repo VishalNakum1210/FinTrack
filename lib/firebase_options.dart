@@ -67,7 +67,7 @@ class DefaultFirebaseOptions {
     projectId: 'account-flutter-58a59',
     databaseURL: 'https://account-flutter-58a59-default-rtdb.firebaseio.com',
     storageBucket: 'account-flutter-58a59.firebasestorage.app',
-    iosBundleId: 'com.example.account',
+    iosBundleId: 'com.vishalnakum.fintrack',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -77,7 +77,7 @@ class DefaultFirebaseOptions {
     projectId: 'account-flutter-58a59',
     databaseURL: 'https://account-flutter-58a59-default-rtdb.firebaseio.com',
     storageBucket: 'account-flutter-58a59.firebasestorage.app',
-    iosBundleId: 'com.example.account',
+    iosBundleId: 'com.vishalnakum.fintrack',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

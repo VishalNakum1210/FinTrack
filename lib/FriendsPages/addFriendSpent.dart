@@ -6,10 +6,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class AddFriendExpenses extends StatefulWidget {
-  final String friend_number;
+  final String friendNumber;
   const AddFriendExpenses({
     super.key,
-    required this.friend_number,
+    required this.friendNumber,
   });
 
   @override
@@ -75,10 +75,12 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
       return;
     }
 
-    if (int.tryParse(amount) == null || (int.tryParse(amount) ?? 0) <= 0) {
+    final parsed = double.tryParse(amount.replaceAll(',', '').trim());
+    if (parsed == null || parsed <= 0) {
       Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
     }
+    final formattedAmount = parsed.truncateToDouble() == parsed ? parsed.toInt().toString() : parsed.toStringAsFixed(2);
 
     setState(() {
       isLoading = true;
@@ -95,8 +97,8 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
       if (!mounted) return;
       final success = await context.read<FriendProvider>().addFriendTransaction(
         userPhone: userPhoneNumber,
-        friendNumber: widget.friend_number,
-        amount: amount,
+        friendNumber: widget.friendNumber,
+        amount: formattedAmount,
         description: description,
         paymentMode: selectedMode,
         date: formattedDate,

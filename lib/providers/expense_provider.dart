@@ -1,6 +1,6 @@
+import 'package:FinTrack/utils/date_helper.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 class ExpenseProvider extends ChangeNotifier {
   bool _isLoading = false;
@@ -28,36 +28,10 @@ class ExpenseProvider extends ChangeNotifier {
       final mode = (r["Payment_Mode"] ?? "").toString();
       if (mode.startsWith("Add")) continue;
       final cat = (r["Category"] ?? "Other").toString();
-      final amount = int.tryParse(r["Amount"]?.toString() ?? '0') ?? 0;
+      final amount = (double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0).round();
       totals[cat] = (totals[cat] ?? 0) + amount;
     }
     return totals;
-  }
-
-  DateTime? _parseDate(dynamic dateVal) {
-    if (dateVal == null) return null;
-    final str = dateVal.toString().trim();
-    if (str.isEmpty || str == "-") return null;
-
-    final formats = [
-      'd/M/yyyy',
-      'dd/MM/yyyy',
-      'd-M-yyyy',
-      'dd-MM-yyyy',
-      'yyyy-MM-dd',
-      'yyyy/MM/dd',
-      'd MMM yyyy',
-      'dd MMM yyyy',
-      'MM/dd/yyyy',
-      'M/d/yyyy',
-    ];
-
-    for (var f in formats) {
-      try {
-        return DateFormat(f).parseStrict(str);
-      } catch (_) {}
-    }
-    return DateTime.tryParse(str);
   }
 
   /// Fetches all expense records for the user and calculates totals
@@ -83,10 +57,11 @@ class ExpenseProvider extends ChangeNotifier {
           if (value is Map) {
             final map = Map<String, dynamic>.from(value);
             map['key'] = key;
+            map['_parsedDate'] = DateHelper.parse(map["Date"]);
             _records.add(map);
 
             final mode = (map["Payment_Mode"] ?? "").toString();
-            final amount = int.tryParse(map["Amount"]?.toString() ?? '0') ?? 0;
+            final amount = (double.tryParse(map["Amount"]?.toString() ?? '0') ?? 0.0).round();
 
             if (mode == "Spent Cash") {
               _spentCash += amount;
@@ -100,10 +75,10 @@ class ExpenseProvider extends ChangeNotifier {
           }
         });
 
-        // Sort primarily by transaction Date (descending), and secondarily by creation timestamp
+        // Fast sort primarily by pre-parsed transaction Date (descending), secondarily by timestamp
         _records.sort((a, b) {
-          final dateA = _parseDate(a["Date"]);
-          final dateB = _parseDate(b["Date"]);
+          final DateTime? dateA = a["_parsedDate"] as DateTime?;
+          final DateTime? dateB = b["_parsedDate"] as DateTime?;
 
           if (dateA != null && dateB != null) {
             final dateCmp = dateB.compareTo(dateA);
@@ -114,8 +89,8 @@ class ExpenseProvider extends ChangeNotifier {
             return 1;
           }
 
-          final tA = a["timestamp"] is int ? a["timestamp"] as int : 0;
-          final tB = b["timestamp"] is int ? b["timestamp"] as int : 0;
+          final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
+          final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
           return tB.compareTo(tA);
         });
       }
@@ -196,9 +171,19 @@ class ExpenseProvider extends ChangeNotifier {
     int total = 0;
     for (var r in _records) {
       if (r["Category"] == filterType) {
-        total += int.tryParse(r["Amount"]?.toString() ?? '0') ?? 0;
+        total += (double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0).round();
       }
     }
     return total;
+  }
+
+  /// Clears expenses on logout
+  void clearExpenses() {
+    _records.clear();
+    _spentCash = 0;
+    _spentOnline = 0;
+    _addCash = 0;
+    _addOnline = 0;
+    notifyListeners();
   }
 }

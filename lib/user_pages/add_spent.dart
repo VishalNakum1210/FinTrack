@@ -48,17 +48,19 @@ class _AddSpentState extends State<AddSpent> {
   String? selectedFriendNumber;
   String? selectedFriendName;
 
+  void _onAmountChanged() {
+    if (isSplitWithFriend && mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     selectedMode = paymentModes.first;
     selectedCategory = categories.first;
 
-    amountController.addListener(() {
-      if (isSplitWithFriend && mounted) {
-        setState(() {});
-      }
-    });
+    amountController.addListener(_onAmountChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadFriends();
@@ -74,6 +76,7 @@ class _AddSpentState extends State<AddSpent> {
 
   @override
   void dispose() {
+    amountController.removeListener(_onAmountChanged);
     amountController.dispose();
     descriptionController.dispose();
     super.dispose();
@@ -104,7 +107,7 @@ class _AddSpentState extends State<AddSpent> {
       return;
     }
 
-    final totalAmount = int.tryParse(rawAmount);
+    final totalAmount = double.tryParse(rawAmount.replaceAll(',', '').trim());
     if (totalAmount == null || totalAmount <= 0) {
       Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
@@ -134,14 +137,18 @@ class _AddSpentState extends State<AddSpent> {
       final friendProvider = context.read<FriendProvider>();
 
       if (isSplitWithFriend && isSpending && selectedFriendNumber != null) {
-        final friendShare = (totalAmount * 0.5).round();
-        final myShare = totalAmount - friendShare;
+        final friendShare = (totalAmount * 0.5 * 100).round() / 100;
+        final myShare = ((totalAmount - friendShare) * 100).round() / 100;
+
+        final myShareStr = myShare.truncateToDouble() == myShare ? myShare.toInt().toString() : myShare.toStringAsFixed(2);
+        final friendShareStr = friendShare.truncateToDouble() == friendShare ? friendShare.toInt().toString() : friendShare.toStringAsFixed(2);
+        final totalAmountStr = totalAmount.truncateToDouble() == totalAmount ? totalAmount.toInt().toString() : totalAmount.toStringAsFixed(2);
 
         // 1. Record personal expense in Passbook
         final passbookSuccess = await expenseProvider.addExpense(
           phoneNumber: phone,
-          amount: myShare.toString(),
-          description: "$description (Your 50% split of ₹$totalAmount)",
+          amount: myShareStr,
+          description: "$description (Your 50% split of ₹$totalAmountStr)",
           paymentMode: selectedMode,
           date: formattedDate,
           category: selectedCategory,
@@ -151,8 +158,8 @@ class _AddSpentState extends State<AddSpent> {
         final friendSuccess = await friendProvider.addFriendTransaction(
           userPhone: phone,
           friendNumber: selectedFriendNumber!,
-          amount: friendShare.toString(),
-          description: "Split: $description (Total ₹$totalAmount)",
+          amount: friendShareStr,
+          description: "Split: $description (Total ₹$totalAmountStr)",
           paymentMode: selectedMode,
           date: formattedDate,
           categoryType: "Give Money To Friend",
@@ -160,7 +167,7 @@ class _AddSpentState extends State<AddSpent> {
 
         if (passbookSuccess && friendSuccess) {
           Fluttertoast.showToast(
-            msg: "Saved! ₹$myShare in Passbook & ₹$friendShare added to $selectedFriendName's ledger",
+            msg: "Saved! ₹$myShareStr in Passbook & ₹$friendShareStr added to $selectedFriendName's ledger",
           );
           if (!mounted) return;
           Navigator.pop(context, true);
@@ -168,10 +175,14 @@ class _AddSpentState extends State<AddSpent> {
           Fluttertoast.showToast(msg: "Failed to save split transaction");
         }
       } else {
+        final rawAmountFormatted = totalAmount.truncateToDouble() == totalAmount
+            ? totalAmount.toInt().toString()
+            : totalAmount.toStringAsFixed(2);
+
         // Standard single transaction
         final success = await expenseProvider.addExpense(
           phoneNumber: phone,
-          amount: rawAmount,
+          amount: rawAmountFormatted,
           description: description,
           paymentMode: selectedMode,
           date: formattedDate,
@@ -235,9 +246,12 @@ class _AddSpentState extends State<AddSpent> {
     final friendProvider = context.watch<FriendProvider>();
     final friends = friendProvider.friends;
     final isSpending = selectedMode.startsWith("Spent");
-    final currentAmount = int.tryParse(amountController.text.trim()) ?? 0;
-    final mySharePreview = (currentAmount * 0.5).round();
-    final friendSharePreview = currentAmount - mySharePreview;
+    final currentAmount = double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
+    final mySharePreview = ((currentAmount * 0.5) * 100).round() / 100;
+    final friendSharePreview = ((currentAmount - mySharePreview) * 100).round() / 100;
+
+    final mySharePreviewStr = mySharePreview.truncateToDouble() == mySharePreview ? mySharePreview.toInt().toString() : mySharePreview.toStringAsFixed(2);
+    final friendSharePreviewStr = friendSharePreview.truncateToDouble() == friendSharePreview ? friendSharePreview.toInt().toString() : friendSharePreview.toStringAsFixed(2);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FBF2),
@@ -466,7 +480,7 @@ class _AddSpentState extends State<AddSpent> {
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          "Your Expense: ₹$mySharePreview",
+                                          "Your Expense: ₹$mySharePreviewStr",
                                           style: const TextStyle(
                                             color: Color(0xFF558B2F),
                                             fontWeight: FontWeight.bold,
@@ -474,7 +488,7 @@ class _AddSpentState extends State<AddSpent> {
                                           ),
                                         ),
                                         Text(
-                                          "Friend Owes: ₹$friendSharePreview",
+                                          "Friend Owes: ₹$friendSharePreviewStr",
                                           style: const TextStyle(
                                             color: Color(0xFFE65100),
                                             fontWeight: FontWeight.bold,

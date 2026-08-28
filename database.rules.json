@@ -4,7 +4,7 @@
       "$phoneNumber": {
         ".read": true,
         ".write": true,
-        ".validate": "newData.hasChildren(['phone_number', 'password']) && newData.child('phone_number').val().length == 10",
+        ".validate": "!newData.exists() || (newData.hasChildren(['phone_number', 'password']) && newData.child('phone_number').val().length == 10)",
         "phone_number": {
           ".validate": "newData.isString() && newData.val().length == 10"
         },
@@ -24,7 +24,7 @@
         ".read": true,
         ".write": true,
         "$recordKey": {
-          ".validate": "newData.hasChildren(['Amount', 'Category', 'Date', 'Payment_Mode'])",
+          ".validate": "!newData.exists() || newData.hasChildren(['Amount', 'Category', 'Date', 'Payment_Mode'])",
           "Amount": {
             ".validate": "newData.isString()"
           },
@@ -59,7 +59,7 @@
           },
           "Records": {
             "$recordKey": {
-              ".validate": "newData.hasChildren(['Amount', 'Type', 'Date'])"
+              ".validate": "!newData.exists() || newData.hasChildren(['Amount', 'Type', 'Date'])"
             }
           }
         }

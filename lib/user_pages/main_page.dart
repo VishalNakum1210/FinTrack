@@ -59,7 +59,7 @@ class _UserMainPageState extends State<UserMainPage> {
 
         for (var record in records) {
           final mode = (record["Payment_Mode"] ?? "").toString();
-          final amount = int.tryParse(record["Amount"]?.toString() ?? '0') ?? 0;
+          final amount = (double.tryParse(record["Amount"]?.toString() ?? '0') ?? 0.0).round();
           if (!mode.startsWith("Add")) {
             if (amount > highestTransaction) {
               highestTransaction = amount;
@@ -288,7 +288,7 @@ class _UserMainPageState extends State<UserMainPage> {
                                 final record = records[index];
                                 final paymentMode = (record["Payment_Mode"] ?? "").toString();
                                 final isIncome = paymentMode == "Add CASH" || paymentMode == "Add Online";
-                                final amount = int.tryParse(record["Amount"]?.toString() ?? '0') ?? 0;
+                                final amount = (double.tryParse(record["Amount"]?.toString() ?? '0') ?? 0.0).round();
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 12),

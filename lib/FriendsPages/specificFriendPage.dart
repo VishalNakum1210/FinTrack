@@ -3,6 +3,7 @@ import 'package:FinTrack/GetInformation/GetSpecificFriendDetails.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/services/export_service.dart';
+import 'package:FinTrack/utils/date_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -10,19 +11,26 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Specificfriendpage extends StatefulWidget {
-  final String friend_number;
-  const Specificfriendpage({super.key, required this.friend_number});
+  final String friendNumber;
+  final String friendName;
+  const Specificfriendpage({super.key, required this.friendNumber, required this.friendName});
 
   @override
-  State<Specificfriendpage> createState() => _SpecificFriendPageState();
+  State<Specificfriendpage> createState() => _SpecificfriendpageState();
 }
 
-class _SpecificFriendPageState extends State<Specificfriendpage> {
-  List<Map<String, dynamic>> friendDetails = [];
-  List<Map<String, dynamic>> expensesRecords = [];
-  bool isLoading = true;
+class _SpecificfriendpageState extends State<Specificfriendpage> {
   int totalGet = 0;
   int totalGive = 0;
+  List<Map<dynamic, dynamic>> friendDetails = [];
+  List<Map<String, dynamic>> expensesRecords = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    getDetails();
+  }
 
   Future<void> getDetails() async {
     try {
@@ -35,34 +43,27 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
 
       friendDetails = await getSpecificFriendDetails(
         phoneNumber,
-        widget.friend_number,
+        widget.friendNumber,
       );
 
       expensesRecords.clear();
 
       if (friendDetails.isNotEmpty) {
-        totalGet = int.tryParse(friendDetails[0]["total_get"]?.toString() ?? '0') ?? 0;
-        totalGive = int.tryParse(friendDetails[0]["total_give"]?.toString() ?? '0') ?? 0;
+        totalGet = (double.tryParse(friendDetails[0]["total_get"]?.toString() ?? '0') ?? 0.0).round();
+        totalGive = (double.tryParse(friendDetails[0]["total_give"]?.toString() ?? '0') ?? 0.0).round();
 
         if (friendDetails[0].containsKey("Records") && friendDetails[0]["Records"] is Map) {
           friendDetails[0]["Records"].forEach((key, value) {
             if (value is Map) {
-              expensesRecords.add(Map<String, dynamic>.from(value));
+              final map = Map<String, dynamic>.from(value);
+              map["_parsedDate"] = DateHelper.parse(map["Date"]);
+              expensesRecords.add(map);
             }
           });
 
           expensesRecords.sort((a, b) {
-            DateTime? parseDate(String? d) {
-              if (d == null || d.isEmpty) return null;
-              try {
-                return DateFormat('d/M/yyyy').parse(d);
-              } catch (_) {
-                return DateTime.tryParse(d);
-              }
-            }
-
-            final dateA = parseDate(a["Date"]);
-            final dateB = parseDate(b["Date"]);
+            final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
+            final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
 
             if (dateA != null && dateB != null) {
               final cmp = dateB.compareTo(dateA);
@@ -73,8 +74,8 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
               return 1;
             }
 
-            final tA = a["timestamp"] is int ? a["timestamp"] as int : 0;
-            final tB = b["timestamp"] is int ? b["timestamp"] as int : 0;
+            final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
+            final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
             return tB.compareTo(tA);
           });
         }
@@ -101,7 +102,7 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
       if (userNumber.isNotEmpty && friendDetails.isNotEmpty && mounted) {
         await context.read<FriendProvider>().deleteFriendTransaction(
           userPhone: userNumber,
-          friendNumber: friendDetails[0]["friend_number"] ?? widget.friend_number,
+          friendNumber: friendDetails[0]["friend_number"] ?? widget.friendNumber,
           recordKey: key,
           isGive: con,
           amount: amount,
@@ -128,7 +129,7 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
       return;
     }
     final friendName = friendDetails[0]["friend_name"] ?? "Friend";
-    final friendNum = friendDetails[0]["friend_number"] ?? widget.friend_number;
+    final friendNum = friendDetails[0]["friend_number"] ?? widget.friendNumber;
     final userProvider = context.read<UserProvider>();
     final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
 
@@ -145,12 +146,6 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
 
   String formatIndianNumber(int number) {
     return NumberFormat('#,##,##0', 'en_IN').format(number);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    getDetails();
   }
 
   @override
@@ -184,7 +179,7 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
             context,
             MaterialPageRoute(
               builder: (context) =>
-                  AddFriendExpenses(friend_number: widget.friend_number),
+                  AddFriendExpenses(friendNumber: widget.friendNumber),
             ),
           ) ?? false;
 
@@ -414,7 +409,7 @@ class _SpecificFriendPageState extends State<Specificfriendpage> {
                               itemBuilder: (context, index) {
                                 final record = expensesRecords[index];
                                 final isGive = record["Type"] == "Take Money From Friend";
-                                final amount = int.tryParse(record["Amount"]?.toString() ?? '0') ?? 0;
+                                final amount = (double.tryParse(record["Amount"]?.toString() ?? '0') ?? 0.0).round();
                                 final key = (record["key"] ?? "").toString();
 
                                 return InkWell(

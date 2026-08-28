@@ -1,3 +1,4 @@
+import 'package:FinTrack/utils/date_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -510,38 +511,12 @@ class ExportService {
   // ===========================================================================
   // MONTHLY GROUPING & MONTH TOTAL BUILDERS
   // ===========================================================================
-  static DateTime? _parseRecordDate(dynamic dateVal) {
-    if (dateVal == null) return null;
-    final str = dateVal.toString().trim();
-    if (str.isEmpty || str == "-") return null;
-
-    final formats = [
-      'd/M/yyyy',
-      'dd/MM/yyyy',
-      'd-M-yyyy',
-      'dd-MM-yyyy',
-      'yyyy-MM-dd',
-      'yyyy/MM/dd',
-      'd MMM yyyy',
-      'dd MMM yyyy',
-      'MM/dd/yyyy',
-      'M/d/yyyy',
-    ];
-
-    for (var f in formats) {
-      try {
-        return DateFormat(f).parseStrict(str);
-      } catch (_) {}
-    }
-    return DateTime.tryParse(str);
-  }
-
   static Map<String, List<Map<String, dynamic>>> _groupByMonth(List<Map<String, dynamic>> records) {
     final Map<int, Map<String, dynamic>> sortedMonthMap = {};
     final List<Map<String, dynamic>> unparsedRecords = [];
 
     for (var r in records) {
-      final parsed = _parseRecordDate(r["Date"]);
+      final parsed = DateHelper.parse(r["Date"]);
       if (parsed != null) {
         final sortKey = parsed.year * 100 + parsed.month;
         final displayName = DateFormat('MMMM yyyy').format(parsed);
