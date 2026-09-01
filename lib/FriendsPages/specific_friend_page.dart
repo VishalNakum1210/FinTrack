@@ -1,5 +1,6 @@
-import 'package:FinTrack/FriendsPages/addFriendSpent.dart';
-import 'package:FinTrack/GetInformation/GetSpecificFriendDetails.dart';
+import 'package:FinTrack/FriendsPages/add_friend_spent.dart';
+import 'package:FinTrack/GetInformation/get_specific_friend_details.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/services/export_service.dart';
@@ -8,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class Specificfriendpage extends StatefulWidget {
   final String friendNumber;
@@ -34,8 +34,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
 
   Future<void> getDetails() async {
     try {
-      SharedPreferences sp = await SharedPreferences.getInstance();
-      String phoneNumber = sp.getString("phone_number") ?? "";
+      String phoneNumber = await SessionManager.getPhoneNumber() ?? "";
       if (phoneNumber.isEmpty) {
         if (mounted) setState(() => isLoading = false);
         return;
@@ -96,8 +95,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
       });
     }
     try {
-      SharedPreferences sp = await SharedPreferences.getInstance();
-      String userNumber = sp.getString("phone_number") ?? "";
+      String userNumber = await SessionManager.getPhoneNumber() ?? "";
 
       if (userNumber.isNotEmpty && friendDetails.isNotEmpty && mounted) {
         await context.read<FriendProvider>().deleteFriendTransaction(

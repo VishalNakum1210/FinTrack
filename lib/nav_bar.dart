@@ -1,4 +1,4 @@
-import 'package:FinTrack/user_pages/PassbookPage.dart';
+import 'package:FinTrack/user_pages/passbook_page.dart';
 import 'package:FinTrack/FriendsPages/friend_expenses.dart';
 import 'package:FinTrack/user_pages/main_page.dart';
 import 'package:FinTrack/user_pages/profile.dart';

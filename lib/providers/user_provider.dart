@@ -1,5 +1,5 @@
-import 'package:FinTrack/GetInformation/GetUserDetail.dart';
-import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/GetInformation/get_user_detail.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 

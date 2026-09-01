@@ -1,7 +1,7 @@
-import 'package:FinTrack/FriendsPages/addFriends.dart';
-import 'package:FinTrack/FriendsPages/specificFriendPage.dart';
+import 'package:FinTrack/FriendsPages/add_friends.dart';
+import 'package:FinTrack/FriendsPages/specific_friend_page.dart';
 import 'package:FinTrack/FriendsPages/split_bill_page.dart';
-import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/services/export_service.dart';

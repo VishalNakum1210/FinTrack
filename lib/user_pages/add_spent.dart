@@ -1,5 +1,5 @@
 import 'package:FinTrack/FriendsPages/split_bill_page.dart';
-import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
@@ -144,28 +144,21 @@ class _AddSpentState extends State<AddSpent> {
         final friendShareStr = friendShare.truncateToDouble() == friendShare ? friendShare.toInt().toString() : friendShare.toStringAsFixed(2);
         final totalAmountStr = totalAmount.truncateToDouble() == totalAmount ? totalAmount.toInt().toString() : totalAmount.toStringAsFixed(2);
 
-        // 1. Record personal expense in Passbook
-        final passbookSuccess = await expenseProvider.addExpense(
-          phoneNumber: phone,
-          amount: myShareStr,
-          description: "$description (Your 50% split of ₹$totalAmountStr)",
-          paymentMode: selectedMode,
-          date: formattedDate,
-          category: selectedCategory,
-        );
-
-        // 2. Record friend ledger (Money You Will Receive)
-        final friendSuccess = await friendProvider.addFriendTransaction(
+        // Single atomic multi-path update for Passbook + Friend Ledger
+        final splitSuccess = await friendProvider.atomicSplitBill(
           userPhone: phone,
           friendNumber: selectedFriendNumber!,
-          amount: friendShareStr,
-          description: "Split: $description (Total ₹$totalAmountStr)",
-          paymentMode: selectedMode,
+          myShareAmount: myShareStr,
+          friendShareAmount: friendShareStr,
+          totalAmount: totalAmountStr,
+          description: description,
           date: formattedDate,
-          categoryType: "Give Money To Friend",
+          category: selectedCategory,
+          paymentMode: selectedMode,
         );
 
-        if (passbookSuccess && friendSuccess) {
+        if (splitSuccess) {
+          await expenseProvider.fetchExpenses(phone);
           Fluttertoast.showToast(
             msg: "Saved! ₹$myShareStr in Passbook & ₹$friendShareStr added to $selectedFriendName's ledger",
           );

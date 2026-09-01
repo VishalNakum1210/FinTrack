@@ -1,9 +1,9 @@
-import 'package:FinTrack/GetInformation/GetUserDetail.dart';
+import 'package:FinTrack/GetInformation/get_user_detail.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class EditInformationPage extends StatefulWidget {
   const EditInformationPage({super.key});
@@ -17,18 +17,9 @@ class _EditInformationPageState extends State<EditInformationPage> {
   Map<String, String> details = {};
 
   TextEditingController nameController = TextEditingController(text: "User");
-
-  TextEditingController mobileController = TextEditingController(
-    text: "9876543210",
-  );
-
-  TextEditingController emailController = TextEditingController(
-    text: "user@gmail.com",
-  );
-
-  TextEditingController addressController = TextEditingController(
-    text: "User Address",
-  );
+  TextEditingController mobileController = TextEditingController(text: "9876543210");
+  TextEditingController emailController = TextEditingController(text: "user@gmail.com");
+  TextEditingController addressController = TextEditingController(text: "User Address");
 
   Widget customField({
     required String label,
@@ -46,7 +37,6 @@ class _EditInformationPageState extends State<EditInformationPage> {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(color: Colors.grey),
-
           floatingLabelStyle: TextStyle(
             color: themeColor,
             fontWeight: FontWeight.w600,
@@ -96,8 +86,7 @@ class _EditInformationPageState extends State<EditInformationPage> {
 
   void getDetails() async {
     try {
-      SharedPreferences sp = await SharedPreferences.getInstance();
-      String phoneNumber = sp.getString("phone_number") ?? "";
+      String phoneNumber = await SessionManager.getPhoneNumber() ?? "";
       if (phoneNumber.isNotEmpty) {
         details = await getUserInformation(phoneNumber);
         if (mounted) {
@@ -137,15 +126,12 @@ class _EditInformationPageState extends State<EditInformationPage> {
               backgroundColor: themeColor,
               child: const Icon(Icons.person, size: 65, color: Colors.white),
             ),
-
             const SizedBox(height: 25),
-
             customField(
               label: "Full Name",
               icon: Icons.person_outline,
               controller: nameController,
             ),
-
             Padding(
               padding: const EdgeInsets.only(bottom: 18),
               child: TextField(
@@ -166,23 +152,19 @@ class _EditInformationPageState extends State<EditInformationPage> {
                 ),
               ),
             ),
-
             customField(
               label: "Email",
               icon: Icons.email_outlined,
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
             ),
-
             customField(
               label: "Address",
               icon: Icons.location_on_outlined,
               controller: addressController,
               maxLines: 3,
             ),
-
             const SizedBox(height: 10),
-
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -195,6 +177,12 @@ class _EditInformationPageState extends State<EditInformationPage> {
 
                   if (name.isEmpty || email.isEmpty) {
                     Fluttertoast.showToast(msg: "Name and Email cannot be empty");
+                    return;
+                  }
+
+                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                  if (!emailRegex.hasMatch(email)) {
+                    Fluttertoast.showToast(msg: "Please enter a valid email address");
                     return;
                   }
 

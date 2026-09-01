@@ -1,4 +1,4 @@
-import 'package:FinTrack/GetInformation/HashPassword.dart';
+import 'package:FinTrack/GetInformation/hash_password.dart';
 import 'package:FinTrack/authantication/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';

@@ -1,4 +1,4 @@
-import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/user_pages/add_spent.dart';

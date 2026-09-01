@@ -212,6 +212,63 @@ class FriendProvider extends ChangeNotifier {
     }
   }
 
+  /// Executes an atomic multi-path transaction for bill splitting
+  /// Updates both Passbook Expense and Friend Ledger in a single atomic network payload
+  Future<bool> atomicSplitBill({
+    required String userPhone,
+    required String friendNumber,
+    required String myShareAmount,
+    required String friendShareAmount,
+    required String totalAmount,
+    required String description,
+    required String date,
+    required String category,
+    required String paymentMode,
+  }) async {
+    try {
+      final dbRef = FirebaseDatabase.instance.ref();
+      final expenseKey = dbRef.child("Expenses/$userPhone").push().key!;
+      final recordKey = dbRef.child("Friends/$userPhone/$friendNumber/Records").push().key!;
+
+      final Map<String, Object?> multiPathUpdates = {};
+
+      // 1. Personal Passbook Entry
+      multiPathUpdates["Expenses/$userPhone/$expenseKey"] = {
+        "key": expenseKey,
+        "Amount": myShareAmount,
+        "Description": "$description (Your share of ₹$totalAmount)",
+        "Payment_Mode": paymentMode,
+        "Date": date,
+        "Category": category,
+        "timestamp": ServerValue.timestamp,
+      };
+
+      // 2. Friend Ledger Record
+      multiPathUpdates["Friends/$userPhone/$friendNumber/Records/$recordKey"] = {
+        "key": recordKey,
+        "Amount": friendShareAmount,
+        "Description": "Split: $description (Total ₹$totalAmount)",
+        "Payment_Mode": paymentMode,
+        "Date": date,
+        "Type": "Give Money To Friend",
+        "timestamp": ServerValue.timestamp,
+      };
+
+      // Single atomic multi-path update
+      await dbRef.update(multiPathUpdates);
+
+      // Atomically update ledger total
+      final parsedFriendAmount = (double.tryParse(friendShareAmount) ?? 0.0).round();
+      final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
+      await _atomicUpdateLedger(friendRef, "total_get", parsedFriendAmount);
+
+      await fetchFriends(userPhone);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Clears friends state on logout
   void clearFriends() {
     _friends.clear();

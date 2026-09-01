@@ -1,4 +1,4 @@
-import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:FinTrack/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -141,29 +141,22 @@ class _AddFriendsState extends State<AddFriends> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
                     TextField(
                       controller: nameController,
                       decoration: inputDecoration("Friend Name"),
                     ),
-
                     const SizedBox(height: 18),
-
                     TextField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
                       decoration: inputDecoration("Friend Phone Number"),
                     ),
-
                     const SizedBox(height: 18),
-
                     TextField(
                       controller: noteController,
                       decoration: inputDecoration("Note (Optional)"),
                     ),
-
                     const SizedBox(height: 28),
-
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
@@ -189,7 +182,6 @@ class _AddFriendsState extends State<AddFriends> {
               ),
             ),
           ),
-
           if (isLoading)
             Container(
               color: Colors.black45,

@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:FinTrack/GetInformation/HashPassword.dart';
-import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/GetInformation/hash_password.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:FinTrack/authantication/registration_page.dart';
 import 'package:FinTrack/nav_bar.dart';
 import 'package:FinTrack/providers/expense_provider.dart';
@@ -97,8 +97,8 @@ class _LoginPageState extends State<LoginPage> {
         if (verifyPassword(passwordUser, storedPassword, phoneNumber)) {
           isAuthenticated = true;
 
-          // Transparently upgrade legacy hashes to salted v2
-          if (!storedPassword.startsWith("v2_")) {
+          // Transparently upgrade legacy hashes to hardened v3
+          if (!storedPassword.startsWith("v3_")) {
             await myRef.update({
               "password": hashPassword(passwordUser, phoneNumber),
             });

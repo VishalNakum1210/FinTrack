@@ -2,8 +2,8 @@
   "rules": {
     "user_details": {
       "$phoneNumber": {
-        ".read": true,
-        ".write": true,
+        ".read": "auth != null || $phoneNumber.length == 10",
+        ".write": "auth != null || !data.exists() || (data.exists() && newData.exists())",
         ".validate": "!newData.exists() || (newData.hasChildren(['phone_number', 'password']) && newData.child('phone_number').val().length == 10)",
         "phone_number": {
           ".validate": "newData.isString() && newData.val().length == 10"
@@ -15,14 +15,20 @@
           ".validate": "newData.isString()"
         },
         "name": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "Address": {
+          ".validate": "newData.isString()"
+        },
+        "address": {
           ".validate": "newData.isString()"
         }
       }
     },
     "Expenses": {
       "$phoneNumber": {
-        ".read": true,
-        ".write": true,
+        ".read": "auth != null || $phoneNumber.length == 10",
+        ".write": "auth != null || $phoneNumber.length == 10",
         "$recordKey": {
           ".validate": "!newData.exists() || newData.hasChildren(['Amount', 'Category', 'Date', 'Payment_Mode'])",
           "Amount": {
@@ -42,11 +48,11 @@
     },
     "Friends": {
       "$phoneNumber": {
-        ".read": true,
-        ".write": true,
+        ".read": "auth != null || $phoneNumber.length == 10",
+        ".write": "auth != null || $phoneNumber.length == 10",
         "$friendNumber": {
           "friend_name": {
-            ".validate": "newData.isString()"
+            ".validate": "newData.isString() && newData.val().length > 0"
           },
           "friend_number": {
             ".validate": "newData.isString() && newData.val().length == 10"
@@ -67,8 +73,8 @@
     },
     "userUpdates": {
       "$phoneNumber": {
-        ".read": true,
-        ".write": true
+        ".read": "auth != null || $phoneNumber.length == 10",
+        ".write": "auth != null || $phoneNumber.length == 10"
       }
     }
   }

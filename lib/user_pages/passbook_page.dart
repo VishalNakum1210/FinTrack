@@ -1,4 +1,4 @@
-import 'package:FinTrack/GetInformation/SessionManager.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/providers/user_provider.dart';
 import 'package:FinTrack/services/export_service.dart';
@@ -216,7 +216,7 @@ class PassbookPageState extends State<PassbookApp> {
                   ? Container(
                       padding: const EdgeInsets.all(20),
                       child: Column(
-                        children: [
+                          children: [
                           _categoryChips(),
                           const SizedBox(height: 10),
                           _balanceCard(income, expense, spentCash, spentOnline, recordCount),

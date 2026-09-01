@@ -1,8 +1,8 @@
-import 'package:FinTrack/GetInformation/SessionManager.dart';
-import 'package:FinTrack/ProfilePages/ChangePasswordPage.dart';
-import 'package:FinTrack/ProfilePages/FeedbackPage.dart';
-import 'package:FinTrack/ProfilePages/PersonalInformationPage.dart';
-import 'package:FinTrack/ProfilePages/ReportPage.dart';
+import 'package:FinTrack/GetInformation/session_manager.dart';
+import 'package:FinTrack/ProfilePages/change_password_page.dart';
+import 'package:FinTrack/ProfilePages/feedback_page.dart';
+import 'package:FinTrack/ProfilePages/personal_information_page.dart';
+import 'package:FinTrack/ProfilePages/report_page.dart';
 import 'package:FinTrack/authantication/login_page.dart';
 import 'package:FinTrack/providers/expense_provider.dart';
 import 'package:FinTrack/providers/friend_provider.dart';

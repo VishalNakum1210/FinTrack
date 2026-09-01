@@ -1,7 +1,7 @@
+import 'package:FinTrack/GetInformation/session_manager.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class FeedbackPage extends StatefulWidget {
   const FeedbackPage({super.key});
@@ -14,7 +14,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
   final Color themeColor = const Color(0xFF8BC24A);
 
   final TextEditingController feedbackController = TextEditingController();
-
   final TextEditingController emailController = TextEditingController();
 
   String selectedType = "Suggestion";
@@ -34,9 +33,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
     });
 
     try {
-      SharedPreferences sp = await SharedPreferences.getInstance();
-
-      String phoneNumber = sp.getString("phone_number") ?? "";
+      String phoneNumber = await SessionManager.getPhoneNumber() ?? "";
 
       DatabaseReference ref = FirebaseDatabase.instance.ref(
         "userUpdates/$phoneNumber",
@@ -107,7 +104,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FBF2),
-
       appBar: AppBar(
         backgroundColor: themeColor,
         elevation: 0,
@@ -118,7 +114,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -156,9 +151,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -179,23 +172,17 @@ class _FeedbackPageState extends State<FeedbackPage> {
                     "Rate Your Experience",
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 10),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(5, (index) => buildStar(index)),
                   ),
-
                   const SizedBox(height: 20),
-
                   const Text(
                     "Feedback Type",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 8),
-
                   DropdownButtonFormField<String>(
                     initialValue: selectedType,
                     decoration: inputDecoration("Select Type"),
@@ -220,31 +207,23 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       });
                     },
                   ),
-
                   const SizedBox(height: 20),
-
                   const Text(
                     "Your Feedback",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 8),
-
                   TextField(
                     controller: feedbackController,
                     maxLines: 6,
                     decoration: inputDecoration("Write your feedback here..."),
                   ),
-
                   const SizedBox(height: 20),
-
                   const Text(
                     "Email (Optional)",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 8),
-
                   TextField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -253,9 +232,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 25),
-
             SizedBox(
               width: double.infinity,
               height: 58,
@@ -288,7 +265,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
           ],
         ),
