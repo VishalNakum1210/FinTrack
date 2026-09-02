@@ -99,7 +99,7 @@ class SessionManager {
 
     // Check expiration (30 days inactivity)
     final now = DateTime.now().millisecondsSinceEpoch;
-    final maxInactivityMs = sessionExpiryDays * 24 * 60 * 60 * 1000;
+    const maxInactivityMs = sessionExpiryDays * 24 * 60 * 60 * 1000;
     if (now - lastActive > maxInactivityMs) {
       await clearSession();
       return false;

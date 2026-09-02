@@ -1,6 +1,6 @@
-import 'package:FinTrack/GetInformation/get_user_detail.dart';
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/providers/user_provider.dart';
+import 'package:fin_track/get_information/get_user_detail.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
@@ -16,10 +16,10 @@ class _EditInformationPageState extends State<EditInformationPage> {
   final Color themeColor = const Color(0xFF8BC24A);
   Map<String, String> details = {};
 
-  TextEditingController nameController = TextEditingController(text: "User");
-  TextEditingController mobileController = TextEditingController(text: "9876543210");
-  TextEditingController emailController = TextEditingController(text: "user@gmail.com");
-  TextEditingController addressController = TextEditingController(text: "User Address");
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController mobileController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController addressController = TextEditingController();
 
   Widget customField({
     required String label,

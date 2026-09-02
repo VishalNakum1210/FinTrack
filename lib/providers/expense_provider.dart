@@ -1,4 +1,4 @@
-import 'package:FinTrack/utils/date_helper.dart';
+import 'package:fin_track/utils/date_helper.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 

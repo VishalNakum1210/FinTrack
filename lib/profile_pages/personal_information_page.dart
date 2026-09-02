@@ -1,5 +1,5 @@
-import 'package:FinTrack/ProfilePages/edit_information_page.dart';
-import 'package:FinTrack/providers/user_provider.dart';
+import 'package:fin_track/profile_pages/edit_information_page.dart';
+import 'package:fin_track/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

@@ -1,9 +1,9 @@
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/authantication/login_page.dart';
-import 'package:FinTrack/nav_bar.dart';
-import 'package:FinTrack/providers/expense_provider.dart';
-import 'package:FinTrack/providers/friend_provider.dart';
-import 'package:FinTrack/providers/user_provider.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/authentication/login_page.dart';
+import 'package:fin_track/nav_bar.dart';
+import 'package:fin_track/providers/expense_provider.dart';
+import 'package:fin_track/providers/friend_provider.dart';
+import 'package:fin_track/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';

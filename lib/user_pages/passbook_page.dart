@@ -1,12 +1,14 @@
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/providers/expense_provider.dart';
-import 'package:FinTrack/providers/user_provider.dart';
-import 'package:FinTrack/services/export_service.dart';
-import 'package:FinTrack/user_pages/add_spent.dart';
-import 'package:FinTrack/utils/date_helper.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/providers/expense_provider.dart';
+import 'package:fin_track/providers/user_provider.dart';
+import 'package:fin_track/services/export_service.dart';
+import 'package:fin_track/user_pages/add_spent.dart';
+import 'package:fin_track/utils/category_theme.dart';
+import 'package:fin_track/utils/currency_helper.dart';
+import 'package:fin_track/utils/date_helper.dart';
+import 'package:fin_track/widgets/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class PassbookApp extends StatefulWidget {
@@ -20,7 +22,7 @@ class PassbookPageState extends State<PassbookApp> {
   String currentSort = "Newest First";
   final List<String> sortList = const ["Newest First", "Oldest First"];
   String selectedCategory = "All";
-  static const Color green = Color(0xFF8BC24A);
+  static const Color green = CategoryTheme.primaryGreen;
 
   @override
   void initState() {
@@ -94,14 +96,6 @@ class PassbookPageState extends State<PassbookApp> {
       spentOnline: spentOnline,
       filterCategory: selectedCategory,
     );
-  }
-
-  String money(int value) {
-    return NumberFormat.currency(
-      locale: 'en_IN',
-      symbol: '₹ ',
-      decimalDigits: 0,
-    ).format(value);
   }
 
   @override
@@ -216,7 +210,7 @@ class PassbookPageState extends State<PassbookApp> {
                   ? Container(
                       padding: const EdgeInsets.all(20),
                       child: Column(
-                          children: [
+                        children: [
                           _categoryChips(),
                           const SizedBox(height: 10),
                           _balanceCard(income, expense, spentCash, spentOnline, recordCount),
@@ -268,52 +262,27 @@ class PassbookPageState extends State<PassbookApp> {
                                     if (showHeader && formattedCurrentDate.isNotEmpty)
                                       _sectionHeader('', formattedCurrentDate),
                                     _transactionTile(
-                                      icon: iconName(category),
-                                      iconColor: iconColor(category),
-                                      bgColor: backgroundColor(category),
+                                      icon: CategoryTheme.getIcon(category),
+                                      iconColor: CategoryTheme.getColor(category),
+                                      bgColor: CategoryTheme.getBgColor(category),
                                       title: category,
                                       subtitle: desc,
                                       method: method,
                                       time: date,
-                                      amount: money(amount),
+                                      amount: amount.toINR(),
                                       isIncome: isIncome,
                                     ),
                                   ],
                                 ),
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      title: const Text("Delete Record"),
-                                      content: const Text(
-                                        "Are you sure you want to delete this record?",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                          },
-                                          child: const Text("Cancel"),
-                                        ),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red,
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          onPressed: () async {
-                                            Navigator.pop(context);
-                                            if (item["key"] != null) {
-                                              await deleteRecord(item["key"]);
-                                            }
-                                          },
-                                          child: const Text("Delete"),
-                                        ),
-                                      ],
-                                    ),
+                                onTap: () async {
+                                  final confirmed = await showDeleteConfirmDialog(
+                                    context,
+                                    title: "Delete Record",
+                                    message: "Are you sure you want to delete this record?",
                                   );
+                                  if (confirmed == true && item["key"] != null) {
+                                    await deleteRecord(item["key"]);
+                                  }
                                 },
                               );
                             },
@@ -332,18 +301,14 @@ class PassbookPageState extends State<PassbookApp> {
       child: Row(
         children: [
           _chip(Icons.grid_view_rounded, 'All', green),
-          _chip(iconName("Food"), 'Food', iconColor("Food")),
-          _chip(iconName("Shopping"), 'Shopping', iconColor("Shopping")),
-          _chip(iconName("Transport"), 'Transport', iconColor("Transport")),
-          _chip(iconName("Education"), 'Education', iconColor("Education")),
-          _chip(iconName("HealthCare"), 'HealthCare', iconColor("HealthCare")),
-          _chip(
-            iconName("Entertainment"),
-            'Entertainment',
-            iconColor("Entertainment"),
-          ),
-          _chip(iconName("Add Money"), 'Add Money', iconColor("Add Money")),
-          _chip(Icons.more_horiz, 'Other', iconColor("other")),
+          _chip(CategoryTheme.getIcon("Food"), 'Food', CategoryTheme.getColor("Food")),
+          _chip(CategoryTheme.getIcon("Shopping"), 'Shopping', CategoryTheme.getColor("Shopping")),
+          _chip(CategoryTheme.getIcon("Transport"), 'Transport', CategoryTheme.getColor("Transport")),
+          _chip(CategoryTheme.getIcon("Education"), 'Education', CategoryTheme.getColor("Education")),
+          _chip(CategoryTheme.getIcon("HealthCare"), 'HealthCare', CategoryTheme.getColor("HealthCare")),
+          _chip(CategoryTheme.getIcon("Entertainment"), 'Entertainment', CategoryTheme.getColor("Entertainment")),
+          _chip(CategoryTheme.getIcon("Add Money"), 'Add Money', CategoryTheme.getColor("Add Money")),
+          _chip(Icons.more_horiz, 'Other', CategoryTheme.getColor("other")),
         ],
       ),
     );
@@ -362,7 +327,7 @@ class PassbookPageState extends State<PassbookApp> {
         margin: const EdgeInsets.only(right: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? backgroundColor(label) : Colors.white,
+          color: selected ? CategoryTheme.getBgColor(label) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? iconColor : const Color(0xFFE8E8E8),
@@ -419,7 +384,6 @@ class PassbookPageState extends State<PassbookApp> {
               ),
             ),
           ),
-
           Positioned(
             left: -30,
             bottom: -40,
@@ -432,38 +396,32 @@ class PassbookPageState extends State<PassbookApp> {
               ),
             ),
           ),
-
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 10),
-
               Row(
                 children: [
                   Expanded(
-                    child: balanceItem(
+                    child: _balanceItem(
                       Icons.trending_up_rounded,
                       Colors.greenAccent,
                       "Income",
-                      money(income),
+                      income.toINR(),
                     ),
                   ),
-
                   Container(height: 45, width: 1, color: Colors.white24),
-
                   Expanded(
-                    child: balanceItem(
+                    child: _balanceItem(
                       Icons.trending_down_rounded,
                       const Color(0xFFFF8A80),
                       "Expense",
-                      money(expense),
+                      expense.toINR(),
                     ),
                   ),
-
                   Container(height: 45, width: 1, color: Colors.white24),
-
                   Expanded(
-                    child: balanceItem(
+                    child: _balanceItem(
                       Icons.receipt_long_rounded,
                       Colors.white,
                       "Records",
@@ -477,22 +435,20 @@ class PassbookPageState extends State<PassbookApp> {
               Row(
                 children: [
                   Expanded(
-                    child: balanceItem(
+                    child: _balanceItem(
                       Icons.payments_rounded,
                       const Color(0xFFFFD180),
                       "Cash Exp.",
-                      money(spentCash),
+                      spentCash.toINR(),
                     ),
                   ),
-
                   Container(height: 45, width: 1, color: Colors.white24),
-
                   Expanded(
-                    child: balanceItem(
+                    child: _balanceItem(
                       Icons.credit_card_rounded,
                       const Color(0xFF80D8FF),
                       "Online Exp.",
-                      money(spentOnline),
+                      spentOnline.toINR(),
                     ),
                   ),
                 ],
@@ -501,6 +457,52 @@ class PassbookPageState extends State<PassbookApp> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _balanceItem(
+    IconData icon,
+    Color iconColor,
+    String title,
+    dynamic value, {
+    bool isMoney = true,
+  }) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.25),
+              width: 1,
+            ),
+          ),
+          child: Icon(icon, color: iconColor, size: 16),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            isMoney ? "$value" : value.toString(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -520,11 +522,9 @@ class PassbookPageState extends State<PassbookApp> {
                 dropdownMenuEntries: sortList
                     .map((item) => DropdownMenuEntry(value: item, label: item))
                     .toList(),
-
                 onSelected: (value) {
                   changeOrder(value);
                 },
-
                 inputDecorationTheme: InputDecorationTheme(
                   enabledBorder: OutlineInputBorder(
                     borderSide: const BorderSide(
@@ -623,13 +623,7 @@ class PassbookPageState extends State<PassbookApp> {
                 Row(
                   children: [
                     Icon(
-                      method == 'Spent Cash'
-                          ? Icons.currency_rupee_rounded
-                          : method == 'Spent Online'
-                          ? Icons.payment_rounded
-                          // : method == 'Bank Transfer'
-                          // ? Icons.account_balance
-                          : Icons.add_card_rounded,
+                      CategoryTheme.getMethodIcon(method),
                       color: Colors.grey,
                       size: 16,
                     ),
@@ -664,145 +658,5 @@ class PassbookPageState extends State<PassbookApp> {
         ],
       ),
     );
-  }
-}
-
-Widget balanceItem(
-  IconData icon,
-  Color iconColor,
-  String title,
-  dynamic value, {
-  bool isMoney = true,
-}) {
-  return Column(
-    children: [
-      Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.18),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.25),
-            width: 1,
-          ),
-        ),
-        child: Icon(icon, color: iconColor, size: 16),
-      ),
-
-      const SizedBox(height: 8),
-
-      Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 12.5,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-
-      const SizedBox(height: 4),
-
-      FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          isMoney ? "$value" : value.toString(),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-IconData iconName(String category) {
-  switch (category) {
-    case "Shopping":
-      return Icons.shopping_bag_rounded;
-    case "Food":
-      return Icons.restaurant_rounded;
-    case "Transport":
-      return Icons.directions_car_filled_rounded;
-    case "Education":
-      return Icons.school_rounded;
-    case "HealthCare":
-      return Icons.medical_services_rounded;
-    case "Entertainment":
-      return Icons.movie_filter_rounded;
-    case "Add Money":
-      return Icons.account_balance_wallet_rounded;
-    default:
-      return Icons.category_rounded;
-  }
-}
-
-Color iconColor(String category) {
-  switch (category.trim()) {
-    case "Shopping":
-      return Colors.deepOrange; // Purple
-
-    case "Food":
-      return const Color(0xFFFF9800); // Orange
-
-    case "Transport":
-      return const Color(0xFF2196F3); // Blue
-
-    case "Education":
-      return const Color(0xFF3F51B5); // Indigo
-
-    case "HealthCare":
-      return const Color(0xFFE53935); // Red
-
-    case "Entertainment":
-      return const Color(0xFFEC407A); // Pink
-
-    case "Add CASH":
-    case "Add Online":
-      return const Color(0xFF43A047); // Green
-
-    default:
-      return const Color(0xFF757575); // Grey
-  }
-}
-
-Color backgroundColor(String category) {
-  switch (category.trim()) {
-    case "Shopping":
-      return const Color.fromARGB(39, 255, 86, 34); // Light Purple
-
-    case "Food":
-      return const Color(0xFFFFF3E0); // Light Orange
-
-    case "Transport":
-      return const Color(0xFFE3F2FD); // Light Blue
-
-    case "Education":
-      return const Color(0xFFE8EAF6); // Light Indigo
-
-    case "HealthCare":
-      return const Color(0xFFFFEBEE); // Light Red
-
-    case "Entertainment":
-      return const Color(0xFFFCE4EC); // Light Pink
-
-    case "Add CASH":
-    case "Add Online":
-      return const Color(0xFFE8F5E9); // Light Green
-
-    default:
-      return const Color(0xFFF5F5F5); // Light Grey
-  }
-}
-
-IconData methodIcon(String method) {
-  switch (method) {
-    case "Spent Cash":
-      return Icons.money_off_rounded;
-    case "Spent Online":
-      return Icons.payment_rounded;
-    default:
-      return Icons.add_card_rounded;
   }
 }

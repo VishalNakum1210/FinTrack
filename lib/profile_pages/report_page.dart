@@ -1,13 +1,15 @@
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/providers/expense_provider.dart';
-import 'package:FinTrack/providers/friend_provider.dart';
-import 'package:FinTrack/providers/user_provider.dart';
-import 'package:FinTrack/services/export_service.dart';
-import 'package:FinTrack/utils/date_helper.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/providers/expense_provider.dart';
+import 'package:fin_track/providers/friend_provider.dart';
+import 'package:fin_track/providers/user_provider.dart';
+import 'package:fin_track/services/export_service.dart';
+import 'package:fin_track/utils/category_theme.dart';
+import 'package:fin_track/utils/currency_helper.dart';
+import 'package:fin_track/utils/date_helper.dart';
+import 'package:fin_track/widgets/insight_card.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 enum ReportPeriod { thisMonth, lastMonth, thisYear, allTime }
@@ -20,7 +22,7 @@ class Reportpage extends StatefulWidget {
 }
 
 class _ReportPageState extends State<Reportpage> {
-  final Color themeColor = const Color(0xFF689F38);
+  final Color themeColor = CategoryTheme.darkGreen;
   ReportPeriod selectedPeriod = ReportPeriod.thisMonth;
   int _touchedPieIndex = -1;
 
@@ -117,14 +119,6 @@ class _ReportPageState extends State<Reportpage> {
       categoryTotals: categoryTotals,
       records: records,
     );
-  }
-
-  String money(num value) {
-    return NumberFormat.currency(
-      locale: 'en_IN',
-      symbol: '₹ ',
-      decimalDigits: 0,
-    ).format(value);
   }
 
   @override
@@ -289,7 +283,7 @@ class _ReportPageState extends State<Reportpage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        money(periodBalance),
+                        periodBalance.toINR(),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 32,
@@ -398,35 +392,41 @@ class _ReportPageState extends State<Reportpage> {
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
                   children: [
-                    _insightCard(
+                    InsightCard(
                       icon: Icons.payments_rounded,
                       title: "Cash Spent",
-                      value: money(periodCashSpent),
+                      value: periodCashSpent.toINR(),
+                      iconColor: themeColor,
                     ),
-                    _insightCard(
+                    InsightCard(
                       icon: Icons.account_balance_wallet_rounded,
                       title: "Online Spent",
-                      value: money(periodOnlineSpent),
+                      value: periodOnlineSpent.toINR(),
+                      iconColor: themeColor,
                     ),
-                    _insightCard(
+                    InsightCard(
                       icon: Icons.shopping_bag_outlined,
                       title: "Top Category",
                       value: topCategory,
+                      iconColor: themeColor,
                     ),
-                    _insightCard(
+                    InsightCard(
                       icon: Icons.arrow_upward_rounded,
                       title: "Highest Income",
-                      value: money(highestIncome),
+                      value: highestIncome.toINR(),
+                      iconColor: themeColor,
                     ),
-                    _insightCard(
+                    InsightCard(
                       icon: Icons.savings_outlined,
                       title: "Savings Rate",
                       value: "${savingsRate.toStringAsFixed(0)}%",
+                      iconColor: themeColor,
                     ),
-                    _insightCard(
+                    InsightCard(
                       icon: Icons.receipt_long_outlined,
                       title: "Transactions",
                       value: "${filteredRecords.length} records",
+                      iconColor: themeColor,
                     ),
                   ],
                 ),
@@ -463,7 +463,7 @@ class _ReportPageState extends State<Reportpage> {
                         children: [
                           const Text("Money You Will Receive"),
                           Text(
-                            money(friendGiven),
+                            friendGiven.toINR(),
                             style: TextStyle(
                               color: themeColor,
                               fontWeight: FontWeight.bold,
@@ -477,7 +477,7 @@ class _ReportPageState extends State<Reportpage> {
                         children: [
                           const Text("Money You Owe (To Give)"),
                           Text(
-                            money(friendTaken),
+                            friendTaken.toINR(),
                             style: const TextStyle(
                               color: Colors.red,
                               fontWeight: FontWeight.bold,
@@ -494,7 +494,7 @@ class _ReportPageState extends State<Reportpage> {
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            money(friendGiven - friendTaken),
+                            (friendGiven - friendTaken).toINR(),
                             style: TextStyle(
                               color: (friendGiven < friendTaken) ? Colors.red : themeColor,
                               fontWeight: FontWeight.bold,
@@ -555,7 +555,7 @@ class _ReportPageState extends State<Reportpage> {
                             icon: isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
                             title: category,
                             subtitle: "$date • $payment",
-                            amount: "${isIncome ? '+' : '-'}${money(amt)}",
+                            amount: "${isIncome ? '+' : '-'}${amt.toINR()}",
                             amountColor: isIncome ? themeColor : Colors.red,
                           );
                         }),
@@ -632,7 +632,7 @@ class _ReportPageState extends State<Reportpage> {
                         const TextStyle(color: Colors.white70, fontSize: 11),
                         children: [
                           TextSpan(
-                            text: money(rod.toY),
+                            text: rod.toY.toINR(),
                             style: TextStyle(
                               color: isIncome ? Colors.greenAccent : const Color(0xFFFF8A80),
                               fontWeight: FontWeight.bold,
@@ -781,7 +781,7 @@ class _ReportPageState extends State<Reportpage> {
                         final double radius = isTouched ? 48 : 40;
                         final entry = entries[i];
                         final share = totalExpense > 0 ? (entry.value / totalExpense) * 100 : 0.0;
-                        final color = _getCategoryColor(entry.key);
+                        final color = CategoryTheme.getColor(entry.key);
 
                         return PieChartSectionData(
                           color: color,
@@ -814,7 +814,7 @@ class _ReportPageState extends State<Reportpage> {
                               width: 10,
                               height: 10,
                               decoration: BoxDecoration(
-                                color: _getCategoryColor(e.key),
+                                color: CategoryTheme.getColor(e.key),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -848,10 +848,10 @@ class _ReportPageState extends State<Reportpage> {
           ...entries.map((e) {
             final share = totalExpense > 0 ? (e.value / totalExpense).clamp(0.0, 1.0) : 0.0;
             return _categoryTile(
-              themeColor: _getCategoryColor(e.key),
-              icon: _getCategoryIcon(e.key),
+              themeColor: CategoryTheme.getColor(e.key),
+              icon: CategoryTheme.getIcon(e.key),
               title: e.key,
-              amount: money(e.value),
+              amount: e.value.toINR(),
               percentage: (share * 100).toStringAsFixed(1),
               value: share,
             );
@@ -916,48 +916,6 @@ class _ReportPageState extends State<Reportpage> {
     );
   }
 
-  Color _getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case "food":
-        return const Color(0xFFFF9800);
-      case "shopping":
-        return Colors.deepOrange;
-      case "transport":
-        return const Color(0xFF2196F3);
-      case "education":
-        return const Color(0xFF3F51B5);
-      case "healthcare":
-        return const Color(0xFFE53935);
-      case "entertainment":
-        return const Color(0xFFEC407A);
-      case "add money":
-        return const Color(0xFF43A047);
-      default:
-        return const Color(0xFF78909C);
-    }
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case "food":
-        return Icons.restaurant;
-      case "shopping":
-        return Icons.shopping_bag;
-      case "transport":
-        return Icons.directions_car;
-      case "education":
-        return Icons.school;
-      case "healthcare":
-        return Icons.local_hospital;
-      case "entertainment":
-        return Icons.movie;
-      case "add money":
-        return Icons.add_card;
-      default:
-        return Icons.category;
-    }
-  }
-
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
       color: Colors.white,
@@ -969,34 +927,6 @@ class _ReportPageState extends State<Reportpage> {
           offset: const Offset(0, 3),
         ),
       ],
-    );
-  }
-
-  Widget _insightCard({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: _cardDecoration(),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Icon(icon, color: themeColor, size: 26),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11.5, color: Colors.black54),
-          ),
-        ],
-      ),
     );
   }
 

@@ -1,12 +1,13 @@
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/ProfilePages/change_password_page.dart';
-import 'package:FinTrack/ProfilePages/feedback_page.dart';
-import 'package:FinTrack/ProfilePages/personal_information_page.dart';
-import 'package:FinTrack/ProfilePages/report_page.dart';
-import 'package:FinTrack/authantication/login_page.dart';
-import 'package:FinTrack/providers/expense_provider.dart';
-import 'package:FinTrack/providers/friend_provider.dart';
-import 'package:FinTrack/providers/user_provider.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/profile_pages/change_password_page.dart';
+import 'package:fin_track/profile_pages/feedback_page.dart';
+import 'package:fin_track/profile_pages/personal_information_page.dart';
+import 'package:fin_track/profile_pages/report_page.dart';
+import 'package:fin_track/authentication/login_page.dart';
+import 'package:fin_track/providers/expense_provider.dart';
+import 'package:fin_track/providers/friend_provider.dart';
+import 'package:fin_track/providers/user_provider.dart';
+import 'package:fin_track/utils/currency_helper.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -217,11 +218,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                     const SizedBox(height: 5),
                                     Text(
-                                      NumberFormat.currency(
-                                        locale: 'en_IN',
-                                        symbol: '₹',
-                                        decimalDigits: 0,
-                                      ).format(totalExpense),
+                                      totalExpense.toINR(compactSymbol: true),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 22,
@@ -243,11 +240,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                     const SizedBox(height: 5),
                                     Text(
-                                      NumberFormat.currency(
-                                        locale: 'en_IN',
-                                        symbol: '',
-                                        decimalDigits: 0,
-                                      ).format(recordCount),
+                                      "$recordCount",
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 22,

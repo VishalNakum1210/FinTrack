@@ -1,9 +1,11 @@
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/providers/expense_provider.dart';
-import 'package:FinTrack/providers/user_provider.dart';
-import 'package:FinTrack/user_pages/add_spent.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/providers/expense_provider.dart';
+import 'package:fin_track/providers/user_provider.dart';
+import 'package:fin_track/user_pages/add_spent.dart';
+import 'package:fin_track/utils/category_theme.dart';
+import 'package:fin_track/utils/currency_helper.dart';
+import 'package:fin_track/widgets/insight_card.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class UserMainPage extends StatefulWidget {
@@ -14,7 +16,7 @@ class UserMainPage extends StatefulWidget {
 }
 
 class _UserMainPageState extends State<UserMainPage> {
-  final Color themeColor = const Color(0xFF8BC24A);
+  final Color themeColor = CategoryTheme.primaryGreen;
 
   @override
   void initState() {
@@ -30,14 +32,6 @@ class _UserMainPageState extends State<UserMainPage> {
       context.read<UserProvider>().loadUserSession();
       context.read<ExpenseProvider>().fetchExpenses(phone);
     }
-  }
-
-  String money(int value) {
-    return NumberFormat.currency(
-      locale: 'en_IN',
-      symbol: '₹',
-      decimalDigits: 0,
-    ).format(value);
   }
 
   @override
@@ -154,7 +148,7 @@ class _UserMainPageState extends State<UserMainPage> {
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              money(currentBalance),
+                              currentBalance.toINR(),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 34,
@@ -170,7 +164,7 @@ class _UserMainPageState extends State<UserMainPage> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  "${money(totalIncome)} Income",
+                                  "${totalIncome.toINR()} Income",
                                   style: const TextStyle(color: Colors.white),
                                 ),
                               ],
@@ -240,25 +234,29 @@ class _UserMainPageState extends State<UserMainPage> {
                         mainAxisSpacing: 12,
                         childAspectRatio: 1.25,
                         children: [
-                          _insightCard(
-                            Icons.shopping_bag_outlined,
-                            "Biggest Expense",
-                            biggestCategory,
+                          InsightCard(
+                            icon: Icons.shopping_bag_outlined,
+                            title: "Biggest Expense",
+                            value: biggestCategory,
+                            iconColor: themeColor,
                           ),
-                          _insightCard(
-                            Icons.arrow_upward_rounded,
-                            "Highest Transaction",
-                            money(highestTransaction),
+                          InsightCard(
+                            icon: Icons.arrow_upward_rounded,
+                            title: "Highest Transaction",
+                            value: highestTransaction.toINR(),
+                            iconColor: themeColor,
                           ),
-                          _insightCard(
-                            Icons.receipt_long_outlined,
-                            "Transactions",
-                            "${records.length}",
+                          InsightCard(
+                            icon: Icons.receipt_long_outlined,
+                            title: "Transactions",
+                            value: "${records.length}",
+                            iconColor: themeColor,
                           ),
-                          _insightCard(
-                            Icons.account_balance_wallet_outlined,
-                            "Balance",
-                            money(currentBalance),
+                          InsightCard(
+                            icon: Icons.account_balance_wallet_outlined,
+                            title: "Balance",
+                            value: currentBalance.toINR(),
+                            iconColor: themeColor,
                           ),
                         ],
                       ),
@@ -366,7 +364,7 @@ class _UserMainPageState extends State<UserMainPage> {
                                         crossAxisAlignment: CrossAxisAlignment.end,
                                         children: [
                                           Text(
-                                            isIncome ? "+${money(amount)}" : "-${money(amount)}",
+                                            isIncome ? "+${amount.toINR()}" : "-${amount.toINR()}",
                                             style: TextStyle(
                                               color: isIncome ? Colors.green : Colors.red,
                                               fontWeight: FontWeight.bold,
@@ -483,56 +481,9 @@ class _UserMainPageState extends State<UserMainPage> {
 
           FittedBox(
             child: Text(
-              money(amount),
-
+              amount.toINR(),
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _insightCard(IconData icon, String title, String value) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-
-      decoration: BoxDecoration(
-        color: Colors.white,
-
-        borderRadius: BorderRadius.circular(22),
-
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-
-        children: [
-          Icon(icon, color: themeColor, size: 30),
-
-          Text(
-            value,
-            textAlign: TextAlign.center,
-
-            maxLines: 2,
-
-            overflow: TextOverflow.ellipsis,
-
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          ),
-
-          Text(
-            title,
-            textAlign: TextAlign.center,
-
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
           ),
         ],
       ),

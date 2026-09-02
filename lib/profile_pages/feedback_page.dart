@@ -1,4 +1,4 @@
-import 'package:FinTrack/GetInformation/session_manager.dart';
+import 'package:fin_track/get_information/session_manager.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -129,8 +129,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   colors: [themeColor, themeColor.withValues(alpha: 0.75)],
                 ),
               ),
-              child: Column(
-                children: const [
+              child: const Column(
+                children: [
                   Icon(Icons.feedback_rounded, color: Colors.white, size: 55),
                   SizedBox(height: 12),
                   Text(

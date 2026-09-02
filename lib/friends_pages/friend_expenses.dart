@@ -1,10 +1,11 @@
-import 'package:FinTrack/FriendsPages/add_friends.dart';
-import 'package:FinTrack/FriendsPages/specific_friend_page.dart';
-import 'package:FinTrack/FriendsPages/split_bill_page.dart';
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/providers/friend_provider.dart';
-import 'package:FinTrack/providers/user_provider.dart';
-import 'package:FinTrack/services/export_service.dart';
+import 'package:fin_track/friends_pages/add_friends.dart';
+import 'package:fin_track/friends_pages/specific_friend_page.dart';
+import 'package:fin_track/friends_pages/split_bill_page.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/providers/friend_provider.dart';
+import 'package:fin_track/providers/user_provider.dart';
+import 'package:fin_track/services/export_service.dart';
+import 'package:fin_track/utils/currency_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -139,11 +140,7 @@ class _FriendPageState extends State<FriendPage> {
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                NumberFormat.currency(
-                                  locale: 'en_IN',
-                                  symbol: '₹',
-                                  decimalDigits: 0,
-                                ).format(totalGet),
+                                totalGet.toINR(compactSymbol: true),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 24,
@@ -168,11 +165,7 @@ class _FriendPageState extends State<FriendPage> {
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerRight,
                               child: Text(
-                                NumberFormat.currency(
-                                  locale: 'en_IN',
-                                  symbol: '₹',
-                                  decimalDigits: 0,
-                                ).format(totalGive),
+                                totalGive.toINR(compactSymbol: true),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 24,
@@ -287,7 +280,7 @@ class _FriendPageState extends State<FriendPage> {
                 // Friend List
                 Expanded(
                   child: (isLoading)
-                      ? Center(
+                      ? const Center(
                           child: CircularProgressIndicator(color: primaryColor),
                         )
                       : (displayedFriends.isNotEmpty)
@@ -421,11 +414,7 @@ class _FriendPageState extends State<FriendPage> {
                                                 borderRadius: BorderRadius.circular(20),
                                               ),
                                               child: Text(
-                                                NumberFormat.currency(
-                                                  locale: 'en_IN',
-                                                  symbol: 'Get ₹',
-                                                  decimalDigits: 0,
-                                                ).format(fGet),
+                                                "Get ${fGet.toINR(compactSymbol: true)}",
                                                 style: const TextStyle(
                                                   color: Colors.green,
                                                   fontWeight: FontWeight.bold,
@@ -444,11 +433,7 @@ class _FriendPageState extends State<FriendPage> {
                                                 borderRadius: BorderRadius.circular(20),
                                               ),
                                               child: Text(
-                                                NumberFormat.currency(
-                                                  locale: 'en_IN',
-                                                  symbol: 'Give ₹',
-                                                  decimalDigits: 0,
-                                                ).format(fGive),
+                                                "Give ${fGive.toINR(compactSymbol: true)}",
                                                 style: const TextStyle(
                                                   color: Colors.red,
                                                   fontWeight: FontWeight.bold,

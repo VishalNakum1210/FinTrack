@@ -1,4 +1,4 @@
-import 'package:FinTrack/utils/date_helper.dart';
+import 'package:fin_track/utils/date_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -158,7 +158,7 @@ class ExportService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text("Account: ${_cleanPdfText(userName, defaultVal: 'User')}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                      pw.Text("Account: ${_cleanPdfText(userName, defaultVal: 'User')}", style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
                       pw.SizedBox(height: 2),
                       pw.Text("Friend: ${_cleanPdfText(friendName, defaultVal: 'Friend')} (${_cleanPdfText(friendNumber, defaultVal: '')})", style: const pw.TextStyle(fontSize: 10)),
                     ],
@@ -217,7 +217,7 @@ class ExportService {
             else
               pw.TableHelper.fromTextArray(
                 headers: ['#', 'Date', 'Type', 'Description', 'Mode', 'Amount'],
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
+                headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
                 headerDecoration: pw.BoxDecoration(color: _headerBg),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellStyle: const pw.TextStyle(fontSize: 8.5),
@@ -288,7 +288,7 @@ class ExportService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text("Account: ${_cleanPdfText(userName, defaultVal: 'User')}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                      pw.Text("Account: ${_cleanPdfText(userName, defaultVal: 'User')}", style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
                       pw.Text("Total Friends: ${friends.length}", style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
                     ],
                   ),
@@ -337,7 +337,7 @@ class ExportService {
             else
               pw.TableHelper.fromTextArray(
                 headers: ['#', 'Friend Name', 'Phone Number', 'To Receive', 'To Pay', 'Net Due'],
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
+                headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
                 headerDecoration: pw.BoxDecoration(color: _headerBg),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellStyle: const pw.TextStyle(fontSize: 8.5),
@@ -475,7 +475,7 @@ class ExportService {
             else
               pw.TableHelper.fromTextArray(
                 headers: ['Category', 'Amount (INR)', 'Share of Total Expense'],
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
+                headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
                 headerDecoration: pw.BoxDecoration(color: _headerBg),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellStyle: const pw.TextStyle(fontSize: 8.5),
@@ -611,7 +611,7 @@ class ExportService {
             children: [
               pw.Text(
                 monthName,
-                style: pw.TextStyle(
+                style: const pw.TextStyle(
                   color: PdfColors.white,
                   fontWeight: pw.FontWeight.bold,
                   fontSize: 10.5,
@@ -630,7 +630,7 @@ class ExportService {
       widgets.add(
         pw.TableHelper.fromTextArray(
           headers: ['#', 'Date', 'Category', 'Description', 'Payment Mode', 'Amount'],
-          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 8.5),
+          headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 8.5),
           headerDecoration: pw.BoxDecoration(color: _headerBg),
           columnWidths: {
             0: const pw.FixedColumnWidth(22),
@@ -804,7 +804,7 @@ class ExportService {
                 pw.Text("Generated On", style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600)),
                 pw.Text(
                   _exportDateFormatter.format(DateTime.now()),
-                  style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold),
+                  style: const pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -859,7 +859,7 @@ class ExportService {
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text("Account Holder: ${_cleanPdfText(userName, defaultVal: 'User')}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10.5)),
+              pw.Text("Account Holder: ${_cleanPdfText(userName, defaultVal: 'User')}", style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10.5)),
               if (phoneNumber.isNotEmpty)
                 pw.Text("Phone: ${_cleanPdfText(phoneNumber, defaultVal: '')}", style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.grey800)),
             ],

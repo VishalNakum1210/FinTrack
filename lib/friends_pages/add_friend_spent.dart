@@ -1,5 +1,5 @@
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/providers/friend_provider.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';

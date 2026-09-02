@@ -1,13 +1,14 @@
-import 'package:FinTrack/FriendsPages/add_friend_spent.dart';
-import 'package:FinTrack/GetInformation/get_specific_friend_details.dart';
-import 'package:FinTrack/GetInformation/session_manager.dart';
-import 'package:FinTrack/providers/friend_provider.dart';
-import 'package:FinTrack/providers/user_provider.dart';
-import 'package:FinTrack/services/export_service.dart';
-import 'package:FinTrack/utils/date_helper.dart';
+import 'package:fin_track/friends_pages/add_friend_spent.dart';
+import 'package:fin_track/get_information/get_specific_friend_details.dart';
+import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/providers/friend_provider.dart';
+import 'package:fin_track/providers/user_provider.dart';
+import 'package:fin_track/services/export_service.dart';
+import 'package:fin_track/utils/currency_helper.dart';
+import 'package:fin_track/utils/date_helper.dart';
+import 'package:fin_track/widgets/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class Specificfriendpage extends StatefulWidget {
@@ -142,10 +143,6 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
     );
   }
 
-  String formatIndianNumber(int number) {
-    return NumberFormat('#,##,##0', 'en_IN').format(number);
-  }
-
   @override
   Widget build(BuildContext context) {
     const Color primaryColor = Color(0xFF8BC24A);
@@ -190,7 +187,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
       ),
 
       body: (isLoading)
-          ? Center(
+          ? const Center(
               child: CircularProgressIndicator(color: primaryColor),
             )
           : (friendDetails.isEmpty)
@@ -276,11 +273,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    NumberFormat.currency(
-                                      locale: 'en_IN',
-                                      symbol: '₹',
-                                      decimalDigits: 0,
-                                    ).format(totalGet),
+                                    totalGet.toINR(compactSymbol: true),
                                     style: const TextStyle(
                                       fontSize: 22,
                                       color: Colors.green,
@@ -312,11 +305,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    NumberFormat.currency(
-                                      locale: 'en_IN',
-                                      symbol: '₹',
-                                      decimalDigits: 0,
-                                    ).format(totalGive),
+                                    totalGive.toINR(compactSymbol: true),
                                     style: const TextStyle(
                                       fontSize: 22,
                                       color: Colors.red,
@@ -359,11 +348,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                           const SizedBox(height: 6),
 
                           Text(
-                            NumberFormat.currency(
-                              locale: 'en_IN',
-                              symbol: '₹',
-                              decimalDigits: 0,
-                            ).format((totalGet - totalGive).abs()),
+                            (totalGet - totalGive).abs().toINR(compactSymbol: true),
                             style: TextStyle(
                               color: (totalGet >= totalGive) ? Colors.green : Colors.red,
                               fontSize: 26,
@@ -411,49 +396,22 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                                 final key = (record["key"] ?? "").toString();
 
                                 return InkWell(
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        title: const Text("Delete Record"),
-                                        content: const Text(
-                                          "Are you sure you want to delete this record?",
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context),
-                                            child: const Text("Cancel"),
-                                          ),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red,
-                                              foregroundColor: Colors.white,
-                                            ),
-                                            onPressed: () async {
-                                              Navigator.pop(context);
-                                              if (key.isNotEmpty) {
-                                                await deleteRecord(
-                                                  key,
-                                                  isGive,
-                                                  amount,
-                                                );
-                                              }
-                                            },
-                                            child: const Text("Delete"),
-                                          ),
-                                        ],
-                                      ),
+                                  onTap: () async {
+                                    final confirmed = await showDeleteConfirmDialog(
+                                      context,
+                                      title: "Delete Record",
+                                      message: "Are you sure you want to delete this record?",
                                     );
+                                    if (confirmed == true && key.isNotEmpty) {
+                                      await deleteRecord(
+                                        key,
+                                        isGive,
+                                        amount,
+                                      );
+                                    }
                                   },
                                   child: _transactionCard(
-                                    amount: NumberFormat.currency(
-                                      locale: 'en_IN',
-                                      symbol: '₹',
-                                      decimalDigits: 0,
-                                    ).format(amount),
+                                    amount: amount.toINR(compactSymbol: true),
                                     title: (record["Type"] ?? "").toString(),
                                     note: (record["Description"] ?? "").toString(),
                                     date: (record["Date"] ?? "").toString(),
