@@ -1,9 +1,15 @@
+import 'dart:async';
 import 'package:fin_track/utils/date_helper.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class ExpenseProvider extends ChangeNotifier {
   bool _isLoading = false;
+  bool _hasError = false;
+  String _errorMessage = "";
+  String _currentPhoneNumber = "";
+  StreamSubscription<DatabaseEvent>? _subscription;
+
   final List<Map<String, dynamic>> _records = [];
 
   int _spentCash = 0;
@@ -12,6 +18,8 @@ class ExpenseProvider extends ChangeNotifier {
   int _addOnline = 0;
 
   bool get isLoading => _isLoading;
+  bool get hasError => _hasError;
+  String get errorMessage => _errorMessage;
   List<Map<String, dynamic>> get records => _records;
   int get spentCash => _spentCash;
   int get spentOnline => _spentOnline;
@@ -34,73 +42,102 @@ class ExpenseProvider extends ChangeNotifier {
     return totals;
   }
 
-  /// Fetches all expense records for the user and calculates totals
-  Future<void> fetchExpenses(String phoneNumber) async {
+  /// Sets up a real-time stream listener for user expenses
+  Future<void> fetchExpenses(String phoneNumber, {bool force = false}) async {
     if (phoneNumber.isEmpty) return;
 
+    // If already listening to this phone and not forced or in error, do nothing
+    if (_currentPhoneNumber == phoneNumber && _subscription != null && !force && !_hasError) {
+      return;
+    }
+
+    _currentPhoneNumber = phoneNumber;
     _isLoading = true;
+    _hasError = false;
+    _errorMessage = "";
     notifyListeners();
+
+    await _subscription?.cancel();
 
     try {
       final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber");
-      final event = await ref.once();
 
-      _records.clear();
-      _spentCash = 0;
-      _spentOnline = 0;
-      _addCash = 0;
-      _addOnline = 0;
-
-      if (event.snapshot.value != null && event.snapshot.value is Map) {
-        final data = event.snapshot.value as Map;
-        data.forEach((key, value) {
-          if (value is Map) {
-            final map = Map<String, dynamic>.from(value);
-            map['key'] = key;
-            map['_parsedDate'] = DateHelper.parse(map["Date"]);
-            _records.add(map);
-
-            final mode = (map["Payment_Mode"] ?? "").toString();
-            final amount = (double.tryParse(map["Amount"]?.toString() ?? '0') ?? 0.0).round();
-
-            if (mode == "Spent Cash") {
-              _spentCash += amount;
-            } else if (mode == "Spent Online") {
-              _spentOnline += amount;
-            } else if (mode == "Add CASH") {
-              _addCash += amount;
-            } else if (mode == "Add Online") {
-              _addOnline += amount;
-            }
-          }
-        });
-
-        // Fast sort primarily by pre-parsed transaction Date (descending), secondarily by timestamp
-        _records.sort((a, b) {
-          final DateTime? dateA = a["_parsedDate"] as DateTime?;
-          final DateTime? dateB = b["_parsedDate"] as DateTime?;
-
-          if (dateA != null && dateB != null) {
-            final dateCmp = dateB.compareTo(dateA);
-            if (dateCmp != 0) return dateCmp;
-          } else if (dateA != null) {
-            return -1;
-          } else if (dateB != null) {
-            return 1;
-          }
-
-          final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
-          final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
-          return tB.compareTo(tA);
-        });
-      }
-    } catch (_) {}
-
-    _isLoading = false;
-    notifyListeners();
+      _subscription = ref.onValue.listen(
+        (event) {
+          _processSnapshot(event.snapshot);
+          _isLoading = false;
+          _hasError = false;
+          _errorMessage = "";
+          notifyListeners();
+        },
+        onError: (error) {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = "Unable to sync expenses. Check your internet connection.";
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      _isLoading = false;
+      _hasError = true;
+      _errorMessage = "Connection error. Please try again.";
+      notifyListeners();
+    }
   }
 
-  /// Adds a new expense record to Firebase and updates local state
+  void _processSnapshot(DataSnapshot snapshot) {
+    _records.clear();
+    _spentCash = 0;
+    _spentOnline = 0;
+    _addCash = 0;
+    _addOnline = 0;
+
+    if (snapshot.value != null && snapshot.value is Map) {
+      final data = snapshot.value as Map;
+      data.forEach((key, value) {
+        if (value is Map) {
+          final map = Map<String, dynamic>.from(value);
+          map['key'] = key;
+          map['_parsedDate'] = DateHelper.parse(map["Date"]);
+          _records.add(map);
+
+          final mode = (map["Payment_Mode"] ?? "").toString();
+          final amount = (double.tryParse(map["Amount"]?.toString() ?? '0') ?? 0.0).round();
+
+          if (mode == "Spent Cash") {
+            _spentCash += amount;
+          } else if (mode == "Spent Online") {
+            _spentOnline += amount;
+          } else if (mode == "Add CASH") {
+            _addCash += amount;
+          } else if (mode == "Add Online") {
+            _addOnline += amount;
+          }
+        }
+      });
+
+      // Fast sort primarily by pre-parsed transaction Date (descending), secondarily by timestamp
+      _records.sort((a, b) {
+        final DateTime? dateA = a["_parsedDate"] as DateTime?;
+        final DateTime? dateB = b["_parsedDate"] as DateTime?;
+
+        if (dateA != null && dateB != null) {
+          final dateCmp = dateB.compareTo(dateA);
+          if (dateCmp != 0) return dateCmp;
+        } else if (dateA != null) {
+          return -1;
+        } else if (dateB != null) {
+          return 1;
+        }
+
+        final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
+        final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
+        return tB.compareTo(tA);
+      });
+    }
+  }
+
+  /// Adds a new expense record to Firebase (real-time stream will auto-update state)
   Future<bool> addExpense({
     required String phoneNumber,
     required String amount,
@@ -123,14 +160,13 @@ class ExpenseProvider extends ChangeNotifier {
         "timestamp": ServerValue.timestamp,
       });
 
-      await fetchExpenses(phoneNumber);
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  /// Deletes an expense record and refreshes state
+  /// Deletes an expense record (real-time stream will auto-update state)
   Future<bool> deleteExpense({
     required String phoneNumber,
     required String key,
@@ -138,7 +174,6 @@ class ExpenseProvider extends ChangeNotifier {
     try {
       final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber/$key");
       await ref.remove();
-      await fetchExpenses(phoneNumber);
       return true;
     } catch (_) {
       return false;
@@ -179,11 +214,23 @@ class ExpenseProvider extends ChangeNotifier {
 
   /// Clears expenses on logout
   void clearExpenses() {
+    _subscription?.cancel();
+    _subscription = null;
+    _currentPhoneNumber = "";
     _records.clear();
     _spentCash = 0;
     _spentOnline = 0;
     _addCash = 0;
     _addOnline = 0;
+    _isLoading = false;
+    _hasError = false;
+    _errorMessage = "";
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 }

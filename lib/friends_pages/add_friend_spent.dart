@@ -203,13 +203,15 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
-                      decoration: inputDecoration("Enter Amount (₹)"),
+                      maxLength: 10,
+                      decoration: inputDecoration("Enter Amount (₹)").copyWith(counterText: ""),
                     ),
 
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
 
                     TextField(
                       controller: descriptionController,
+                      maxLength: 150,
                       decoration: inputDecoration("Enter Description / Note"),
                     ),
 

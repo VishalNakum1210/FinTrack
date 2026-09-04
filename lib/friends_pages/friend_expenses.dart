@@ -6,6 +6,7 @@ import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/services/export_service.dart';
 import 'package:fin_track/utils/currency_helper.dart';
+import 'package:fin_track/widgets/error_retry_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -30,10 +31,10 @@ class _FriendPageState extends State<FriendPage> {
     });
   }
 
-  Future<void> _loadFriends() async {
+  Future<void> _loadFriends({bool force = false}) async {
     final phone = await SessionManager.getPhoneNumber() ?? "";
     if (mounted && phone.isNotEmpty) {
-      context.read<FriendProvider>().fetchFriends(phone);
+      context.read<FriendProvider>().fetchFriends(phone, force: force);
     }
   }
 
@@ -105,7 +106,7 @@ class _FriendPageState extends State<FriendPage> {
           ),
           body: RefreshIndicator(
             color: primaryColor,
-            onRefresh: _loadFriends,
+            onRefresh: () => _loadFriends(force: true),
             child: Column(
               children: [
                 // Summary Card
@@ -279,12 +280,19 @@ class _FriendPageState extends State<FriendPage> {
 
                 // Friend List
                 Expanded(
-                  child: (isLoading)
+                  child: (isLoading && allFriends.isEmpty)
                       ? const Center(
                           child: CircularProgressIndicator(color: primaryColor),
                         )
-                      : (displayedFriends.isNotEmpty)
-                          ? ListView.builder(
+                      : (friendProvider.hasError && allFriends.isEmpty)
+                          ? ErrorRetryWidget(
+                              message: friendProvider.errorMessage,
+                              primaryColor: primaryColor,
+                              onRetry: () => _loadFriends(force: true),
+                            )
+                          : (displayedFriends.isNotEmpty)
+                              ? ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
                               padding: const EdgeInsets.symmetric(horizontal: 15),
                               itemCount: displayedFriends.length,
                               itemBuilder: (context, index) {
@@ -317,13 +325,15 @@ class _FriendPageState extends State<FriendPage> {
                                               foregroundColor: Colors.white,
                                             ),
                                             onPressed: () async {
+                                              final friendProvider = context.read<FriendProvider>();
                                               Navigator.pop(dialogCtx);
                                               final phone = await SessionManager.getPhoneNumber() ?? "";
-                                              if (phone.isNotEmpty && context.mounted) {
-                                                await context.read<FriendProvider>().deleteFriend(
+                                              if (phone.isNotEmpty) {
+                                                await friendProvider.deleteFriend(
                                                   userPhone: phone,
                                                   friendNumber: friendNumber,
                                                 );
+                                                Fluttertoast.showToast(msg: "Friend removed");
                                               }
                                             },
                                             child: const Text("Delete"),
@@ -345,13 +355,13 @@ class _FriendPageState extends State<FriendPage> {
                                   },
                                   child: Container(
                                     margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.all(15),
+                                    padding: const EdgeInsets.all(14),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(18),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withValues(alpha: .05),
+                                          color: Colors.black.withValues(alpha: .04),
                                           blurRadius: 8,
                                           offset: const Offset(0, 3),
                                         ),
@@ -361,20 +371,18 @@ class _FriendPageState extends State<FriendPage> {
                                       children: [
                                         // Avatar
                                         CircleAvatar(
-                                          radius: 28,
+                                          radius: 24,
                                           backgroundColor: primaryColor.withValues(alpha: .15),
                                           child: Text(
-                                            friendName.isNotEmpty
-                                                ? friendName[0].toUpperCase()
-                                                : '?',
+                                            friendName.isNotEmpty ? friendName[0].toUpperCase() : "F",
                                             style: const TextStyle(
-                                              color: primaryColor,
-                                              fontWeight: FontWeight.bold,
                                               fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: primaryColor,
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
+                                        const SizedBox(width: 14),
 
                                         // Name & Number
                                         Expanded(
@@ -384,11 +392,11 @@ class _FriendPageState extends State<FriendPage> {
                                               Text(
                                                 friendName,
                                                 style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
                                                   fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
                                                 ),
                                               ),
-                                              const SizedBox(height: 4),
+                                              const SizedBox(height: 3),
                                               Text(
                                                 friendNumber,
                                                 style: TextStyle(
@@ -449,15 +457,20 @@ class _FriendPageState extends State<FriendPage> {
                                 );
                               },
                             )
-                          : Center(
-                              child: Text(
-                                searchQuery.isNotEmpty
-                                    ? "No friends matching '$searchQuery'"
-                                    : "No Friends Added Yet",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.grey.shade600,
+                          : SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: Container(
+                                padding: const EdgeInsets.only(top: 80),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  searchQuery.isNotEmpty
+                                      ? "No friends matching '$searchQuery'"
+                                      : "No Friends Added Yet",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
                               ),
                             ),

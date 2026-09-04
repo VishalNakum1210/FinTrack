@@ -1,54 +1,90 @@
+import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class FriendProvider extends ChangeNotifier {
   bool _isLoading = false;
+  bool _hasError = false;
+  String _errorMessage = "";
+  String _currentPhone = "";
+  StreamSubscription<DatabaseEvent>? _subscription;
+
   final List<Map<String, dynamic>> _friends = [];
 
   int _totalGet = 0;
   int _totalGive = 0;
 
   bool get isLoading => _isLoading;
+  bool get hasError => _hasError;
+  String get errorMessage => _errorMessage;
   List<Map<String, dynamic>> get friends => _friends;
   int get totalGet => _totalGet;
   int get totalGive => _totalGive;
 
-  /// Fetches all friends and aggregate get/give ledger totals
-  Future<void> fetchFriends(String phoneNumber) async {
+  /// Sets up a real-time stream listener for friends and aggregate ledger totals
+  Future<void> fetchFriends(String phoneNumber, {bool force = false}) async {
     if (phoneNumber.isEmpty) return;
 
+    if (_currentPhone == phoneNumber && _subscription != null && !force && !_hasError) {
+      return;
+    }
+
+    _currentPhone = phoneNumber;
     _isLoading = true;
+    _hasError = false;
+    _errorMessage = "";
     notifyListeners();
+
+    await _subscription?.cancel();
 
     try {
       final ref = FirebaseDatabase.instance.ref("Friends/$phoneNumber");
-      final event = await ref.once();
 
-      _friends.clear();
-      _totalGet = 0;
-      _totalGive = 0;
-
-      if (event.snapshot.value != null && event.snapshot.value is Map) {
-        final data = event.snapshot.value as Map;
-        data.forEach((key, value) {
-          if (value is Map) {
-            final map = Map<String, dynamic>.from(value);
-            _friends.add(map);
-
-            final getVal = (double.tryParse(map["total_get"]?.toString() ?? '0') ?? 0.0).round();
-            final giveVal = (double.tryParse(map["total_give"]?.toString() ?? '0') ?? 0.0).round();
-            _totalGet += getVal;
-            _totalGive += giveVal;
-          }
-        });
-      }
-    } catch (_) {}
-
-    _isLoading = false;
-    notifyListeners();
+      _subscription = ref.onValue.listen(
+        (event) {
+          _processSnapshot(event.snapshot);
+          _isLoading = false;
+          _hasError = false;
+          _errorMessage = "";
+          notifyListeners();
+        },
+        onError: (error) {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = "Unable to sync friends ledger. Check your internet connection.";
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      _isLoading = false;
+      _hasError = true;
+      _errorMessage = "Connection error. Please try again.";
+      notifyListeners();
+    }
   }
 
-  /// Adds a new friend
+  void _processSnapshot(DataSnapshot snapshot) {
+    _friends.clear();
+    _totalGet = 0;
+    _totalGive = 0;
+
+    if (snapshot.value != null && snapshot.value is Map) {
+      final data = snapshot.value as Map;
+      data.forEach((key, value) {
+        if (value is Map) {
+          final map = Map<String, dynamic>.from(value);
+          _friends.add(map);
+
+          final getVal = (double.tryParse(map["total_get"]?.toString() ?? '0') ?? 0.0).round();
+          final giveVal = (double.tryParse(map["total_give"]?.toString() ?? '0') ?? 0.0).round();
+          _totalGet += getVal;
+          _totalGive += giveVal;
+        }
+      });
+    }
+  }
+
+  /// Adds a new friend (real-time stream will auto-update local state)
   Future<bool> addFriend({
     required String userPhone,
     required String friendName,
@@ -68,14 +104,13 @@ class FriendProvider extends ChangeNotifier {
         "total_give": "0",
       });
 
-      await fetchFriends(userPhone);
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  /// Deletes a friend and all ledger history
+  /// Deletes a friend and all ledger history (real-time stream will auto-update)
   Future<bool> deleteFriend({
     required String userPhone,
     required String friendNumber,
@@ -83,7 +118,6 @@ class FriendProvider extends ChangeNotifier {
     try {
       final ref = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
       await ref.remove();
-      await fetchFriends(userPhone);
       return true;
     } catch (_) {
       return false;
@@ -135,7 +169,6 @@ class FriendProvider extends ChangeNotifier {
         await _atomicUpdateLedger(friendRef, "total_get", parsedAmount);
       }
 
-      await fetchFriends(userPhone);
       return true;
     } catch (_) {
       return false;
@@ -180,7 +213,6 @@ class FriendProvider extends ChangeNotifier {
       } catch (_) {}
     }
 
-    await fetchFriends(userPhone);
     return successCount;
   }
 
@@ -205,7 +237,6 @@ class FriendProvider extends ChangeNotifier {
         await _atomicUpdateLedger(friendRef, "total_get", -amount);
       }
 
-      await fetchFriends(userPhone);
       return true;
     } catch (_) {
       return false;
@@ -262,7 +293,6 @@ class FriendProvider extends ChangeNotifier {
       final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
       await _atomicUpdateLedger(friendRef, "total_get", parsedFriendAmount);
 
-      await fetchFriends(userPhone);
       return true;
     } catch (_) {
       return false;
@@ -271,10 +301,21 @@ class FriendProvider extends ChangeNotifier {
 
   /// Clears friends state on logout
   void clearFriends() {
+    _subscription?.cancel();
+    _subscription = null;
+    _currentPhone = "";
     _friends.clear();
     _totalGet = 0;
     _totalGive = 0;
+    _isLoading = false;
+    _hasError = false;
+    _errorMessage = "";
     notifyListeners();
   }
-}
 
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+}

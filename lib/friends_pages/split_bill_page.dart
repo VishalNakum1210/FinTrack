@@ -302,14 +302,16 @@ class _SplitBillPageState extends State<SplitBillPage> {
                         TextField(
                           controller: amountController,
                           keyboardType: TextInputType.number,
-                          decoration: _inputDeco("Total Bill Amount (₹)"),
+                          maxLength: 10,
+                          decoration: _inputDeco("Total Bill Amount (₹)").copyWith(counterText: ""),
                         ),
 
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
 
                         TextField(
                           controller: descriptionController,
-                          decoration: _inputDeco("Bill Description (e.g. Dinner, Trip Taxi)"),
+                          maxLength: 150,
+                          decoration: _inputDeco("Bill Description (e.g. Dinner, Taxi)"),
                         ),
 
                         const SizedBox(height: 14),

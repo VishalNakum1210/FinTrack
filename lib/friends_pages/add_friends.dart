@@ -143,17 +143,20 @@ class _AddFriendsState extends State<AddFriends> {
                     const SizedBox(height: 20),
                     TextField(
                       controller: nameController,
+                      maxLength: 50,
                       decoration: inputDecoration("Friend Name"),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration: inputDecoration("Friend Phone Number"),
+                      maxLength: 10,
+                      decoration: inputDecoration("Friend Phone Number").copyWith(counterText: ""),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: noteController,
+                      maxLength: 150,
                       decoration: inputDecoration("Note (Optional)"),
                     ),
                     const SizedBox(height: 28),

@@ -7,6 +7,7 @@ import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/date_helper.dart';
 import 'package:fin_track/widgets/confirm_dialog.dart';
+import 'package:fin_track/widgets/error_retry_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
@@ -32,10 +33,10 @@ class PassbookPageState extends State<PassbookApp> {
     });
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool force = false}) async {
     final phone = await SessionManager.getPhoneNumber() ?? "";
     if (mounted && phone.isNotEmpty) {
-      context.read<ExpenseProvider>().fetchExpenses(phone);
+      context.read<ExpenseProvider>().fetchExpenses(phone, force: force);
     }
   }
 
@@ -204,92 +205,102 @@ class PassbookPageState extends State<PassbookApp> {
             },
             child: const Icon(Icons.add, color: Colors.white, size: 34),
           ),
-          body: isLoading
+          body: (isLoading && records.isEmpty)
               ? const Center(child: CircularProgressIndicator(color: green))
-              : (records.isEmpty)
-                  ? Container(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          _categoryChips(),
-                          const SizedBox(height: 10),
-                          _balanceCard(income, expense, spentCash, spentOnline, recordCount),
-                          const SizedBox(height: 10),
-                          const Expanded(
-                            child: Center(
-                              child: Text(
-                                "No Record Found!",
-                                style: TextStyle(color: green),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _categoryChips(),
-                          const SizedBox(height: 10),
-                          _balanceCard(income, expense, spentCash, spentOnline, recordCount),
-                          const SizedBox(height: 10),
-                          _sortRow(),
-                          const SizedBox(height: 10),
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: records.length,
-                            itemBuilder: (context, index) {
-                              final item = records[index];
-                              final date = (item["Date"] ?? "").toString();
-                              final formattedCurrentDate = formatDate(date);
-                              final formattedPrevDate = index > 0
-                                  ? formatDate((records[index - 1]["Date"] ?? "").toString())
-                                  : "";
-                              final showHeader = index == 0 || formattedCurrentDate != formattedPrevDate;
-                              final category = (item["Category"] ?? "Other").toString();
-                              final desc = (item["Description"] ?? "").toString();
-                              final method = (item["Payment_Mode"] ?? "").toString();
-                              final amount = (double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0).round();
-                              final isIncome = ["Add CASH", "Add Online"].contains(method);
-
-                              return InkWell(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (showHeader && formattedCurrentDate.isNotEmpty)
-                                      _sectionHeader('', formattedCurrentDate),
-                                    _transactionTile(
-                                      icon: CategoryTheme.getIcon(category),
-                                      iconColor: CategoryTheme.getColor(category),
-                                      bgColor: CategoryTheme.getBgColor(category),
-                                      title: category,
-                                      subtitle: desc,
-                                      method: method,
-                                      time: date,
-                                      amount: amount.toINR(),
-                                      isIncome: isIncome,
-                                    ),
-                                  ],
+              : RefreshIndicator(
+                  color: green,
+                  onRefresh: () => _loadData(force: true),
+                  child: (expenseProvider.hasError && records.isEmpty)
+                      ? ErrorRetryWidget(
+                          message: expenseProvider.errorMessage,
+                          primaryColor: green,
+                          onRetry: () => _loadData(force: true),
+                        )
+                      : (records.isEmpty)
+                      ? SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            children: [
+                              _categoryChips(),
+                              const SizedBox(height: 10),
+                              _balanceCard(income, expense, spentCash, spentOnline, recordCount),
+                              const SizedBox(height: 80),
+                              const Center(
+                                child: Text(
+                                  "No Record Found!",
+                                  style: TextStyle(color: green, fontWeight: FontWeight.bold, fontSize: 16),
                                 ),
-                                onTap: () async {
-                                  final confirmed = await showDeleteConfirmDialog(
-                                    context,
-                                    title: "Delete Record",
-                                    message: "Are you sure you want to delete this record?",
-                                  );
-                                  if (confirmed == true && item["key"] != null) {
-                                    await deleteRecord(item["key"]);
-                                  }
-                                },
-                              );
-                            },
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
+                        )
+                      : SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _categoryChips(),
+                              const SizedBox(height: 10),
+                              _balanceCard(income, expense, spentCash, spentOnline, recordCount),
+                              const SizedBox(height: 10),
+                              _sortRow(),
+                              const SizedBox(height: 10),
+                              ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: records.length,
+                                itemBuilder: (context, index) {
+                                  final item = records[index];
+                                  final date = (item["Date"] ?? "").toString();
+                                  final formattedCurrentDate = formatDate(date);
+                                  final formattedPrevDate = index > 0
+                                      ? formatDate((records[index - 1]["Date"] ?? "").toString())
+                                      : "";
+                                  final showHeader = index == 0 || formattedCurrentDate != formattedPrevDate;
+                                  final category = (item["Category"] ?? "Other").toString();
+                                  final desc = (item["Description"] ?? "").toString();
+                                  final method = (item["Payment_Mode"] ?? "").toString();
+                                  final amount = (double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0).round();
+                                  final isIncome = ["Add CASH", "Add Online"].contains(method);
+
+                                  return InkWell(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (showHeader && formattedCurrentDate.isNotEmpty)
+                                          _sectionHeader('', formattedCurrentDate),
+                                        _transactionTile(
+                                          icon: CategoryTheme.getIcon(category),
+                                          iconColor: CategoryTheme.getColor(category),
+                                          bgColor: CategoryTheme.getBgColor(category),
+                                          title: category,
+                                          subtitle: desc,
+                                          method: method,
+                                          time: date,
+                                          amount: amount.toINR(),
+                                          isIncome: isIncome,
+                                        ),
+                                      ],
+                                    ),
+                                    onTap: () async {
+                                      final confirmed = await showDeleteConfirmDialog(
+                                        context,
+                                        title: "Delete Record",
+                                        message: "Are you sure you want to delete this record?",
+                                      );
+                                      if (confirmed == true && item["key"] != null) {
+                                        await deleteRecord(item["key"]);
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
         );
       },
     );

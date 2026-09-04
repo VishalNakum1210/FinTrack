@@ -4,6 +4,7 @@ import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/user_pages/add_spent.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
+import 'package:fin_track/widgets/error_retry_widget.dart';
 import 'package:fin_track/widgets/insight_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -26,11 +27,11 @@ class _UserMainPageState extends State<UserMainPage> {
     });
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool force = false}) async {
     final phone = await SessionManager.getPhoneNumber() ?? "";
     if (mounted && phone.isNotEmpty) {
       context.read<UserProvider>().loadUserSession();
-      context.read<ExpenseProvider>().fetchExpenses(phone);
+      context.read<ExpenseProvider>().fetchExpenses(phone, force: force);
     }
   }
 
@@ -116,11 +117,17 @@ class _UserMainPageState extends State<UserMainPage> {
             children: [
               RefreshIndicator(
                 color: themeColor,
-                onRefresh: _loadData,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
+                onRefresh: () => _loadData(force: true),
+                child: (expenseProvider.hasError && records.isEmpty)
+                    ? ErrorRetryWidget(
+                        message: expenseProvider.errorMessage,
+                        primaryColor: themeColor,
+                        onRetry: () => _loadData(force: true),
+                      )
+                    : SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
                     children: [
                       // BALANCE CARD
                       Container(

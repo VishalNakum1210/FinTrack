@@ -291,13 +291,15 @@ class _AddSpentState extends State<AddSpent> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
-                      decoration: inputDecoration("Enter Total Amount (₹)"),
+                      maxLength: 10,
+                      decoration: inputDecoration("Enter Total Amount (₹)").copyWith(counterText: ""),
                     ),
 
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
 
                     TextField(
                       controller: descriptionController,
+                      maxLength: 150,
                       decoration: inputDecoration("Enter Description / Note"),
                     ),
 
