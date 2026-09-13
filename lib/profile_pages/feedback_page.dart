@@ -34,6 +34,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
     try {
       String phoneNumber = await SessionManager.getPhoneNumber() ?? "";
+      if (phoneNumber.isEmpty) {
+        Fluttertoast.showToast(msg: "Session expired. Please log in again.");
+        if (mounted) setState(() => isLoading = false);
+        return;
+      }
 
       DatabaseReference ref = FirebaseDatabase.instance.ref(
         "userUpdates/$phoneNumber",
@@ -216,7 +221,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   TextField(
                     controller: feedbackController,
                     maxLines: 6,
-                    decoration: inputDecoration("Write your feedback here..."),
+                    maxLength: 1000,
+                    decoration: inputDecoration("Write your feedback here...").copyWith(counterText: ""),
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -227,7 +233,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   TextField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: inputDecoration("example@gmail.com"),
+                    maxLength: 100,
+                    decoration: inputDecoration("example@gmail.com").copyWith(counterText: ""),
                   ),
                 ],
               ),

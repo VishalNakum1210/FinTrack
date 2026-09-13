@@ -23,44 +23,54 @@ class _NavPageSelectorState extends State<NavPageSelector> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: selectedIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        height: 70,
-        backgroundColor: Colors.white,
-        indicatorColor: Colors.green.shade100,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        onDestinationSelected: (int index) {
+    return PopScope(
+      canPop: selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && selectedIndex != 0) {
           setState(() {
-            selectedIndex = index;
+            selectedIndex = 0;
           });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: "Home",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: "Passbook",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.group_add_outlined),
-            selectedIcon: Icon(Icons.group_add),
-            label: "Add Friends",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.manage_accounts_outlined),
-            selectedIcon: Icon(Icons.manage_accounts),
-            label: "Profile",
-          ),
-        ],
+        }
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: selectedIndex,
+          children: _pages,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: selectedIndex,
+          height: 70,
+          backgroundColor: Colors.white,
+          indicatorColor: Colors.green.shade100,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          onDestinationSelected: (int index) {
+            setState(() {
+              selectedIndex = index;
+            });
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard),
+              label: "Home",
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet),
+              label: "Passbook",
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.group_outlined),
+              selectedIcon: Icon(Icons.group),
+              label: "Friends",
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.manage_accounts_outlined),
+              selectedIcon: Icon(Icons.manage_accounts),
+              label: "Profile",
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -14,7 +14,7 @@ class SessionManager {
   static const String _keyEmail = "email";
   static const String _keyLastActive = "session_last_active";
   static const String _keySessionSignature = "session_signature";
-  static const String _sessionSecret = "FinTrack_Session_Secret_2026";
+  static const String _sessionSecret = String.fromEnvironment('SESSION_SECRET', defaultValue: 'FinTrack_Session_Secret_2026');
 
   // Session validity duration: 30 days of inactivity
   static const int sessionExpiryDays = 30;

@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 
-const String _appSecretSalt = "FinTrack_Secure_Salt_2026_x#99";
+const String _appSecretSalt = String.fromEnvironment('APP_SALT', defaultValue: 'FinTrack_Secure_Salt_2026_x#99');
 
 /// Generates a hardened multi-round salted hash using a phone-number salt
 /// and application key derivation rounds.
@@ -52,3 +53,14 @@ bool isPasswordStrong(String password) {
   final hasDigitOrSpecial = RegExp(r'[0-9!@#\$%^&*(),.?":{}|<>]').hasMatch(password);
   return hasLetter && hasDigitOrSpecial;
 }
+
+Future<String> hashPasswordAsync(String password, String salt) {
+  return compute(_hashEntry, [password, salt]);
+}
+
+Future<bool> verifyPasswordAsync(String entered, String stored, String salt) {
+  return compute(_verifyEntry, [entered, stored, salt]);
+}
+
+String _hashEntry(List<String> args) => hashPassword(args[0], args[1]);
+bool _verifyEntry(List<String> args) => verifyPassword(args[0], args[1], args[2]);

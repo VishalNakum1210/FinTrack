@@ -1,4 +1,3 @@
-import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
@@ -25,22 +24,6 @@ class _ReportPageState extends State<Reportpage> {
   final Color themeColor = CategoryTheme.darkGreen;
   ReportPeriod selectedPeriod = ReportPeriod.thisMonth;
   int _touchedPieIndex = -1;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
-    });
-  }
-
-  Future<void> _loadData() async {
-    final phone = await SessionManager.getPhoneNumber() ?? "";
-    if (mounted && phone.isNotEmpty) {
-      context.read<ExpenseProvider>().fetchExpenses(phone);
-      context.read<FriendProvider>().fetchFriends(phone);
-    }
-  }
 
   bool _matchesPeriod(DateTime? date, ReportPeriod period) {
     if (period == ReportPeriod.allTime) return true;

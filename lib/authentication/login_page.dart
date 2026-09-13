@@ -94,13 +94,13 @@ class _LoginPageState extends State<LoginPage> {
         Map values = event.snapshot.value as Map;
         String storedPassword = (values["password"] ?? "").toString();
 
-        if (verifyPassword(passwordUser, storedPassword, phoneNumber)) {
+        if (await verifyPasswordAsync(passwordUser, storedPassword, phoneNumber)) {
           isAuthenticated = true;
 
           // Transparently upgrade legacy hashes to hardened v3
           if (!storedPassword.startsWith("v3_")) {
             await myRef.update({
-              "password": hashPassword(passwordUser, phoneNumber),
+              "password": await hashPasswordAsync(passwordUser, phoneNumber),
             });
           }
 

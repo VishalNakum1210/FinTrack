@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:fin_track/get_information/hash_password.dart';
 import 'package:fin_track/authentication/login_page.dart';
 import 'package:flutter/material.dart';
@@ -20,16 +21,25 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool isLoading = false;
   bool isPasswordVisible = false;
 
+  int failedAttempts = 0;
+  Timer? _throttleTimer;
+
   @override
   void dispose() {
     nameController.dispose();
     emailController.dispose();
     phoneController.dispose();
     passwordController.dispose();
+    _throttleTimer?.cancel();
     super.dispose();
   }
 
   Future<void> checkDetails() async {
+    if (failedAttempts >= 5) {
+      Fluttertoast.showToast(msg: "Too many attempts. Please wait before trying again.");
+      return;
+    }
+
     String name = nameController.text.trim();
     String phoneNumber = phoneController.text.trim();
     String email = emailController.text.trim();
@@ -78,6 +88,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
       }
     } catch (e) {
       Fluttertoast.showToast(msg: "Database connection error: $e");
+      failedAttempts++;
+      if (failedAttempts >= 5) {
+        _throttleTimer?.cancel();
+        _throttleTimer = Timer(const Duration(seconds: 30), () {
+          if (mounted) setState(() => failedAttempts = 0);
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -100,8 +117,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
         "name": name,
         "phone_number": phoneNumber,
         "email": email,
-        "password": hashPassword(password, phoneNumber),
-        "Address": "Not Entered",
+        "password": await hashPasswordAsync(password, phoneNumber),
+        "address": "Not Entered",
         "created_at": ServerValue.timestamp,
       });
 
@@ -119,6 +136,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   InputDecoration inputDecoration(String hint, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,
+      counterText: "",
       hintStyle: const TextStyle(color: Color(0xFF8BC24A)),
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
@@ -248,6 +266,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
                         TextField(
                           controller: nameController,
+                          maxLength: 50,
                           decoration: inputDecoration("Full Name"),
                         ),
 
@@ -256,6 +275,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         TextField(
                           controller: emailController,
                           keyboardType: TextInputType.emailAddress,
+                          maxLength: 100,
                           decoration: inputDecoration("Email"),
                         ),
 
@@ -264,6 +284,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         TextField(
                           controller: phoneController,
                           keyboardType: TextInputType.phone,
+                          maxLength: 10,
                           decoration: inputDecoration("Phone Number"),
                         ),
 
@@ -272,6 +293,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         TextField(
                           controller: passwordController,
                           obscureText: !isPasswordVisible,
+                          maxLength: 64,
                           decoration: inputDecoration(
                             "Password",
                             suffixIcon: IconButton(

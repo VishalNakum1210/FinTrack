@@ -27,6 +27,7 @@ class _EditInformationPageState extends State<EditInformationPage> {
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    int? maxLength,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
@@ -34,7 +35,9 @@ class _EditInformationPageState extends State<EditInformationPage> {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        maxLength: maxLength,
         decoration: InputDecoration(
+          counterText: "",
           labelText: label,
           labelStyle: const TextStyle(color: Colors.grey),
           floatingLabelStyle: TextStyle(
@@ -131,6 +134,7 @@ class _EditInformationPageState extends State<EditInformationPage> {
               label: "Full Name",
               icon: Icons.person_outline,
               controller: nameController,
+              maxLength: 50,
             ),
             Padding(
               padding: const EdgeInsets.only(bottom: 18),
@@ -157,12 +161,14 @@ class _EditInformationPageState extends State<EditInformationPage> {
               icon: Icons.email_outlined,
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
+              maxLength: 100,
             ),
             customField(
               label: "Address",
               icon: Icons.location_on_outlined,
               controller: addressController,
               maxLines: 3,
+              maxLength: 200,
             ),
             const SizedBox(height: 10),
             SizedBox(

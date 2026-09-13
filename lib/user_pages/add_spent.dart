@@ -496,11 +496,14 @@ class _AddSpentState extends State<AddSpent> {
                                   const SizedBox(height: 10),
                                   Center(
                                     child: TextButton.icon(
-                                      onPressed: () {
-                                        Navigator.push(
+                                      onPressed: () async {
+                                        final res = await Navigator.push(
                                           context,
                                           MaterialPageRoute(builder: (context) => const SplitBillPage()),
                                         );
+                                        if (res == true && context.mounted) {
+                                          Navigator.pop(context, true);
+                                        }
                                       },
                                       icon: const Icon(Icons.group_work_rounded, size: 16, color: Color(0xFF558B2F)),
                                       label: const Text(

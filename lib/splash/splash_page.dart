@@ -30,35 +30,43 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> getDecision() async {
-    final bool hasValidSession = await SessionManager.isSessionValid();
-    final String? phoneNumber = await SessionManager.getPhoneNumber();
+    try {
+      final results = await Future.wait([
+        SessionManager.isSessionValid().timeout(const Duration(seconds: 3), onTimeout: () => false),
+        SessionManager.getPhoneNumber().timeout(const Duration(seconds: 3), onTimeout: () => null),
+        Future.delayed(const Duration(milliseconds: 800)),
+      ]);
+
+      if (!mounted) return;
+
+      final bool hasValidSession = results[0] as bool;
+      final String? phoneNumber = results[1] as String?;
+
+      if (hasValidSession && phoneNumber != null && phoneNumber.isNotEmpty) {
+        context.read<UserProvider>().loadUserSession();
+        context.read<ExpenseProvider>().fetchExpenses(phoneNumber);
+        context.read<FriendProvider>().fetchFriends(phoneNumber);
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const NavPageSelector()),
+        );
+        return;
+      }
+    } catch (_) {}
 
     if (!mounted) return;
-
-    if (hasValidSession && phoneNumber != null && phoneNumber.isNotEmpty) {
-      context.read<UserProvider>().loadUserSession();
-      context.read<ExpenseProvider>().fetchExpenses(phoneNumber);
-      context.read<FriendProvider>().fetchFriends(phoneNumber);
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NavPageSelector()),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
   }
 
   @override
   void initState() {
     super.initState();
     getVersion();
-    Future.delayed(const Duration(milliseconds: 2200), () {
-      getDecision();
-    });
+    getDecision();
   }
 
   @override

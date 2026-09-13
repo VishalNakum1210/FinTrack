@@ -25,6 +25,10 @@ class PassbookPageState extends State<PassbookApp> {
   String selectedCategory = "All";
   static const Color green = CategoryTheme.primaryGreen;
 
+  int _displayLimit = 50;
+  List<Map<String, dynamic>> _cachedSorted = [];
+  String _lastSortKey = '';
+
   @override
   void initState() {
     super.initState();
@@ -105,38 +109,44 @@ class PassbookPageState extends State<PassbookApp> {
       builder: (context, expenseProvider, _) {
         final isLoading = expenseProvider.isLoading;
         List<Map<String, dynamic>> rawFiltered = expenseProvider.getFilteredRecords(selectedCategory);
-        List<Map<String, dynamic>> records = List<Map<String, dynamic>>.from(rawFiltered);
+        
+        final sortKey = '${expenseProvider.records.length}_${currentSort}_$selectedCategory';
+        if (sortKey != _lastSortKey) {
+          List<Map<String, dynamic>> records = List<Map<String, dynamic>>.from(rawFiltered);
+          records.sort((a, b) {
+            final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
+            final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
 
-        // Fast sort primarily by pre-parsed transaction Date, secondarily by timestamp
-        records.sort((a, b) {
-          final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
-          final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
+            int cmp = 0;
+            if (dateA != null && dateB != null) {
+              cmp = currentSort == "Oldest First"
+                  ? dateA.compareTo(dateB)
+                  : dateB.compareTo(dateA);
+            } else if (dateA != null) {
+              cmp = -1;
+            } else if (dateB != null) {
+              cmp = 1;
+            }
 
-          int cmp = 0;
-          if (dateA != null && dateB != null) {
-            cmp = currentSort == "Oldest First"
-                ? dateA.compareTo(dateB)
-                : dateB.compareTo(dateA);
-          } else if (dateA != null) {
-            cmp = -1;
-          } else if (dateB != null) {
-            cmp = 1;
-          }
+            if (cmp != 0) return cmp;
 
-          if (cmp != 0) return cmp;
+            final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
+            final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
+            return currentSort == "Oldest First"
+                ? tA.compareTo(tB)
+                : tB.compareTo(tA);
+          });
+          _cachedSorted = records;
+          _lastSortKey = sortKey;
+        }
 
-          final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
-          final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
-          return currentSort == "Oldest First"
-              ? tA.compareTo(tB)
-              : tB.compareTo(tA);
-        });
+        final displayedRecords = _cachedSorted.take(_displayLimit).toList();
 
         final income = expenseProvider.totalIncome;
         final expense = expenseProvider.totalExpense;
         final spentCash = expenseProvider.spentCash;
         final spentOnline = expenseProvider.spentOnline;
-        final recordCount = records.length;
+        final recordCount = _cachedSorted.length;
 
         return Scaffold(
           appBar: AppBar(
@@ -183,7 +193,7 @@ class PassbookPageState extends State<PassbookApp> {
                 onPressed: () {
                   exportToPdf(
                     context: context,
-                    records: records,
+                    records: _cachedSorted,
                     income: income,
                     expense: expense,
                     spentCash: spentCash,
@@ -205,18 +215,18 @@ class PassbookPageState extends State<PassbookApp> {
             },
             child: const Icon(Icons.add, color: Colors.white, size: 34),
           ),
-          body: (isLoading && records.isEmpty)
+          body: (isLoading && _cachedSorted.isEmpty)
               ? const Center(child: CircularProgressIndicator(color: green))
               : RefreshIndicator(
                   color: green,
                   onRefresh: () => _loadData(force: true),
-                  child: (expenseProvider.hasError && records.isEmpty)
+                  child: (expenseProvider.hasError && _cachedSorted.isEmpty)
                       ? ErrorRetryWidget(
                           message: expenseProvider.errorMessage,
                           primaryColor: green,
                           onRetry: () => _loadData(force: true),
                         )
-                      : (records.isEmpty)
+                      : (_cachedSorted.isEmpty)
                       ? SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(20),
@@ -250,13 +260,13 @@ class PassbookPageState extends State<PassbookApp> {
                               ListView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
-                                itemCount: records.length,
+                                itemCount: displayedRecords.length,
                                 itemBuilder: (context, index) {
-                                  final item = records[index];
+                                  final item = displayedRecords[index];
                                   final date = (item["Date"] ?? "").toString();
                                   final formattedCurrentDate = formatDate(date);
                                   final formattedPrevDate = index > 0
-                                      ? formatDate((records[index - 1]["Date"] ?? "").toString())
+                                      ? formatDate((displayedRecords[index - 1]["Date"] ?? "").toString())
                                       : "";
                                   final showHeader = index == 0 || formattedCurrentDate != formattedPrevDate;
                                   final category = (item["Category"] ?? "Other").toString();
@@ -297,6 +307,17 @@ class PassbookPageState extends State<PassbookApp> {
                                   );
                                 },
                               ),
+                              if (_cachedSorted.length > _displayLimit)
+                                Center(
+                                  child: TextButton.icon(
+                                    onPressed: () => setState(() => _displayLimit += 50),
+                                    icon: const Icon(Icons.expand_more, color: green),
+                                    label: const Text(
+                                      'Load More',
+                                      style: TextStyle(color: green, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -332,6 +353,7 @@ class PassbookPageState extends State<PassbookApp> {
       onTap: () {
         setState(() {
           selectedCategory = label;
+          _displayLimit = 50;
         });
       },
       child: Container(

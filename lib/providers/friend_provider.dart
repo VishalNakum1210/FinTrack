@@ -137,6 +137,14 @@ class FriendProvider extends ChangeNotifier {
     });
   }
 
+  Future<void> adjustLedger({
+    required DatabaseReference friendRef,
+    required String field,
+    required int delta,
+  }) async {
+    await _atomicUpdateLedger(friendRef, field, delta);
+  }
+
   /// Adds a transaction to a specific friend's ledger atomically
   Future<bool> addFriendTransaction({
     required String userPhone,

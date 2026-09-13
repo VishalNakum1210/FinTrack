@@ -102,7 +102,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       child: TextField(
         controller: controller,
         obscureText: !visible,
+        maxLength: 64,
         decoration: InputDecoration(
+          counterText: "",
           labelText: label,
           labelStyle: const TextStyle(color: Colors.grey),
           floatingLabelStyle: TextStyle(
