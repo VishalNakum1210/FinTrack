@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:fin_track/get_information/hash_password.dart';
 import 'package:fin_track/authentication/login_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -76,15 +77,39 @@ class _RegistrationPageState extends State<RegistrationPage> {
     });
 
     try {
-      final myRef = FirebaseDatabase.instance.ref(
-        'user_details/$phoneNumber',
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: "$phoneNumber@fintrack.app",
+        password: password,
       );
-      DatabaseEvent event = await myRef.once();
 
-      if (event.snapshot.value != null) {
+      try {
+        final myRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
+        await myRef.set({
+          "name": name,
+          "phone_number": phoneNumber,
+          "email": email,
+          "address": "Not Entered",
+          "created_at": ServerValue.timestamp,
+        });
+
+        await FirebaseAuth.instance.signOut();
+        Fluttertoast.showToast(msg: "Registration Successful! Please login.");
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      } catch (dbError) {
+        await userCredential.user?.delete();
+        Fluttertoast.showToast(msg: "Failed to save profile: $dbError");
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
         Fluttertoast.showToast(msg: "Phone number is already registered!");
+      } else if (e.code == 'weak-password') {
+        Fluttertoast.showToast(msg: "Password is too weak");
       } else {
-        await registerDetails(name, phoneNumber, email, password);
+        Fluttertoast.showToast(msg: e.message ?? "Registration failed");
       }
     } catch (e) {
       Fluttertoast.showToast(msg: "Database connection error: $e");
@@ -101,35 +126,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
           isLoading = false;
         });
       }
-    }
-  }
-
-  Future<void> registerDetails(
-    String name,
-    String phoneNumber,
-    String email,
-    String password,
-  ) async {
-    try {
-      final myRef = FirebaseDatabase.instance.ref("user_details");
-
-      await myRef.child(phoneNumber).set({
-        "name": name,
-        "phone_number": phoneNumber,
-        "email": email,
-        "password": await hashPasswordAsync(password, phoneNumber),
-        "address": "Not Entered",
-        "created_at": ServerValue.timestamp,
-      });
-
-      Fluttertoast.showToast(msg: "Registration Successful! Please login.");
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
-    } catch (e) {
-      Fluttertoast.showToast(msg: "Failed to register: $e");
     }
   }
 

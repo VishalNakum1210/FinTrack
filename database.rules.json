@@ -2,14 +2,11 @@
   "rules": {
     "user_details": {
       "$phoneNumber": {
-        ".read": "auth != null",
-        ".write": "auth != null || !data.exists()",
-        ".validate": "!newData.exists() || (newData.hasChildren(['phone_number', 'password']) && newData.child('phone_number').val().length == 10)",
+        ".read": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
+        ".write": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
+        ".validate": "!newData.exists() || (newData.hasChildren(['phone_number', 'email', 'name']) && newData.child('phone_number').val().length == 10)",
         "phone_number": {
           ".validate": "newData.isString() && newData.val().length == 10"
-        },
-        "password": {
-          ".validate": "newData.isString() && newData.val().length > 0"
         },
         "email": {
           ".validate": "newData.isString()"
@@ -24,8 +21,8 @@
     },
     "Expenses": {
       "$phoneNumber": {
-        ".read": "auth != null",
-        ".write": "auth != null",
+        ".read": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
+        ".write": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
         "$recordKey": {
           ".validate": "!newData.exists() || newData.hasChildren(['Amount', 'Category', 'Date', 'Payment_Mode'])",
           "Amount": {
@@ -45,8 +42,8 @@
     },
     "Friends": {
       "$phoneNumber": {
-        ".read": "auth != null",
-        ".write": "auth != null",
+        ".read": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
+        ".write": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
         "$friendNumber": {
           "friend_name": {
             ".validate": "newData.isString() && newData.val().length > 0"
@@ -70,8 +67,8 @@
     },
     "userUpdates": {
       "$phoneNumber": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+        ".read": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
+        ".write": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')"
       }
     }
   }

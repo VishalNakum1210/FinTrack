@@ -1,6 +1,6 @@
 import 'package:fin_track/get_information/hash_password.dart';
 import 'package:fin_track/get_information/session_manager.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -57,29 +57,30 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         return;
       }
 
-      DatabaseReference myRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
-      DatabaseEvent event = await myRef.once();
-
-      if (!event.snapshot.exists) {
-        Fluttertoast.showToast(msg: "User not found");
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        Fluttertoast.showToast(msg: "User not logged in");
         return;
       }
 
-      Map data = event.snapshot.value as Map;
-      String currentPassword = data["password"] ?? "";
-
-      if (!verifyPassword(oldPassword, currentPassword, phoneNumber)) {
-        Fluttertoast.showToast(msg: "Old password is incorrect");
-        return;
-      }
-
-      await myRef.update({
-        "password": hashPassword(newPassword, phoneNumber),
-      });
+      final cred = EmailAuthProvider.credential(
+        email: "$phoneNumber@fintrack.app",
+        password: oldPassword,
+      );
+      await user.reauthenticateWithCredential(cred);
+      await user.updatePassword(newPassword);
 
       if (!mounted) return;
       Fluttertoast.showToast(msg: "Password changed successfully");
       Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        Fluttertoast.showToast(msg: "Old password is incorrect");
+      } else if (e.code == 'weak-password') {
+        Fluttertoast.showToast(msg: "Password is too weak");
+      } else {
+        Fluttertoast.showToast(msg: e.message ?? "Failed to change password");
+      }
     } catch (e) {
       Fluttertoast.showToast(msg: e.toString());
     } finally {

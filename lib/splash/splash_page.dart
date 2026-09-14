@@ -4,6 +4,7 @@ import 'package:fin_track/nav_bar.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -42,7 +43,14 @@ class _SplashPageState extends State<SplashPage> {
       final bool hasValidSession = results[0] as bool;
       final String? phoneNumber = results[1] as String?;
 
-      if (hasValidSession && phoneNumber != null && phoneNumber.isNotEmpty) {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final expectedEmail = '$phoneNumber@fintrack.app';
+
+      if (hasValidSession &&
+          phoneNumber != null &&
+          phoneNumber.isNotEmpty &&
+          currentUser != null &&
+          currentUser.email == expectedEmail) {
         context.read<UserProvider>().loadUserSession();
         context.read<ExpenseProvider>().fetchExpenses(phoneNumber);
         context.read<FriendProvider>().fetchFriends(phoneNumber);

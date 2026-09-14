@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'package:fin_track/get_information/hash_password.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/authentication/registration_page.dart';
 import 'package:fin_track/nav_bar.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -25,7 +25,6 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
   bool isPasswordVisible = false;
 
-  // Brute-force protection
   int failedAttempts = 0;
   int lockoutSeconds = 0;
   Timer? lockoutTimer;
@@ -85,59 +84,64 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final myRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
-      DatabaseEvent event = await myRef.once();
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: "$phoneNumber@fintrack.app",
+        password: passwordUser,
+      );
 
-      bool isAuthenticated = false;
+      if (userCredential.user != null) {
+        failedAttempts = 0;
+        final myRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
+        final event = await myRef.once();
 
-      if (event.snapshot.value != null && event.snapshot.value is Map) {
-        Map values = event.snapshot.value as Map;
-        String storedPassword = (values["password"] ?? "").toString();
-
-        if (await verifyPasswordAsync(passwordUser, storedPassword, phoneNumber)) {
-          isAuthenticated = true;
-
-          // Transparently upgrade legacy hashes to hardened v3
-          if (!storedPassword.startsWith("v3_")) {
-            await myRef.update({
-              "password": await hashPasswordAsync(passwordUser, phoneNumber),
-            });
-          }
-
-          failedAttempts = 0;
-          await SessionManager.saveSession(
-            phoneNumber: phoneNumber,
-            username: (values["name"] ?? "").toString(),
-            email: (values["email"] ?? "").toString(),
-          );
-
-          if (mounted) {
-            context.read<UserProvider>().loadUserSession();
-            context.read<ExpenseProvider>().fetchExpenses(phoneNumber);
-            context.read<FriendProvider>().fetchFriends(phoneNumber);
-          }
-
-          Fluttertoast.showToast(msg: "Login successful");
-          if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const NavPageSelector()),
-          );
+        String name = "User";
+        String email = "";
+        if (event.snapshot.value != null && event.snapshot.value is Map) {
+          Map values = event.snapshot.value as Map;
+          name = (values["name"] ?? "User").toString();
+          email = (values["email"] ?? "").toString();
         }
-      }
 
-      if (!isAuthenticated) {
-        failedAttempts++;
-        if (failedAttempts >= 5) {
-          startLockoutTimer();
-          Fluttertoast.showToast(
-            msg: "Too many failed attempts. Locked for 30 seconds.",
-          );
-        } else {
-          // Anti-enumeration: Generic message
+        await SessionManager.saveSession(
+          phoneNumber: phoneNumber,
+          username: name,
+          email: email,
+        );
+
+        if (mounted) {
+          context.read<UserProvider>().loadUserSession();
+          context.read<ExpenseProvider>().fetchExpenses(phoneNumber);
+          context.read<FriendProvider>().fetchFriends(phoneNumber);
+        }
+
+        Fluttertoast.showToast(msg: "Login successful");
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const NavPageSelector()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      failedAttempts++;
+      if (failedAttempts >= 5) {
+        startLockoutTimer();
+        Fluttertoast.showToast(
+          msg: "Too many failed attempts. Locked for 30 seconds.",
+        );
+      } else {
+        if (e.code == 'user-not-found' ||
+            e.code == 'wrong-password' ||
+            e.code == 'invalid-credential') {
           Fluttertoast.showToast(
             msg: "Invalid phone number or password (${5 - failedAttempts} attempts remaining)",
           );
+        } else if (e.code == 'too-many-requests') {
+          startLockoutTimer();
+          Fluttertoast.showToast(
+            msg: "Too many attempts. Account temporarily locked by server.",
+          );
+        } else {
+          Fluttertoast.showToast(msg: e.message ?? "Authentication failed");
         }
       }
     } catch (e) {

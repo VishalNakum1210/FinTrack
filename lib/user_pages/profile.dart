@@ -8,6 +8,7 @@ import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/utils/currency_helper.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -40,6 +41,7 @@ class _ProfilePageState extends State<ProfilePage> {
       context.read<ExpenseProvider>().clearExpenses();
       context.read<FriendProvider>().clearFriends();
     }
+    await FirebaseAuth.instance.signOut();
     await SessionManager.clearSession();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
@@ -63,6 +65,7 @@ class _ProfilePageState extends State<ProfilePage> {
         await FirebaseDatabase.instance.ref("Expenses/$phone").remove();
         await FirebaseDatabase.instance.ref("user_details/$phone").remove();
       }
+      await FirebaseAuth.instance.currentUser?.delete();
       Fluttertoast.showToast(msg: "Account deleted successfully");
       if (mounted) {
         context.read<UserProvider>().clearUser();
