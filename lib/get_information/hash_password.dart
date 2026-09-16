@@ -50,7 +50,7 @@ bool verifyPassword(String enteredPassword, String storedHash, [String salt = ""
 bool isPasswordStrong(String password) {
   if (password.length < 6) return false;
   final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(password);
-  final hasDigitOrSpecial = RegExp(r'[0-9!@#\$%^&*(),.?":{}|<>]').hasMatch(password);
+  final hasDigitOrSpecial = RegExp(r'[0-9!@#\$%^&*(),.?":{}|<>_\-+~`=;\\]').hasMatch(password);
   return hasLetter && hasDigitOrSpecial;
 }
 

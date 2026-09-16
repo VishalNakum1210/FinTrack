@@ -18,6 +18,7 @@ class UserMainPage extends StatefulWidget {
 
 class _UserMainPageState extends State<UserMainPage> {
   final Color themeColor = CategoryTheme.primaryGreen;
+  bool _isLoadingData = false;
 
   @override
   void initState() {
@@ -28,10 +29,16 @@ class _UserMainPageState extends State<UserMainPage> {
   }
 
   Future<void> _loadData({bool force = false}) async {
-    final phone = await SessionManager.getPhoneNumber() ?? "";
-    if (mounted && phone.isNotEmpty) {
-      context.read<UserProvider>().loadUserSession();
-      context.read<ExpenseProvider>().fetchExpenses(phone, force: force);
+    if (_isLoadingData && !force) return;
+    _isLoadingData = true;
+    try {
+      final phone = await SessionManager.getPhoneNumber() ?? "";
+      if (mounted && phone.isNotEmpty) {
+        context.read<UserProvider>().loadUserSession();
+        context.read<ExpenseProvider>().fetchExpenses(phone, force: force);
+      }
+    } finally {
+      _isLoadingData = false;
     }
   }
 
@@ -43,31 +50,11 @@ class _UserMainPageState extends State<UserMainPage> {
         final totalIncome = expenseProvider.totalIncome;
         final totalExpense = expenseProvider.totalExpense;
         final currentBalance = expenseProvider.currentBalance;
-        final cashBalance = expenseProvider.addCash - expenseProvider.spentCash;
-        final onlineBalance = expenseProvider.addOnline - expenseProvider.spentOnline;
+        final cashBalance = expenseProvider.cashBalance;
+        final onlineBalance = expenseProvider.onlineBalance;
         final isLoading = expenseProvider.isLoading;
-
-        // Calculate highest transaction & biggest category
-        String biggestCategory = "No Data";
-        int biggestCategoryAmount = 0;
-        int highestTransaction = 0;
-
-        for (var record in records) {
-          final mode = (record["Payment_Mode"] ?? "").toString();
-          final amount = (double.tryParse(record["Amount"]?.toString() ?? '0') ?? 0.0).round();
-          if (!mode.startsWith("Add")) {
-            if (amount > highestTransaction) {
-              highestTransaction = amount;
-            }
-          }
-        }
-
-        expenseProvider.categoryTotals.forEach((cat, amount) {
-          if (amount > biggestCategoryAmount) {
-            biggestCategoryAmount = amount;
-            biggestCategory = cat;
-          }
-        });
+        final biggestCategory = expenseProvider.biggestCategory;
+        final highestTransaction = expenseProvider.highestTransaction;
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FBF2),

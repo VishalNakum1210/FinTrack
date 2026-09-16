@@ -27,7 +27,10 @@ class DateHelper {
         final m = int.tryParse(parts[1]);
         final y = int.tryParse(parts[2]);
         if (d != null && m != null && y != null && y > 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-          return DateTime(y, m, d);
+          final dt = DateTime(y, m, d);
+          if (dt.month == m && dt.day == d) {
+            return dt;
+          }
         }
       }
       try {
@@ -45,11 +48,13 @@ class DateHelper {
         if (p0 != null && p1 != null && p2 != null) {
           // If first part is 4-digit year
           if (p0 > 1900 && p1 >= 1 && p1 <= 12 && p2 >= 1 && p2 <= 31) {
-            return DateTime(p0, p1, p2);
+            final dt = DateTime(p0, p1, p2);
+            if (dt.month == p1 && dt.day == p2) return dt;
           }
           // If third part is 4-digit year (d-m-yyyy)
           if (p2 > 1900 && p1 >= 1 && p1 <= 12 && p0 >= 1 && p0 <= 31) {
-            return DateTime(p2, p1, p0);
+            final dt = DateTime(p2, p1, p0);
+            if (dt.month == p1 && dt.day == p0) return dt;
           }
         }
       }
@@ -60,7 +65,7 @@ class DateHelper {
 
     // 4. Fallback for text month formats (e.g. "28 Aug 2026")
     try {
-      return DateFormat('d MMM yyyy').parse(str);
+      return _displayFormat.parse(str);
     } catch (_) {}
 
     return null;

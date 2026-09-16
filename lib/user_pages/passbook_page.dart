@@ -300,8 +300,8 @@ class PassbookPageState extends State<PassbookApp> {
                                         title: "Delete Record",
                                         message: "Are you sure you want to delete this record?",
                                       );
-                                      if (confirmed == true && item["key"] != null) {
-                                        await deleteRecord(item["key"]);
+                                      if (confirmed == true && item["key"] != null && item["key"].toString().isNotEmpty) {
+                                        await deleteRecord(item["key"].toString());
                                       }
                                     },
                                   );

@@ -17,10 +17,14 @@ class ExpenseProvider extends ChangeNotifier {
   int _addCash = 0;
   int _addOnline = 0;
 
+  int _highestTransaction = 0;
+  String _biggestCategory = "No Data";
+  int _biggestCategoryAmount = 0;
+
   bool get isLoading => _isLoading;
   bool get hasError => _hasError;
   String get errorMessage => _errorMessage;
-  List<Map<String, dynamic>> get records => _records;
+  List<Map<String, dynamic>> get records => List.unmodifiable(_records);
   int get spentCash => _spentCash;
   int get spentOnline => _spentOnline;
   int get addCash => _addCash;
@@ -29,6 +33,11 @@ class ExpenseProvider extends ChangeNotifier {
   int get totalIncome => _addCash + _addOnline;
   int get totalExpense => _spentCash + _spentOnline;
   int get currentBalance => totalIncome - totalExpense;
+  int get cashBalance => _addCash - _spentCash;
+  int get onlineBalance => _addOnline - _spentOnline;
+  int get highestTransaction => _highestTransaction;
+  String get biggestCategory => _biggestCategory;
+  int get biggestCategoryAmount => _biggestCategoryAmount;
 
   Map<String, int> get categoryTotals {
     final totals = <String, int>{};
@@ -134,10 +143,32 @@ class ExpenseProvider extends ChangeNotifier {
         final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
         return tB.compareTo(tA);
       });
+
+      _highestTransaction = 0;
+      _biggestCategory = "No Data";
+      _biggestCategoryAmount = 0;
+
+      final catTotals = categoryTotals;
+      catTotals.forEach((cat, amount) {
+        if (amount > _biggestCategoryAmount) {
+          _biggestCategoryAmount = amount;
+          _biggestCategory = cat;
+        }
+      });
+      for (var r in _records) {
+        final mode = (r["Payment_Mode"] ?? "").toString();
+        final amount = (double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0).round();
+        if (!mode.startsWith("Add") && amount > _highestTransaction) {
+          _highestTransaction = amount;
+        }
+      }
+    } else {
+      _highestTransaction = 0;
+      _biggestCategory = "No Data";
+      _biggestCategoryAmount = 0;
     }
   }
 
-  /// Adds a new expense record to Firebase (real-time stream will auto-update state)
   Future<bool> addExpense({
     required String phoneNumber,
     required String amount,
@@ -146,9 +177,11 @@ class ExpenseProvider extends ChangeNotifier {
     required String date,
     required String category,
   }) async {
+    if (phoneNumber.isEmpty) return false;
     try {
       final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber");
-      final key = ref.push().key!;
+      final key = ref.push().key;
+      if (key == null || key.isEmpty) return false;
 
       await ref.child(key).set({
         "key": key,
@@ -166,11 +199,11 @@ class ExpenseProvider extends ChangeNotifier {
     }
   }
 
-  /// Deletes an expense record (real-time stream will auto-update state)
   Future<bool> deleteExpense({
     required String phoneNumber,
     required String key,
   }) async {
+    if (phoneNumber.isEmpty || key.isEmpty) return false;
     try {
       final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber/$key");
       await ref.remove();
@@ -222,6 +255,9 @@ class ExpenseProvider extends ChangeNotifier {
     _spentOnline = 0;
     _addCash = 0;
     _addOnline = 0;
+    _highestTransaction = 0;
+    _biggestCategory = "No Data";
+    _biggestCategoryAmount = 0;
     _isLoading = false;
     _hasError = false;
     _errorMessage = "";

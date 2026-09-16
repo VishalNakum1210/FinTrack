@@ -35,21 +35,24 @@ class SessionManager {
     final now = DateTime.now().millisecondsSinceEpoch;
     final signature = _generateSignature(phoneNumber, now);
 
+    bool secureSuccess = false;
     try {
       await _secureStorage.write(key: _keyPhoneNumber, value: phoneNumber);
       await _secureStorage.write(key: _keyUsername, value: username);
       await _secureStorage.write(key: _keyEmail, value: email);
       await _secureStorage.write(key: _keyLastActive, value: now.toString());
       await _secureStorage.write(key: _keySessionSignature, value: signature);
+      secureSuccess = true;
     } catch (_) {}
 
-    // Keep SharedPreferences in sync for backward compatibility
-    final sp = await SharedPreferences.getInstance();
-    await sp.setString(_keyPhoneNumber, phoneNumber);
-    await sp.setString(_keyUsername, username);
-    await sp.setString(_keyEmail, email);
-    await sp.setInt(_keyLastActive, now);
-    await sp.setString(_keySessionSignature, signature);
+    if (!secureSuccess) {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString(_keyPhoneNumber, phoneNumber);
+      await sp.setString(_keyUsername, username);
+      await sp.setString(_keyEmail, email);
+      await sp.setInt(_keyLastActive, now);
+      await sp.setString(_keySessionSignature, signature);
+    }
   }
 
   /// Validates if the local session exists, is cryptographically genuine, and hasn't expired
@@ -129,12 +132,23 @@ class SessionManager {
 
   /// Clears all session data on logout or account deletion
   static Future<void> clearSession() async {
-    try {
-      await _secureStorage.deleteAll();
-    } catch (_) {}
+    const keys = [
+      _keyPhoneNumber,
+      _keyUsername,
+      _keyEmail,
+      _keyLastActive,
+      _keySessionSignature,
+    ];
+    for (final k in keys) {
+      try {
+        await _secureStorage.delete(key: k);
+      } catch (_) {}
+    }
     try {
       final sp = await SharedPreferences.getInstance();
-      await sp.clear();
+      for (final k in keys) {
+        await sp.remove(k);
+      }
     } catch (_) {}
   }
 

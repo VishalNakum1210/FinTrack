@@ -134,19 +134,19 @@ class _ReportPageState extends State<Reportpage> {
 
           if (mode == "Add CASH") {
             periodIncome += amt;
-            periodCashAdded += amt.toInt();
+            periodCashAdded += amt.round();
             if (amt > highestIncome) highestIncome = amt;
           } else if (mode == "Add Online") {
             periodIncome += amt;
-            periodOnlineAdded += amt.toInt();
+            periodOnlineAdded += amt.round();
             if (amt > highestIncome) highestIncome = amt;
           } else if (mode == "Spent Cash") {
             periodExpense += amt;
-            periodCashSpent += amt.toInt();
+            periodCashSpent += amt.round();
             periodCategoryTotals[category] = (periodCategoryTotals[category] ?? 0) + amt;
           } else if (mode == "Spent Online") {
             periodExpense += amt;
-            periodOnlineSpent += amt.toInt();
+            periodOnlineSpent += amt.round();
             periodCategoryTotals[category] = (periodCategoryTotals[category] ?? 0) + amt;
           } else {
             periodExpense += amt;
@@ -174,6 +174,19 @@ class _ReportPageState extends State<Reportpage> {
         if (isLoading) {
           return Scaffold(
             backgroundColor: const Color(0xFFF8FBF2),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFFF8FBF2),
+              elevation: 0,
+              centerTitle: true,
+              title: const Text(
+                "Financial Analytics & Report",
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
             body: Center(child: CircularProgressIndicator(color: themeColor)),
           );
         }

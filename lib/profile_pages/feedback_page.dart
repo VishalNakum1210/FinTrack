@@ -19,12 +19,33 @@ class _FeedbackPageState extends State<FeedbackPage> {
   String selectedType = "Suggestion";
   int rating = 0;
   bool isLoading = false;
+  DateTime? _lastSubmitTime;
+
+  @override
+  void dispose() {
+    feedbackController.dispose();
+    emailController.dispose();
+    super.dispose();
+  }
 
   Future<void> submitFeedback() async {
-    if (feedbackController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Please enter feedback")));
+    final message = feedbackController.text.trim();
+    if (message.isEmpty) {
+      Fluttertoast.showToast(msg: "Please enter feedback");
+      return;
+    }
+
+    final email = emailController.text.trim();
+    if (email.isNotEmpty) {
+      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,}$');
+      if (!emailRegex.hasMatch(email)) {
+        Fluttertoast.showToast(msg: "Please enter a valid email address");
+        return;
+      }
+    }
+
+    if (_lastSubmitTime != null && DateTime.now().difference(_lastSubmitTime!).inSeconds < 10) {
+      Fluttertoast.showToast(msg: "Please wait 10 seconds before submitting feedback again.");
       return;
     }
 
@@ -47,14 +68,14 @@ class _FeedbackPageState extends State<FeedbackPage> {
       await ref.push().set({
         "rating": rating,
         "type": selectedType,
-        "message": feedbackController.text.trim(),
-        "email": emailController.text.trim(),
-        "phone_number": phoneNumber,
+        "message": message,
+        "email": email,
         "timestamp": ServerValue.timestamp,
       });
 
       feedbackController.clear();
       emailController.clear();
+      _lastSubmitTime = DateTime.now();
 
       setState(() {
         rating = 0;
@@ -277,12 +298,5 @@ class _FeedbackPageState extends State<FeedbackPage> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    feedbackController.dispose();
-    emailController.dispose();
-    super.dispose();
   }
 }

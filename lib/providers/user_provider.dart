@@ -5,20 +5,23 @@ import 'package:flutter/material.dart';
 
 class UserProvider extends ChangeNotifier {
   bool _isLoading = false;
+  bool _hasError = false;
   String _name = "User";
   String _email = "";
   String _phoneNumber = "";
   String _address = "";
 
   bool get isLoading => _isLoading;
+  bool get hasError => _hasError;
   String get name => _name;
   String get email => _email;
   String get phoneNumber => _phoneNumber;
   String get address => _address;
 
-  /// Loads current user information from local session and Firebase
   Future<void> loadUserSession() async {
+    if (_isLoading) return;
     _isLoading = true;
+    _hasError = false;
     notifyListeners();
 
     try {
@@ -30,7 +33,9 @@ class UserProvider extends ChangeNotifier {
         _email = (details["email"] ?? "").toString();
         _address = (details["address"] ?? details["Address"] ?? "").toString();
       }
-    } catch (_) {}
+    } catch (_) {
+      _hasError = true;
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -69,12 +74,12 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  /// Resets user state on logout
   void clearUser() {
     _name = "User";
     _email = "";
     _phoneNumber = "";
     _address = "";
+    _hasError = false;
     notifyListeners();
   }
 }

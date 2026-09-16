@@ -151,9 +151,15 @@ class _SplitBillPageState extends State<SplitBillPage> {
         categoryType: "Give Money To Friend",
       );
 
-      if (passbookSuccess) {
+      if (passbookSuccess && friendSuccessCount == selectedFriendNumbers.length) {
         Fluttertoast.showToast(
           msg: "Split Complete! Added ₹$myShareStr to your passbook & ₹$sharePerPersonStr to $friendSuccessCount friends' ledgers.",
+        );
+        if (!mounted) return;
+        Navigator.pop(context, true);
+      } else if (passbookSuccess) {
+        Fluttertoast.showToast(
+          msg: "Partial Split: Added to passbook, but only $friendSuccessCount of ${selectedFriendNumbers.length} friends updated.",
         );
         if (!mounted) return;
         Navigator.pop(context, true);

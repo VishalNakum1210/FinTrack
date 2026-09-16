@@ -59,7 +59,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       return;
     }
 
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,}$');
     if (!emailRegex.hasMatch(email)) {
       Fluttertoast.showToast(msg: "Please enter a valid email address");
       return;
@@ -82,28 +82,38 @@ class _RegistrationPageState extends State<RegistrationPage> {
         password: password,
       );
 
-      try {
-        final myRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
-        await myRef.set({
-          "name": name,
-          "phone_number": phoneNumber,
-          "email": email,
-          "address": "Not Entered",
-          "created_at": ServerValue.timestamp,
-        });
+      final user = userCredential.user;
+      if (user != null) {
+        try {
+          DatabaseReference ref = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
+          await ref.set({
+            "name": name,
+            "phone_number": phoneNumber,
+            "email": email,
+            "address": "Not Entered",
+            "created_at": ServerValue.timestamp,
+          });
 
-        await FirebaseAuth.instance.signOut();
-        Fluttertoast.showToast(msg: "Registration Successful! Please login.");
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
-      } catch (dbError) {
-        await userCredential.user?.delete();
-        Fluttertoast.showToast(msg: "Failed to save profile: $dbError");
+          await FirebaseAuth.instance.signOut();
+          Fluttertoast.showToast(msg: "Registration Successful! Please login.");
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+          );
+        } catch (dbError) {
+          await userCredential.user?.delete();
+          Fluttertoast.showToast(msg: "Failed to save profile: $dbError");
+        }
       }
     } on FirebaseAuthException catch (e) {
+      failedAttempts++;
+      if (failedAttempts >= 5) {
+        _throttleTimer?.cancel();
+        _throttleTimer = Timer(const Duration(seconds: 30), () {
+          if (mounted) setState(() => failedAttempts = 0);
+        });
+      }
       if (e.code == 'email-already-in-use') {
         Fluttertoast.showToast(msg: "Phone number is already registered!");
       } else if (e.code == 'weak-password') {
@@ -321,7 +331,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               ),
                             ),
                             onTap: () {
-                              Navigator.pushReplacement(
+                              Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => const LoginPage(),

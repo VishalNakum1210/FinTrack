@@ -74,7 +74,7 @@ class _LoginPageState extends State<LoginPage> {
       Fluttertoast.showToast(msg: "Please enter all required details");
       return;
     }
-    if (phoneNumber.length != 10) {
+    if (phoneNumber.length != 10 || int.tryParse(phoneNumber) == null) {
       Fluttertoast.showToast(msg: "Please enter a valid 10-digit phone number");
       return;
     }
@@ -92,12 +92,12 @@ class _LoginPageState extends State<LoginPage> {
       if (userCredential.user != null) {
         failedAttempts = 0;
         final myRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
-        final event = await myRef.once();
+        final event = await myRef.once().timeout(const Duration(seconds: 8));
 
         String name = "User";
         String email = "";
         if (event.snapshot.value != null && event.snapshot.value is Map) {
-          Map values = event.snapshot.value as Map;
+          final values = Map<String, dynamic>.from(event.snapshot.value as Map);
           name = (values["name"] ?? "User").toString();
           email = (values["email"] ?? "").toString();
         }
@@ -322,7 +322,7 @@ class _LoginPageState extends State<LoginPage> {
                           alignment: Alignment.centerRight,
                           child: InkWell(
                             onTap: () {
-                              Navigator.pushReplacement(
+                              Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => const RegistrationPage(),

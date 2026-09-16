@@ -36,6 +36,9 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
   }
 
   Future<void> _startStream() async {
+    await _sub?.cancel();
+    _sub = null;
+
     _userPhone = await SessionManager.getPhoneNumber() ?? '';
     if (_userPhone.isEmpty) {
       if (mounted) setState(() => _isLoading = false);
@@ -105,7 +108,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
   int get _totalGive => (double.tryParse(_friendData['total_give']?.toString() ?? '0') ?? 0.0).round();
 
   Future<void> _deleteRecord(String key, bool isGive, int amount) async {
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
     try {
       if (!mounted) return;
       await context.read<FriendProvider>().deleteFriendTransaction(

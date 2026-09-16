@@ -39,10 +39,22 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
+    if (newPassword == oldPassword) {
+      Fluttertoast.showToast(msg: "New password cannot be the same as old password");
+      return;
+    }
+
     if (!isPasswordStrong(newPassword)) {
       Fluttertoast.showToast(
         msg: "New password must be at least 6 characters and contain letters & numbers",
       );
+      return;
+    }
+
+    final phoneNumber = await SessionManager.getPhoneNumber() ?? "";
+    final user = FirebaseAuth.instance.currentUser;
+    if (phoneNumber.isEmpty || user == null) {
+      Fluttertoast.showToast(msg: "User not logged in");
       return;
     }
 
@@ -51,18 +63,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     });
 
     try {
-      String phoneNumber = await SessionManager.getPhoneNumber() ?? "";
-      if (phoneNumber.isEmpty) {
-        Fluttertoast.showToast(msg: "User not logged in");
-        return;
-      }
-
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        Fluttertoast.showToast(msg: "User not logged in");
-        return;
-      }
-
       final cred = EmailAuthProvider.credential(
         email: "$phoneNumber@fintrack.app",
         password: oldPassword,

@@ -6,6 +6,7 @@ import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/services/export_service.dart';
 import 'package:fin_track/utils/currency_helper.dart';
+import 'package:fin_track/widgets/confirm_dialog.dart';
 import 'package:fin_track/widgets/error_retry_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -304,43 +305,22 @@ class _FriendPageState extends State<FriendPage> {
 
                                 return InkWell(
                                   onLongPress: () async {
-                                    showDialog(
-                                      context: context,
-                                      builder: (dialogCtx) => AlertDialog(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        title: const Text("Delete Friend"),
-                                        content: Text(
-                                          "Are you sure you want to remove $friendName from ledger?",
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(dialogCtx),
-                                            child: const Text("Cancel"),
-                                          ),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red,
-                                              foregroundColor: Colors.white,
-                                            ),
-                                            onPressed: () async {
-                                              final friendProvider = context.read<FriendProvider>();
-                                              Navigator.pop(dialogCtx);
-                                              final phone = await SessionManager.getPhoneNumber() ?? "";
-                                              if (phone.isNotEmpty) {
-                                                await friendProvider.deleteFriend(
-                                                  userPhone: phone,
-                                                  friendNumber: friendNumber,
-                                                );
-                                                Fluttertoast.showToast(msg: "Friend removed");
-                                              }
-                                            },
-                                            child: const Text("Delete"),
-                                          ),
-                                        ],
-                                      ),
+                                    final friendProvider = context.read<FriendProvider>();
+                                    final confirmed = await showDeleteConfirmDialog(
+                                      context,
+                                      title: "Delete Friend",
+                                      message: "Are you sure you want to remove $friendName from ledger?",
                                     );
+                                    if (confirmed == true) {
+                                      final phone = await SessionManager.getPhoneNumber() ?? "";
+                                      if (phone.isNotEmpty) {
+                                        await friendProvider.deleteFriend(
+                                          userPhone: phone,
+                                          friendNumber: friendNumber,
+                                        );
+                                        Fluttertoast.showToast(msg: "Friend removed");
+                                      }
+                                    }
                                   },
                                   onTap: () {
                                     Navigator.push(

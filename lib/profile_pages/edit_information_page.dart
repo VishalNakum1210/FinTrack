@@ -15,6 +15,7 @@ class EditInformationPage extends StatefulWidget {
 class _EditInformationPageState extends State<EditInformationPage> {
   final Color themeColor = const Color(0xFF8BC24A);
   Map<String, String> details = {};
+  bool isLoading = true;
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController mobileController = TextEditingController();
@@ -70,20 +71,21 @@ class _EditInformationPageState extends State<EditInformationPage> {
     super.dispose();
   }
 
-  Future<void> updateInformation(
+  Future<bool> updateInformation(
     String name,
     String phoneNumber,
     String email,
     String address,
   ) async {
     try {
-      await context.read<UserProvider>().updateProfile(
+      return await context.read<UserProvider>().updateProfile(
         name: name,
         email: email,
         address: address,
       );
     } catch (e) {
       Fluttertoast.showToast(msg: "Failed to update profile: $e");
+      return false;
     }
   }
 
@@ -98,10 +100,15 @@ class _EditInformationPageState extends State<EditInformationPage> {
             mobileController.text = details["phone_number"] ?? phoneNumber;
             emailController.text = details["email"] ?? "";
             addressController.text = details["address"] ?? details["Address"] ?? "";
+            isLoading = false;
           });
         }
+      } else {
+        if (mounted) setState(() => isLoading = false);
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -120,7 +127,9 @@ class _EditInformationPageState extends State<EditInformationPage> {
         backgroundColor: themeColor,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF8BC24A)))
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
@@ -186,20 +195,23 @@ class _EditInformationPageState extends State<EditInformationPage> {
                     return;
                   }
 
-                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,}$');
                   if (!emailRegex.hasMatch(email)) {
                     Fluttertoast.showToast(msg: "Please enter a valid email address");
                     return;
                   }
 
-                  await updateInformation(name, mobile, email, address);
+                  final success = await updateInformation(name, mobile, email, address);
 
-                  Fluttertoast.showToast(
-                    msg: "Information Updated Successfully",
-                  );
-
-                  if (!context.mounted) return;
-                  Navigator.pop(context, true);
+                  if (success) {
+                    Fluttertoast.showToast(
+                      msg: "Information Updated Successfully",
+                    );
+                    if (!context.mounted) return;
+                    Navigator.pop(context, true);
+                  } else {
+                    Fluttertoast.showToast(msg: "Failed to update profile");
+                  }
                 },
                 icon: const Icon(Icons.save),
                 label: const Text(

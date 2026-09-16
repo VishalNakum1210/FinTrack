@@ -14,7 +14,6 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -31,6 +30,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> logout() async {
+    if (isActionLoading) return;
     if (mounted) {
       setState(() {
         isActionLoading = true;
@@ -52,20 +52,21 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> deleteUser() async {
+    if (isActionLoading) return;
     if (mounted) {
       setState(() {
         isActionLoading = true;
       });
     }
     try {
-      SharedPreferences sp = await SharedPreferences.getInstance();
-      String phone = sp.getString("phone_number") ?? "";
-      if (phone.isNotEmpty) {
+      final user = FirebaseAuth.instance.currentUser;
+      final phone = user?.email?.split('@').first ?? (await SessionManager.getPhoneNumber() ?? "");
+      if (phone.isNotEmpty && phone.length == 10) {
         await FirebaseDatabase.instance.ref("Friends/$phone").remove();
         await FirebaseDatabase.instance.ref("Expenses/$phone").remove();
         await FirebaseDatabase.instance.ref("user_details/$phone").remove();
       }
-      await FirebaseAuth.instance.currentUser?.delete();
+      await user?.delete();
       Fluttertoast.showToast(msg: "Account deleted successfully");
       if (mounted) {
         context.read<UserProvider>().clearUser();
@@ -79,6 +80,17 @@ class _ProfilePageState extends State<ProfilePage> {
         MaterialPageRoute(builder: (context) => const LoginPage()),
         (route) => false,
       );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        Fluttertoast.showToast(msg: "Please re-login before deleting your account.");
+      } else {
+        Fluttertoast.showToast(msg: e.message ?? "Failed to delete account");
+      }
+      if (mounted) {
+        setState(() {
+          isActionLoading = false;
+        });
+      }
     } catch (e) {
       Fluttertoast.showToast(msg: "Failed to delete account: $e");
       if (mounted) {

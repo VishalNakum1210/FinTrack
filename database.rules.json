@@ -1,5 +1,7 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
     "user_details": {
       "$phoneNumber": {
         ".read": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",

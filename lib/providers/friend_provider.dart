@@ -17,7 +17,7 @@ class FriendProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get hasError => _hasError;
   String get errorMessage => _errorMessage;
-  List<Map<String, dynamic>> get friends => _friends;
+  List<Map<String, dynamic>> get friends => List.unmodifiable(_friends);
   int get totalGet => _totalGet;
   int get totalGive => _totalGive;
 
@@ -155,9 +155,11 @@ class FriendProvider extends ChangeNotifier {
     required String date,
     required String categoryType,
   }) async {
+    if (userPhone.isEmpty || friendNumber.isEmpty) return false;
     try {
       final recordRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber/Records");
-      final key = recordRef.push().key!;
+      final key = recordRef.push().key;
+      if (key == null || key.isEmpty) return false;
       final parsedAmount = (double.tryParse(amount) ?? 0.0).round();
 
       await recordRef.child(key).set({
@@ -183,7 +185,6 @@ class FriendProvider extends ChangeNotifier {
     }
   }
 
-  /// Atomically batches multiple friend ledger transactions (e.g. for Multi-Friend Bill Splitting)
   Future<int> batchAddFriendTransactions({
     required String userPhone,
     required List<String> friendNumbers,
@@ -193,13 +194,16 @@ class FriendProvider extends ChangeNotifier {
     required String date,
     required String categoryType,
   }) async {
+    if (userPhone.isEmpty) return 0;
     int successCount = 0;
     final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
 
     for (final friendNumber in friendNumbers) {
+      if (friendNumber.isEmpty) continue;
       try {
         final recordRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber/Records");
-        final key = recordRef.push().key!;
+        final key = recordRef.push().key;
+        if (key == null || key.isEmpty) continue;
 
         await recordRef.child(key).set({
           "key": key,
@@ -224,7 +228,6 @@ class FriendProvider extends ChangeNotifier {
     return successCount;
   }
 
-  /// Deletes a specific transaction record from a friend's ledger atomically
   Future<bool> deleteFriendTransaction({
     required String userPhone,
     required String friendNumber,
@@ -232,6 +235,7 @@ class FriendProvider extends ChangeNotifier {
     required bool isGive,
     required int amount,
   }) async {
+    if (userPhone.isEmpty || friendNumber.isEmpty || recordKey.isEmpty) return false;
     try {
       final recordRef = FirebaseDatabase.instance.ref(
         "Friends/$userPhone/$friendNumber/Records/$recordKey",
