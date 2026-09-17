@@ -130,71 +130,71 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
     final amountCtrl = TextEditingController(text: record['Amount']?.toString() ?? '');
     final descCtrl = TextEditingController(text: record['Description']?.toString() ?? '');
 
-    if (!mounted) return;
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20, right: 20, top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Edit Transaction',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                maxLength: 10,
-                decoration: InputDecoration(
-                  labelText: 'Amount',
-                  counterText: '',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: descCtrl,
-                maxLength: 150,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  counterText: '',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 18),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8BC24A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (saved != true) return;
-    final newAmount = amountCtrl.text.trim();
-    final newDesc = descCtrl.text.trim();
-    if (newAmount.isEmpty) return;
-
     try {
+      if (!mounted) return;
+      final saved = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        builder: (ctx) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20, right: 20, top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Edit Transaction',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  maxLength: 10,
+                  decoration: InputDecoration(
+                    labelText: 'Amount',
+                    counterText: '',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: descCtrl,
+                  maxLength: 150,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    counterText: '',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8BC24A),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (saved != true) return;
+      final newAmount = amountCtrl.text.trim();
+      final newDesc = descCtrl.text.trim();
+      if (newAmount.isEmpty) return;
+
       final ref = FirebaseDatabase.instance
           .ref('Friends/$_userPhone/${widget.friendNumber}/Records/${record['key']}');
       await ref.update({'Amount': newAmount, 'Description': newDesc});
@@ -212,9 +212,12 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
           delta: diff,
         );
       }
-      Fluttertoast.showToast(msg: 'Record updated');
+      Fluttertoast.showToast(msg: 'Transaction updated successfully');
     } catch (e) {
       Fluttertoast.showToast(msg: 'Failed to update: $e');
+    } finally {
+      amountCtrl.dispose();
+      descCtrl.dispose();
     }
   }
 
@@ -433,7 +436,24 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                     const SizedBox(height: 10),
                     Expanded(
                       child: _records.isEmpty
-                          ? const Center(child: Text('No Records'))
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.handshake_outlined, size: 64, color: Colors.grey.shade400),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'No transactions yet',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Tap the + button to add a transaction',
+                                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            )
                           : ListView.builder(
                               padding: const EdgeInsets.only(bottom: 25, left: 10, right: 10),
                               itemCount: _records.length,
@@ -444,7 +464,8 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                                 final key = (record['key'] ?? '').toString();
 
                                 return InkWell(
-                                  onTap: () async {
+                                  onTap: () => _editRecord(record),
+                                  onLongPress: () async {
                                     final confirmed = await showDeleteConfirmDialog(
                                       context,
                                       title: 'Delete Record',
@@ -454,7 +475,6 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                                       await _deleteRecord(key, isGive, amount);
                                     }
                                   },
-                                  onLongPress: () => _editRecord(record),
                                   child: _transactionCard(
                                     amount: amount.toINR(compactSymbol: true),
                                     title: (record['Type'] ?? '').toString(),
@@ -529,7 +549,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Hold to edit',
+                'Hold to delete',
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
               ),
             ],

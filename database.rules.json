@@ -11,13 +11,13 @@
           ".validate": "newData.isString() && newData.val().length == 10"
         },
         "email": {
-          ".validate": "newData.isString()"
+          ".validate": "newData.isString() && newData.val().length <= 100"
         },
         "name": {
-          ".validate": "newData.isString() && newData.val().length > 0"
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50"
         },
         "address": {
-          ".validate": "newData.isString()"
+          ".validate": "newData.isString() && newData.val().length <= 200"
         }
       }
     },
@@ -28,10 +28,13 @@
         "$recordKey": {
           ".validate": "!newData.exists() || newData.hasChildren(['Amount', 'Category', 'Date', 'Payment_Mode'])",
           "Amount": {
-            ".validate": "newData.isString()"
+            ".validate": "newData.isString() && newData.val().length <= 20"
           },
           "Category": {
-            ".validate": "newData.isString()"
+            ".validate": "newData.isString() && newData.val().length <= 50"
+          },
+          "Description": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500)"
           },
           "Date": {
             ".validate": "newData.isString()"
@@ -48,7 +51,7 @@
         ".write": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
         "$friendNumber": {
           "friend_name": {
-            ".validate": "newData.isString() && newData.val().length > 0"
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50"
           },
           "friend_number": {
             ".validate": "newData.isString() && newData.val().length == 10"

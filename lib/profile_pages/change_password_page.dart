@@ -23,8 +23,25 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool confirmPasswordVisible = false;
 
   bool isLoading = false;
+  int failedAttempts = 0;
+  DateTime? lockoutUntil;
+
+  int _getPasswordStrength(String pass) {
+    if (pass.isEmpty) return 0;
+    int score = 0;
+    if (pass.length >= 6) score++;
+    if (pass.length >= 8 && RegExp(r'[a-zA-Z]').hasMatch(pass) && RegExp(r'[0-9]').hasMatch(pass)) score++;
+    if (pass.length >= 10 && RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(pass)) score++;
+    return score;
+  }
 
   Future<void> changePassword() async {
+    if (lockoutUntil != null && DateTime.now().isBefore(lockoutUntil!)) {
+      final remaining = lockoutUntil!.difference(DateTime.now()).inSeconds;
+      Fluttertoast.showToast(msg: "Too many failed attempts. Locked for ${remaining ~/ 60}m ${remaining % 60}s.");
+      return;
+    }
+
     String oldPassword = oldPasswordController.text.trim();
     String newPassword = newPasswordController.text.trim();
     String confirmPassword = confirmPasswordController.text.trim();
@@ -70,12 +87,28 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       await user.reauthenticateWithCredential(cred);
       await user.updatePassword(newPassword);
 
+      failedAttempts = 0;
+      lockoutUntil = null;
+
       if (!mounted) return;
-      Fluttertoast.showToast(msg: "Password changed successfully");
-      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Password changed successfully!"),
+          backgroundColor: Color(0xFF8BC24A),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-        Fluttertoast.showToast(msg: "Old password is incorrect");
+        failedAttempts++;
+        if (failedAttempts >= 3) {
+          lockoutUntil = DateTime.now().add(const Duration(minutes: 5));
+          Fluttertoast.showToast(msg: "3 failed attempts. Locked for 5 minutes.");
+        } else {
+          Fluttertoast.showToast(msg: "Old password is incorrect (${3 - failedAttempts} attempts remaining)");
+        }
       } else if (e.code == 'weak-password') {
         Fluttertoast.showToast(msg: "Password is too weak");
       } else {
@@ -187,6 +220,52 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 setState(() {
                   newPasswordVisible = !newPasswordVisible;
                 });
+              },
+            ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: newPasswordController,
+              builder: (context, val, _) {
+                final pass = val.text;
+                if (pass.isEmpty) return const SizedBox.shrink();
+                final strength = _getPasswordStrength(pass);
+                final color = strength <= 1
+                    ? Colors.red
+                    : strength == 2
+                        ? Colors.orange
+                        : const Color(0xFF8BC24A);
+                final label = strength <= 1
+                    ? "Weak"
+                    : strength == 2
+                        ? "Medium"
+                        : "Strong";
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: strength / 3.0,
+                            backgroundColor: Colors.grey.shade200,
+                            color: color,
+                            minHeight: 5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
               },
             ),
             passwordField(

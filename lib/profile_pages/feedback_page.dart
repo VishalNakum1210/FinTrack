@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FeedbackPage extends StatefulWidget {
   const FeedbackPage({super.key});
@@ -22,10 +24,76 @@ class _FeedbackPageState extends State<FeedbackPage> {
   DateTime? _lastSubmitTime;
 
   @override
+  void initState() {
+    super.initState();
+    _syncPendingFeedback();
+  }
+
+  Future<void> _syncPendingFeedback() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final pending = sp.getStringList('pending_feedback');
+      if (pending != null && pending.isNotEmpty) {
+        final phoneNumber = await SessionManager.getPhoneNumber() ?? "";
+        if (phoneNumber.isNotEmpty) {
+          final ref = FirebaseDatabase.instance.ref("userUpdates/$phoneNumber");
+          for (final item in List<String>.from(pending)) {
+            final data = jsonDecode(item) as Map<String, dynamic>;
+            await ref.push().set({
+              ...data,
+              "synced_at": ServerValue.timestamp,
+            });
+          }
+          await sp.remove('pending_feedback');
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     feedbackController.dispose();
     emailController.dispose();
     super.dispose();
+  }
+
+  void _showThankYouDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.favorite_rounded, color: Colors.pink, size: 55),
+            const SizedBox(height: 12),
+            const Text(
+              "Thank You!",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Your feedback helps make FinTrack better for everyone.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                if (mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: themeColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text("Done"),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> submitFeedback() async {
@@ -71,7 +139,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
         "message": message,
         "email": email,
         "timestamp": ServerValue.timestamp,
-      });
+      }).timeout(const Duration(seconds: 6));
 
       feedbackController.clear();
       emailController.clear();
@@ -82,9 +150,34 @@ class _FeedbackPageState extends State<FeedbackPage> {
         selectedType = "Suggestion";
       });
 
-      Fluttertoast.showToast(msg: "Thank you for your feedback ❤️");
+      if (mounted) {
+        _showThankYouDialog();
+      }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Error : $e");
+      // Offline fallback: Queue locally in SharedPreferences
+      try {
+        final sp = await SharedPreferences.getInstance();
+        final list = sp.getStringList('pending_feedback') ?? [];
+        list.add(jsonEncode({
+          "rating": rating,
+          "type": selectedType,
+          "message": message,
+          "email": email,
+          "timestamp": DateTime.now().millisecondsSinceEpoch,
+        }));
+        await sp.setStringList('pending_feedback', list);
+
+        feedbackController.clear();
+        emailController.clear();
+        setState(() {
+          rating = 0;
+          selectedType = "Suggestion";
+        });
+        Fluttertoast.showToast(msg: "Saved offline. Will sync when connected.");
+        if (mounted) _showThankYouDialog();
+      } catch (_) {
+        Fluttertoast.showToast(msg: "Failed to submit feedback: $e");
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -224,6 +317,14 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       DropdownMenuItem(
                         value: "Feature Request",
                         child: Text("Feature Request"),
+                      ),
+                      DropdownMenuItem(
+                        value: "Complaint",
+                        child: Text("Complaint"),
+                      ),
+                      DropdownMenuItem(
+                        value: "General Feedback",
+                        child: Text("General Feedback"),
                       ),
                       DropdownMenuItem(value: "Other", child: Text("Other")),
                     ],

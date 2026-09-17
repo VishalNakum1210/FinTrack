@@ -100,10 +100,11 @@ class SessionManager {
       return false;
     }
 
-    // Check expiration (30 days inactivity)
+    // Check expiration (30 days inactivity) & prevent clock rollback exploits
     final now = DateTime.now().millisecondsSinceEpoch;
+    final elapsed = now - lastActive;
     const maxInactivityMs = sessionExpiryDays * 24 * 60 * 60 * 1000;
-    if (now - lastActive > maxInactivityMs) {
+    if (elapsed < 0 || elapsed > maxInactivityMs) {
       await clearSession();
       return false;
     }
@@ -119,14 +120,20 @@ class SessionManager {
     if (phone != null && phone.isNotEmpty) {
       final now = DateTime.now().millisecondsSinceEpoch;
       final signature = _generateSignature(phone, now);
+      bool secureSuccess = false;
       try {
         await _secureStorage.write(key: _keyLastActive, value: now.toString());
         await _secureStorage.write(key: _keySessionSignature, value: signature);
+        secureSuccess = true;
       } catch (_) {}
 
-      final sp = await SharedPreferences.getInstance();
-      await sp.setInt(_keyLastActive, now);
-      await sp.setString(_keySessionSignature, signature);
+      if (!secureSuccess) {
+        try {
+          final sp = await SharedPreferences.getInstance();
+          await sp.setInt(_keyLastActive, now);
+          await sp.setString(_keySessionSignature, signature);
+        } catch (_) {}
+      }
     }
   }
 

@@ -129,23 +129,37 @@ class _LoginPageState extends State<LoginPage> {
           msg: "Too many failed attempts. Locked for 30 seconds.",
         );
       } else {
-        if (e.code == 'user-not-found' ||
-            e.code == 'wrong-password' ||
-            e.code == 'invalid-credential') {
+        if (e.code == 'user-not-found') {
           Fluttertoast.showToast(
-            msg: "Invalid phone number or password (${5 - failedAttempts} attempts remaining)",
+            msg: "No account found with this phone number",
+          );
+        } else if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          Fluttertoast.showToast(
+            msg: "Incorrect password (${5 - failedAttempts} attempts remaining)",
+          );
+        } else if (e.code == 'user-disabled') {
+          Fluttertoast.showToast(
+            msg: "This account has been disabled. Please contact support.",
           );
         } else if (e.code == 'too-many-requests') {
           startLockoutTimer();
           Fluttertoast.showToast(
             msg: "Too many attempts. Account temporarily locked by server.",
           );
+        } else if (e.code == 'network-request-failed') {
+          Fluttertoast.showToast(
+            msg: "Network error. Please check your internet connection.",
+          );
         } else {
           Fluttertoast.showToast(msg: e.message ?? "Authentication failed");
         }
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Database connection failed: $e");
+      // Fix auth zombie: sign out if user session could not be established
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+      Fluttertoast.showToast(msg: "Connection error: Unable to load user profile. Please retry.");
     } finally {
       if (mounted) {
         setState(() {

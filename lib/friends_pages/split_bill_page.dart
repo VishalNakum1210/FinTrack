@@ -105,6 +105,71 @@ class _SplitBillPageState extends State<SplitBillPage> {
       return;
     }
 
+    final totalPeople = selectedFriendNumbers.length + 1; // You + Selected Friends
+    final sharePerPerson = ((totalAmount / totalPeople) * 100).round() / 100;
+    final myShare = ((totalAmount - (sharePerPerson * selectedFriendNumbers.length)) * 100).round() / 100;
+    final formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
+
+    final myShareStr = myShare.truncateToDouble() == myShare ? myShare.toInt().toString() : myShare.toStringAsFixed(2);
+    final sharePerPersonStr = sharePerPerson.truncateToDouble() == sharePerPerson ? sharePerPerson.toInt().toString() : sharePerPerson.toStringAsFixed(2);
+    final totalAmountStr = totalAmount.truncateToDouble() == totalAmount ? totalAmount.toInt().toString() : totalAmount.toStringAsFixed(2);
+
+    // Confirmation BottomSheet before proceeding
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              "Confirm Bill Split",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 14),
+            Text("Total Bill: ₹$totalAmountStr", style: const TextStyle(fontSize: 15)),
+            const SizedBox(height: 6),
+            Text("Your Share: ₹$myShareStr (to Passbook)", style: const TextStyle(fontSize: 14, color: Color(0xFF2E7D32))),
+            const SizedBox(height: 6),
+            Text("Each Friend: ₹$sharePerPersonStr (${selectedFriendNumbers.length} friends)", style: const TextStyle(fontSize: 14, color: Color(0xFFE65100))),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text("Cancel"),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8BC24A),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text("Confirm"),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true) return;
+
     setState(() {
       isLoading = true;
     });
@@ -121,15 +186,6 @@ class _SplitBillPageState extends State<SplitBillPage> {
       final expenseProvider = context.read<ExpenseProvider>();
       final friendProvider = context.read<FriendProvider>();
 
-      final totalPeople = selectedFriendNumbers.length + 1; // You + Selected Friends
-      final sharePerPerson = ((totalAmount / totalPeople) * 100).round() / 100;
-      final myShare = ((totalAmount - (sharePerPerson * selectedFriendNumbers.length)) * 100).round() / 100;
-      final formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
-
-      final myShareStr = myShare.truncateToDouble() == myShare ? myShare.toInt().toString() : myShare.toStringAsFixed(2);
-      final sharePerPersonStr = sharePerPerson.truncateToDouble() == sharePerPerson ? sharePerPerson.toInt().toString() : sharePerPerson.toStringAsFixed(2);
-      final totalAmountStr = totalAmount.truncateToDouble() == totalAmount ? totalAmount.toInt().toString() : totalAmount.toStringAsFixed(2);
-
       // 1. Add Personal Expense (Your Share) into Passbook
       final passbookSuccess = await expenseProvider.addExpense(
         phoneNumber: userPhone,
@@ -140,8 +196,8 @@ class _SplitBillPageState extends State<SplitBillPage> {
         category: selectedCategory,
       );
 
-      // 2. Add each friend's share in an optimized batch
-      final friendSuccessCount = await friendProvider.batchAddFriendTransactions(
+      // 2. Add each friend's share in an atomic multi-path update
+      final friendSuccess = await friendProvider.atomicMultiFriendSplit(
         userPhone: userPhone,
         friendNumbers: selectedFriendNumbers.toList(),
         amountPerFriend: sharePerPersonStr,
@@ -151,22 +207,18 @@ class _SplitBillPageState extends State<SplitBillPage> {
         categoryType: "Give Money To Friend",
       );
 
-      if (passbookSuccess && friendSuccessCount == selectedFriendNumbers.length) {
+      if (passbookSuccess && friendSuccess) {
         Fluttertoast.showToast(
-          msg: "Split Complete! Added ₹$myShareStr to your passbook & ₹$sharePerPersonStr to $friendSuccessCount friends' ledgers.",
-        );
-        if (!mounted) return;
-        Navigator.pop(context, true);
-      } else if (passbookSuccess) {
-        Fluttertoast.showToast(
-          msg: "Partial Split: Added to passbook, but only $friendSuccessCount of ${selectedFriendNumbers.length} friends updated.",
+          msg: "Split Complete! Added ₹$myShareStr to your passbook & ₹$sharePerPersonStr to friends' ledgers.",
         );
         if (!mounted) return;
         Navigator.pop(context, true);
       } else {
-        Fluttertoast.showToast(msg: "Failed to record bill split");
+        // Keep page open on failure so user can retry
+        Fluttertoast.showToast(msg: "Failed to record bill split. Please retry.");
       }
     } catch (e) {
+      // Keep page open on error so user can retry
       Fluttertoast.showToast(msg: "Error splitting bill: $e");
     } finally {
       if (mounted) {
@@ -307,7 +359,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
                         TextField(
                           controller: amountController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           maxLength: 10,
                           decoration: _inputDeco("Total Bill Amount (₹)").copyWith(counterText: ""),
                         ),
@@ -553,7 +605,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                   SizedBox(
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: isLoading ? null : handleSplitBill,
+                      onPressed: (isLoading || totalAmount <= 0 || selectedFriendNumbers.isEmpty) ? null : handleSplitBill,
                       icon: const Icon(Icons.call_split_rounded, color: Colors.white),
                       label: Text(
                         "Split ₹$totalAmountStr with $totalPeople People",

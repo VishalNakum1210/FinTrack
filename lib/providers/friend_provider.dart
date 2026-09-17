@@ -13,13 +13,27 @@ class FriendProvider extends ChangeNotifier {
 
   int _totalGet = 0;
   int _totalGive = 0;
+  bool _isOffline = false;
+  StreamSubscription<DatabaseEvent>? _connectivitySub;
 
   bool get isLoading => _isLoading;
   bool get hasError => _hasError;
+  bool get isOffline => _isOffline;
   String get errorMessage => _errorMessage;
   List<Map<String, dynamic>> get friends => List.unmodifiable(_friends);
   int get totalGet => _totalGet;
   int get totalGive => _totalGive;
+
+  void _initConnectivity() {
+    if (_connectivitySub != null) return;
+    _connectivitySub = FirebaseDatabase.instance.ref(".info/connected").onValue.listen((event) {
+      final connected = event.snapshot.value as bool? ?? true;
+      if (_isOffline != !connected) {
+        _isOffline = !connected;
+        notifyListeners();
+      }
+    });
+  }
 
   /// Sets up a real-time stream listener for friends and aggregate ledger totals
   Future<void> fetchFriends(String phoneNumber, {bool force = false}) async {
@@ -35,6 +49,7 @@ class FriendProvider extends ChangeNotifier {
     _errorMessage = "";
     notifyListeners();
 
+    _initConnectivity();
     await _subscription?.cancel();
 
     try {
@@ -84,7 +99,7 @@ class FriendProvider extends ChangeNotifier {
     }
   }
 
-  /// Adds a new friend (real-time stream will auto-update local state)
+  /// Adds a new friend safely without overwriting existing ledger
   Future<bool> addFriend({
     required String userPhone,
     required String friendName,
@@ -94,6 +109,16 @@ class FriendProvider extends ChangeNotifier {
   }) async {
     try {
       final ref = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
+      final snapshot = await ref.get();
+      if (snapshot.exists) {
+        // Friend already exists: update name/note only, preserve existing ledger
+        await ref.update({
+          "friend_name": friendName,
+          "note": note,
+        });
+        return true;
+      }
+
       await ref.set({
         "friend_name": friendName,
         "friend_number": friendNumber,
@@ -270,8 +295,11 @@ class FriendProvider extends ChangeNotifier {
   }) async {
     try {
       final dbRef = FirebaseDatabase.instance.ref();
-      final expenseKey = dbRef.child("Expenses/$userPhone").push().key!;
-      final recordKey = dbRef.child("Friends/$userPhone/$friendNumber/Records").push().key!;
+      final expRef = dbRef.child("Expenses/$userPhone").push();
+      final expenseKey = expRef.key ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+      final recRef = dbRef.child("Friends/$userPhone/$friendNumber/Records").push();
+      final recordKey = recRef.key ?? (DateTime.now().millisecondsSinceEpoch + 1).toString();
 
       final Map<String, Object?> multiPathUpdates = {};
 
@@ -311,14 +339,69 @@ class FriendProvider extends ChangeNotifier {
     }
   }
 
+  /// Performs an atomic multi-path split across multiple friends in a SINGLE network payload
+  Future<bool> atomicMultiFriendSplit({
+    required String userPhone,
+    required List<String> friendNumbers,
+    required String amountPerFriend,
+    required String description,
+    required String paymentMode,
+    required String date,
+    required String categoryType,
+  }) async {
+    if (userPhone.isEmpty || friendNumbers.isEmpty) return false;
+    try {
+      final dbRef = FirebaseDatabase.instance.ref();
+      final Map<String, Object?> multiPathUpdates = {};
+      final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
+
+      for (int i = 0; i < friendNumbers.length; i++) {
+        final friendNumber = friendNumbers[i];
+        if (friendNumber.isEmpty) continue;
+        final newRef = dbRef.child("Friends/$userPhone/$friendNumber/Records").push();
+        final key = newRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_$i";
+
+        multiPathUpdates["Friends/$userPhone/$friendNumber/Records/$key"] = {
+          "key": key,
+          "Amount": amountPerFriend,
+          "Description": description,
+          "Payment_Mode": paymentMode,
+          "Date": date,
+          "Type": categoryType,
+          "timestamp": ServerValue.timestamp,
+        };
+      }
+
+      await dbRef.update(multiPathUpdates);
+
+      // Adjust ledgers for all friends
+      for (final friendNumber in friendNumbers) {
+        if (friendNumber.isEmpty) continue;
+        final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
+        if (categoryType == "Take Money From Friend") {
+          await _atomicUpdateLedger(friendRef, "total_give", parsedAmount);
+        } else {
+          await _atomicUpdateLedger(friendRef, "total_get", parsedAmount);
+        }
+      }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Clears friends state on logout
   void clearFriends() {
     _subscription?.cancel();
     _subscription = null;
+    _connectivitySub?.cancel();
+    _connectivitySub = null;
     _currentPhone = "";
     _friends.clear();
     _totalGet = 0;
     _totalGive = 0;
+    _isOffline = false;
     _isLoading = false;
     _hasError = false;
     _errorMessage = "";
@@ -328,6 +411,7 @@ class FriendProvider extends ChangeNotifier {
   @override
   void dispose() {
     _subscription?.cancel();
+    _connectivitySub?.cancel();
     super.dispose();
   }
 }

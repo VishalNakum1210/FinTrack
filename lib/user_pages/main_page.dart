@@ -4,6 +4,7 @@ import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/user_pages/add_spent.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
+import 'package:fin_track/utils/date_helper.dart';
 import 'package:fin_track/widgets/error_retry_widget.dart';
 import 'package:fin_track/widgets/insight_card.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ class UserMainPage extends StatefulWidget {
 class _UserMainPageState extends State<UserMainPage> {
   final Color themeColor = CategoryTheme.primaryGreen;
   bool _isLoadingData = false;
+  bool _isPullRefreshing = false;
 
   @override
   void initState() {
@@ -26,6 +28,19 @@ class _UserMainPageState extends State<UserMainPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) {
+      return "Good morning 🌅";
+    } else if (hour >= 12 && hour < 17) {
+      return "Good afternoon ☀️";
+    } else if (hour >= 17 && hour < 21) {
+      return "Good evening 🌆";
+    } else {
+      return "Good night 🌙";
+    }
   }
 
   Future<void> _loadData({bool force = false}) async {
@@ -56,6 +71,28 @@ class _UserMainPageState extends State<UserMainPage> {
         final biggestCategory = expenseProvider.biggestCategory;
         final highestTransaction = expenseProvider.highestTransaction;
 
+        // Calculate 7-day spending trend vs previous 7 days
+        final now = DateTime.now();
+        final sevenDaysAgo = now.subtract(const Duration(days: 7));
+        final fourteenDaysAgo = now.subtract(const Duration(days: 14));
+        double last7Expense = 0;
+        double prev7Expense = 0;
+        for (final r in records) {
+          final mode = (r["Payment_Mode"] ?? "").toString();
+          final isExpense = mode != "Add CASH" && mode != "Add Online";
+          if (isExpense) {
+            final date = DateHelper.parse(r["Date"]);
+            if (date != null) {
+              final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
+              if (date.isAfter(sevenDaysAgo)) {
+                last7Expense += amt;
+              } else if (date.isAfter(fourteenDaysAgo)) {
+                prev7Expense += amt;
+              }
+            }
+          }
+        }
+
         return Scaffold(
           backgroundColor: const Color(0xFFF8FBF2),
           appBar: AppBar(
@@ -82,7 +119,7 @@ class _UserMainPageState extends State<UserMainPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Welcome 👋",
+                        _getGreeting(),
                         style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                       ),
                       Text(
@@ -104,7 +141,11 @@ class _UserMainPageState extends State<UserMainPage> {
             children: [
               RefreshIndicator(
                 color: themeColor,
-                onRefresh: () => _loadData(force: true),
+                onRefresh: () async {
+                  setState(() => _isPullRefreshing = true);
+                  await _loadData(force: true);
+                  if (mounted) setState(() => _isPullRefreshing = false);
+                },
                 child: (expenseProvider.hasError && records.isEmpty)
                     ? ErrorRetryWidget(
                         message: expenseProvider.errorMessage,
@@ -141,26 +182,60 @@ class _UserMainPageState extends State<UserMainPage> {
                               style: TextStyle(color: Colors.white70),
                             ),
                             const SizedBox(height: 10),
-                            Text(
-                              currentBalance.toINR(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 34,
-                                fontWeight: FontWeight.bold,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                currentBalance.toINR(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Icon(
-                                  Icons.account_balance_wallet,
-                                  color: Colors.white,
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.account_balance_wallet,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "${totalIncome.toINR()} Income",
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  "${totalIncome.toINR()} Income",
-                                  style: const TextStyle(color: Colors.white),
-                                ),
+                                if (last7Expense > 0 || prev7Expense > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          last7Expense >= prev7Expense ? Icons.trending_up : Icons.trending_down,
+                                          color: Colors.white,
+                                          size: 15,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          last7Expense >= prev7Expense
+                                              ? "+${(last7Expense - prev7Expense).round().toINR()} vs last wk"
+                                              : "-${(prev7Expense - last7Expense).round().toINR()} vs last wk",
+                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                           ],
@@ -399,7 +474,7 @@ class _UserMainPageState extends State<UserMainPage> {
                 ),
               ),
 
-              if (isLoading)
+              if (isLoading && !_isPullRefreshing)
                 Container(
                   color: Colors.black.withValues(alpha: .25),
                   child: Center(
@@ -474,6 +549,7 @@ class _UserMainPageState extends State<UserMainPage> {
           ),
 
           FittedBox(
+            fit: BoxFit.scaleDown,
             child: Text(
               amount.toINR(),
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),

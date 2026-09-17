@@ -68,6 +68,93 @@ class _ReportPageState extends State<Reportpage> {
     return "Needs Improvement";
   }
 
+  void _showHealthScoreExplanation() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.health_and_safety_rounded, color: themeColor, size: 28),
+                  const SizedBox(width: 10),
+                  const Text(
+                    "Health Score Formula",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                "Evaluated based on your savings rate for the selected period:",
+                style: TextStyle(fontSize: 13, color: Colors.black87),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Text(
+                    "Score = (Income - Expense) / Income × 100",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'monospace'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _scoreGuideItem("80% – 100%", "Excellent", "High savings discipline & minimal debt", Colors.green),
+              _scoreGuideItem("60% – 79%", "Good", "Healthy savings buffer & stable finances", themeColor),
+              _scoreGuideItem("40% – 59%", "Average", "Moderate savings, check major expenses", Colors.orange),
+              _scoreGuideItem("< 40%", "Needs Work", "Expenses close to or exceeding income", Colors.red),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _scoreGuideItem(String range, String label, String desc, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 80,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              range,
+              style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              "$label: $desc",
+              style: const TextStyle(fontSize: 12, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> exportReportToPdf({
     required BuildContext context,
     required List<Map<String, dynamic>> records,
@@ -168,8 +255,38 @@ class _ReportPageState extends State<Reportpage> {
               .key;
         }
 
-        final friendGiven = friendProvider.totalGet.toDouble();
-        final friendTaken = friendProvider.totalGive.toDouble();
+        // Friend Ledger Filtered Calculation
+        double periodFriendGiven = 0;
+        double periodFriendTaken = 0;
+        bool hasFriendRecords = false;
+
+        for (final f in friendProvider.friends) {
+          final recordsObj = f["Records"];
+          if (recordsObj is Map) {
+            hasFriendRecords = true;
+            recordsObj.forEach((rk, rv) {
+              if (rv is Map) {
+                final d = DateHelper.parse(rv["Date"]);
+                if (_matchesPeriod(d, selectedPeriod)) {
+                  final amt = double.tryParse(rv["Amount"]?.toString() ?? '0') ?? 0.0;
+                  final type = rv["Type"]?.toString() ?? "";
+                  if (type == "Take Money From Friend") {
+                    periodFriendTaken += amt;
+                  } else {
+                    periodFriendGiven += amt;
+                  }
+                }
+              }
+            });
+          }
+        }
+
+        final friendGiven = (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
+            ? periodFriendGiven
+            : friendProvider.totalGet.toDouble();
+        final friendTaken = (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
+            ? periodFriendTaken
+            : friendProvider.totalGive.toDouble();
 
         if (isLoading) {
           return Scaffold(
@@ -340,12 +457,25 @@ class _ReportPageState extends State<Reportpage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              "Financial Health Score",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                            Row(
+                              children: [
+                                const Text(
+                                  "Financial Health Score",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  onTap: _showHealthScoreExplanation,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(4.0),
+                                    child: Icon(Icons.info_outline, size: 17, color: Colors.grey),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -689,6 +819,7 @@ class _ReportPageState extends State<Reportpage> {
                   _makeBarGroup(2, onlineIn.toDouble(), onlineOut.toDouble()),
                 ],
               ),
+              duration: const Duration(milliseconds: 150),
             ),
           ),
         ],
@@ -792,6 +923,7 @@ class _ReportPageState extends State<Reportpage> {
                         );
                       }),
                     ),
+                    duration: const Duration(milliseconds: 150),
                   ),
                 ),
                 const SizedBox(width: 14),

@@ -28,13 +28,27 @@ class PassbookPageState extends State<PassbookApp> {
   int _displayLimit = 50;
   List<Map<String, dynamic>> _cachedSorted = [];
   String _lastSortKey = '';
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+        if (_displayLimit < _cachedSorted.length) {
+          setState(() => _displayLimit += 50);
+        }
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData({bool force = false}) async {
@@ -42,6 +56,106 @@ class PassbookPageState extends State<PassbookApp> {
     if (mounted && phone.isNotEmpty) {
       context.read<ExpenseProvider>().fetchExpenses(phone, force: force);
     }
+  }
+
+  void _showTransactionDetails(BuildContext context, Map<String, dynamic> item) {
+    final category = (item["Category"] ?? "Other").toString();
+    final desc = (item["Description"] ?? "No description").toString();
+    final method = (item["Payment_Mode"] ?? "").toString();
+    final amount = (double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0).round();
+    final date = (item["Date"] ?? "").toString();
+    final isIncome = ["Add CASH", "Add Online"].contains(method);
+    final key = (item["key"] ?? "").toString();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: CategoryTheme.getBgColor(category),
+                  child: Icon(CategoryTheme.getIcon(category), color: CategoryTheme.getColor(category), size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(category, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(formatDate(date), style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+                Text(
+                  amount.toINR(),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: isIncome ? Colors.green : Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+            if (desc.isNotEmpty) ...[
+              const Text("Description", style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 4),
+              Text(desc, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 12),
+            ],
+            const Text("Payment Mode", style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const SizedBox(height: 4),
+            Text(method, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text("Delete Transaction", style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  final confirmed = await showDeleteConfirmDialog(
+                    context,
+                    title: "Delete Record",
+                    message: "Are you sure you want to delete this record?",
+                  );
+                  if (confirmed == true && key.isNotEmpty) {
+                    await deleteRecord(key);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String formatDate(String date) {
@@ -246,6 +360,7 @@ class PassbookPageState extends State<PassbookApp> {
                           ),
                         )
                       : SingleChildScrollView(
+                          controller: _scrollController,
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
                           child: Column(
@@ -257,6 +372,22 @@ class PassbookPageState extends State<PassbookApp> {
                               const SizedBox(height: 10),
                               _sortRow(),
                               const SizedBox(height: 10),
+                              if (displayedRecords.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 40),
+                                  child: Center(
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.receipt_long_outlined, size: 50, color: Colors.grey.shade400),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          "No transactions in $selectedCategory",
+                                          style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ListView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -274,36 +405,54 @@ class PassbookPageState extends State<PassbookApp> {
                                   final method = (item["Payment_Mode"] ?? "").toString();
                                   final amount = (double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0).round();
                                   final isIncome = ["Add CASH", "Add Online"].contains(method);
+                                  final itemKey = item["key"]?.toString() ?? "$index";
 
-                                  return InkWell(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        if (showHeader && formattedCurrentDate.isNotEmpty)
-                                          _sectionHeader('', formattedCurrentDate),
-                                        _transactionTile(
-                                          icon: CategoryTheme.getIcon(category),
-                                          iconColor: CategoryTheme.getColor(category),
-                                          bgColor: CategoryTheme.getBgColor(category),
-                                          title: category,
-                                          subtitle: desc,
-                                          method: method,
-                                          time: date,
-                                          amount: amount.toINR(),
-                                          isIncome: isIncome,
-                                        ),
-                                      ],
+                                  return Dismissible(
+                                    key: Key(itemKey),
+                                    direction: DismissDirection.endToStart,
+                                    background: Container(
+                                      alignment: Alignment.centerRight,
+                                      padding: const EdgeInsets.only(right: 20),
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade400,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Icon(Icons.delete, color: Colors.white, size: 28),
                                     ),
-                                    onTap: () async {
-                                      final confirmed = await showDeleteConfirmDialog(
+                                    confirmDismiss: (_) async {
+                                      return await showDeleteConfirmDialog(
                                         context,
                                         title: "Delete Record",
                                         message: "Are you sure you want to delete this record?",
                                       );
-                                      if (confirmed == true && item["key"] != null && item["key"].toString().isNotEmpty) {
-                                        await deleteRecord(item["key"].toString());
+                                    },
+                                    onDismissed: (_) async {
+                                      if (itemKey.isNotEmpty) {
+                                        await deleteRecord(itemKey);
                                       }
                                     },
+                                    child: InkWell(
+                                      onTap: () => _showTransactionDetails(context, item),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (showHeader && formattedCurrentDate.isNotEmpty)
+                                            _sectionHeader('', formattedCurrentDate),
+                                          _transactionTile(
+                                            icon: CategoryTheme.getIcon(category),
+                                            iconColor: CategoryTheme.getColor(category),
+                                            bgColor: CategoryTheme.getBgColor(category),
+                                            title: category,
+                                            subtitle: desc,
+                                            method: method,
+                                            time: date,
+                                            amount: amount.toINR(),
+                                            isIncome: isIncome,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   );
                                 },
                               ),

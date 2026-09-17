@@ -23,6 +23,7 @@ class FriendPage extends StatefulWidget {
 class _FriendPageState extends State<FriendPage> {
   final TextEditingController searchController = TextEditingController();
   String searchQuery = "";
+  String sortBy = "Recent"; // 'Recent', 'Balance', 'Name'
 
   @override
   void initState() {
@@ -74,8 +75,8 @@ class _FriendPageState extends State<FriendPage> {
     return Consumer<FriendProvider>(
       builder: (context, friendProvider, _) {
         final allFriends = friendProvider.friends;
-        final displayedFriends = searchQuery.trim().isEmpty
-            ? allFriends
+        var displayedFriends = searchQuery.trim().isEmpty
+            ? List<Map<String, dynamic>>.from(allFriends)
             : allFriends.where((friend) {
                 final name = (friend["friend_name"] ?? "").toString().toLowerCase();
                 final number = (friend["friend_number"] ?? "").toString();
@@ -83,8 +84,26 @@ class _FriendPageState extends State<FriendPage> {
                 return name.contains(query) || number.contains(query);
               }).toList();
 
+        if (sortBy == "Name") {
+          displayedFriends.sort((a, b) => (a["friend_name"] ?? "")
+              .toString()
+              .toLowerCase()
+              .compareTo((b["friend_name"] ?? "").toString().toLowerCase()));
+        } else if (sortBy == "Balance") {
+          displayedFriends.sort((a, b) {
+            final balA = ((double.tryParse(a["total_get"]?.toString() ?? '0') ?? 0) -
+                    (double.tryParse(a["total_give"]?.toString() ?? '0') ?? 0))
+                .abs();
+            final balB = ((double.tryParse(b["total_get"]?.toString() ?? '0') ?? 0) -
+                    (double.tryParse(b["total_give"]?.toString() ?? '0') ?? 0))
+                .abs();
+            return balB.compareTo(balA);
+          });
+        }
+
         final totalGet = friendProvider.totalGet;
         final totalGive = friendProvider.totalGive;
+        final netBalance = totalGet - totalGive;
         final isLoading = friendProvider.isLoading;
 
         return Scaffold(
@@ -110,7 +129,7 @@ class _FriendPageState extends State<FriendPage> {
             onRefresh: () => _loadFriends(force: true),
             child: Column(
               children: [
-                // Summary Card
+                // Summary Card with Net Position
                 Container(
                   margin: const EdgeInsets.all(15),
                   padding: const EdgeInsets.all(18),
@@ -127,52 +146,79 @@ class _FriendPageState extends State<FriendPage> {
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "You Will Get",
-                              style: TextStyle(color: Colors.white70, fontSize: 13),
-                            ),
-                            const SizedBox(height: 5),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                totalGet.toINR(compactSymbol: true),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "You Will Get",
+                                  style: TextStyle(color: Colors.white70, fontSize: 13),
                                 ),
-                              ),
+                                const SizedBox(height: 5),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    totalGet.toINR(compactSymbol: true),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                          Container(height: 45, width: 1, color: Colors.white30),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                const Text(
+                                  "You Will Give",
+                                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                                ),
+                                const SizedBox(height: 5),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    totalGive.toINR(compactSymbol: true),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      Container(height: 45, width: 1, color: Colors.white30),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text(
-                              "You Will Give",
-                              style: TextStyle(color: Colors.white70, fontSize: 13),
-                            ),
-                            const SizedBox(height: 5),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                totalGive.toINR(compactSymbol: true),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            Text(
+                              netBalance >= 0
+                                  ? "Net: You are owed ${netBalance.abs().toINR(compactSymbol: true)}"
+                                  : "Net: You owe ${netBalance.abs().toINR(compactSymbol: true)}",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
                               ),
                             ),
                           ],
@@ -277,7 +323,41 @@ class _FriendPageState extends State<FriendPage> {
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+
+                // Sort Filter Chips
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  child: Row(
+                    children: [
+                      const Text("Sort: ", style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
+                      for (final s in ["Recent", "Balance", "Name"]) ...[
+                        GestureDetector(
+                          onTap: () => setState(() => sortBy = s),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: sortBy == s ? primaryColor : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: sortBy == s ? primaryColor : Colors.grey.shade300),
+                            ),
+                            child: Text(
+                              s,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: sortBy == s ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
 
                 // Friend List
                 Expanded(
@@ -302,6 +382,8 @@ class _FriendPageState extends State<FriendPage> {
                                 final friendNumber = (friend["friend_number"] ?? "").toString();
                                 final fGet = (double.tryParse(friend["total_get"]?.toString() ?? '0') ?? 0.0).round();
                                 final fGive = (double.tryParse(friend["total_give"]?.toString() ?? '0') ?? 0.0).round();
+                                final avatarColor = Colors.primaries[
+                                    (friendName.isNotEmpty ? friendName.codeUnitAt(0) : 0) % Colors.primaries.length];
 
                                 return InkWell(
                                   onLongPress: () async {
@@ -349,16 +431,16 @@ class _FriendPageState extends State<FriendPage> {
                                     ),
                                     child: Row(
                                       children: [
-                                        // Avatar
+                                        // Distinct avatar
                                         CircleAvatar(
                                           radius: 24,
-                                          backgroundColor: primaryColor.withValues(alpha: .15),
+                                          backgroundColor: avatarColor.withValues(alpha: .18),
                                           child: Text(
                                             friendName.isNotEmpty ? friendName[0].toUpperCase() : "F",
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 18,
                                               fontWeight: FontWeight.bold,
-                                              color: primaryColor,
+                                              color: avatarColor,
                                             ),
                                           ),
                                         ),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddSpent extends StatefulWidget {
   const AddSpent({super.key});
@@ -49,9 +50,42 @@ class _AddSpentState extends State<AddSpent> {
   String? selectedFriendName;
 
   void _onAmountChanged() {
+    _saveDraft();
     if (isSplitWithFriend && mounted) {
       setState(() {});
     }
+  }
+
+  void _saveDraft() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString('draft_add_spent_amount', amountController.text);
+      await sp.setString('draft_add_spent_desc', descriptionController.text);
+    } catch (_) {}
+  }
+
+  Future<void> _restoreDraft() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final draftAmount = sp.getString('draft_add_spent_amount');
+      final draftDesc = sp.getString('draft_add_spent_desc');
+      if (mounted) {
+        if (draftAmount != null && draftAmount.isNotEmpty && amountController.text.isEmpty) {
+          amountController.text = draftAmount;
+        }
+        if (draftDesc != null && draftDesc.isNotEmpty && descriptionController.text.isEmpty) {
+          descriptionController.text = draftDesc;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _clearDraft() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.remove('draft_add_spent_amount');
+      await sp.remove('draft_add_spent_desc');
+    } catch (_) {}
   }
 
   @override
@@ -61,9 +95,11 @@ class _AddSpentState extends State<AddSpent> {
     selectedCategory = categories.first;
 
     amountController.addListener(_onAmountChanged);
+    descriptionController.addListener(_saveDraft);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadFriends();
+      _restoreDraft();
     });
   }
 
@@ -77,6 +113,7 @@ class _AddSpentState extends State<AddSpent> {
   @override
   void dispose() {
     amountController.removeListener(_onAmountChanged);
+    descriptionController.removeListener(_saveDraft);
     amountController.dispose();
     descriptionController.dispose();
     super.dispose();
@@ -158,6 +195,7 @@ class _AddSpentState extends State<AddSpent> {
         );
 
         if (splitSuccess) {
+          await _clearDraft();
           await expenseProvider.fetchExpenses(phone);
           Fluttertoast.showToast(
             msg: "Saved! ₹$myShareStr in Passbook & ₹$friendShareStr added to $selectedFriendName's ledger",
@@ -183,6 +221,7 @@ class _AddSpentState extends State<AddSpent> {
         );
 
         if (success) {
+          await _clearDraft();
           Fluttertoast.showToast(msg: "Transaction added successfully");
           if (!mounted) return;
           Navigator.pop(context, true);
@@ -290,7 +329,7 @@ class _AddSpentState extends State<AddSpent> {
 
                     TextField(
                       controller: amountController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       maxLength: 10,
                       decoration: inputDecoration("Enter Total Amount (₹)").copyWith(counterText: ""),
                     ),
@@ -316,6 +355,53 @@ class _AddSpentState extends State<AddSpent> {
                     ),
 
                     const SizedBox(height: 18),
+
+                    Builder(
+                      builder: (context) {
+                        final expenseProvider = context.watch<ExpenseProvider>();
+                        final recentCats = expenseProvider.records
+                            .map((r) => (r["Category"] ?? "").toString())
+                            .where((c) => c.isNotEmpty && categories.contains(c))
+                            .toSet()
+                            .take(4)
+                            .toList();
+
+                        if (recentCats.isEmpty) return const SizedBox.shrink();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Recent Categories",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                for (final cat in recentCats)
+                                  ActionChip(
+                                    label: Text(cat),
+                                    backgroundColor: selectedCategory == cat
+                                        ? const Color(0xFF8BC24A)
+                                        : Colors.grey.shade100,
+                                    labelStyle: TextStyle(
+                                      color: selectedCategory == cat ? Colors.white : Colors.black87,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                    onPressed: () {
+                                      setState(() => selectedCategory = cat);
+                                    },
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        );
+                      },
+                    ),
 
                     DropdownMenu<String>(
                       width: MediaQuery.of(context).size.width - 84,

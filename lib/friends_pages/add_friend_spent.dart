@@ -42,6 +42,15 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
     super.initState();
     selectedMode = paymentModes.first;
     selectedType = categoryTypes.first;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final friends = context.read<FriendProvider>().friends;
+      final exists = friends.any((f) => (f["friend_number"] ?? "").toString() == widget.friendNumber);
+      if (!exists && friends.isNotEmpty) {
+        Fluttertoast.showToast(msg: "Notice: Friend not found in recent friend list");
+      }
+    });
   }
 
   @override
@@ -202,7 +211,7 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
 
                     TextField(
                       controller: amountController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       maxLength: 10,
                       decoration: inputDecoration("Enter Amount (₹)").copyWith(counterText: ""),
                     ),

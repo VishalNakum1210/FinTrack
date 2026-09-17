@@ -51,6 +51,48 @@ class ExpenseProvider extends ChangeNotifier {
     return totals;
   }
 
+  /// Pre-sorted transactions by date descending
+  List<Map<String, dynamic>> get sortedRecords {
+    final list = List<Map<String, dynamic>>.from(_records);
+    list.sort((a, b) {
+      final DateTime? dA = a['_parsedDate'] as DateTime? ?? DateHelper.parse(a['Date']);
+      final DateTime? dB = b['_parsedDate'] as DateTime? ?? DateHelper.parse(b['Date']);
+      if (dA != null && dB != null) {
+        final c = dB.compareTo(dA);
+        if (c != 0) return c;
+      } else if (dA != null) {
+        return -1;
+      } else if (dB != null) {
+        return 1;
+      }
+      final tA = (a['timestamp'] as num?)?.toInt() ?? 0;
+      final tB = (b['timestamp'] as num?)?.toInt() ?? 0;
+      return tB.compareTo(tA);
+    });
+    return List.unmodifiable(list);
+  }
+
+  /// Searches transactions matching description, category, payment mode or amount
+  List<Map<String, dynamic>> searchRecords(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return sortedRecords;
+    final results = _records.where((r) {
+      final desc = (r['Description'] ?? '').toString().toLowerCase();
+      final cat = (r['Category'] ?? '').toString().toLowerCase();
+      final amt = (r['Amount'] ?? '').toString();
+      final mode = (r['Payment_Mode'] ?? '').toString().toLowerCase();
+      return desc.contains(q) || cat.contains(q) || amt.contains(q) || mode.contains(q);
+    }).toList();
+
+    results.sort((a, b) {
+      final DateTime? dA = a['_parsedDate'] as DateTime? ?? DateHelper.parse(a['Date']);
+      final DateTime? dB = b['_parsedDate'] as DateTime? ?? DateHelper.parse(b['Date']);
+      if (dA != null && dB != null) return dB.compareTo(dA);
+      return 0;
+    });
+    return results;
+  }
+
   /// Sets up a real-time stream listener for user expenses
   Future<void> fetchExpenses(String phoneNumber, {bool force = false}) async {
     if (phoneNumber.isEmpty) return;

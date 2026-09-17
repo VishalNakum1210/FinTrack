@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
+import 'package:firebase_database/firebase_database.dart';
+
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -17,7 +19,7 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
-  String appVersion = "0.0.0";
+  String appVersion = "1.0.0";
 
   Future<void> getVersion() async {
     try {
@@ -30,6 +32,44 @@ class _SplashPageState extends State<SplashPage> {
     } catch (_) {}
   }
 
+  bool _isVersionLower(String current, String minimum) {
+    try {
+      final cParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final mParts = minimum.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      while (cParts.length < 3) {
+        cParts.add(0);
+      }
+      while (mParts.length < 3) {
+        mParts.add(0);
+      }
+      for (int i = 0; i < 3; i++) {
+        if (cParts[i] < mParts[i]) return true;
+        if (cParts[i] > mParts[i]) return false;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  void _showUpdateDialog(String minVersion) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.system_update_rounded, color: Color(0xff0D8A3F)),
+            SizedBox(width: 8),
+            Text("Update Required"),
+          ],
+        ),
+        content: Text(
+          "A newer version of FinTrack (v$minVersion) is required. Please update the app to continue using it.",
+        ),
+      ),
+    );
+  }
+
   Future<void> getDecision() async {
     try {
       final results = await Future.wait([
@@ -37,6 +77,25 @@ class _SplashPageState extends State<SplashPage> {
         SessionManager.getPhoneNumber().timeout(const Duration(seconds: 3), onTimeout: () => null),
         Future.delayed(const Duration(milliseconds: 800)),
       ]);
+
+      if (!mounted) return;
+
+      // Check minVersion from Firebase Realtime Database
+      try {
+        final versionSnap = await FirebaseDatabase.instance
+            .ref('app_config/min_version')
+            .get()
+            .timeout(const Duration(seconds: 2));
+        if (versionSnap.exists && versionSnap.value != null) {
+          final minVer = versionSnap.value.toString().trim();
+          if (_isVersionLower(appVersion, minVer)) {
+            if (mounted) {
+              _showUpdateDialog(minVer);
+              return;
+            }
+          }
+        }
+      } catch (_) {}
 
       if (!mounted) return;
 
@@ -60,8 +119,13 @@ class _SplashPageState extends State<SplashPage> {
           MaterialPageRoute(builder: (context) => const NavPageSelector()),
         );
         return;
+      } else if (hasValidSession) {
+        // Clear stale local session on auth mismatch
+        await SessionManager.clearSession();
       }
-    } catch (_) {}
+    } catch (_) {
+      await SessionManager.clearSession();
+    }
 
     if (!mounted) return;
     Navigator.pushReplacement(

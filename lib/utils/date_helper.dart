@@ -12,6 +12,7 @@ class DateHelper {
   /// Efficiently parses date strings of various common formats without loop exceptions
   static DateTime? parse(dynamic dateVal) {
     if (dateVal == null) return null;
+    if (dateVal is DateTime) return dateVal;
     final str = dateVal.toString().trim();
     if (str.isEmpty || str == "-") return null;
 
@@ -89,5 +90,20 @@ class DateHelper {
   /// Formats date for PDF statement timestamp
   static String formatStatementDate(DateTime dt) {
     return _statementFormat.format(dt);
+  }
+
+  /// Formats relative time (e.g. "just now", "5 min ago", "2 days ago")
+  static String toRelative(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.isNegative || diff.inSeconds < 60) return "just now";
+    if (diff.inMinutes < 60) return "${diff.inMinutes} min ago";
+    if (diff.inHours < 24) return "${diff.inHours} hours ago";
+    if (diff.inDays < 7) return "${diff.inDays} days ago";
+    if (diff.inDays < 30) {
+      final weeks = (diff.inDays / 7).floor();
+      return "$weeks ${weeks == 1 ? 'week' : 'weeks'} ago";
+    }
+    final months = (diff.inDays / 30).floor();
+    return "$months ${months == 1 ? 'month' : 'months'} ago";
   }
 }

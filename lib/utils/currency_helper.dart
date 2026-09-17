@@ -30,6 +30,27 @@ class CurrencyHelper {
     return _inrNoDecimals.format(value);
   }
 
+  /// Compact Indian format (e.g. ₹1.50L, ₹2.30Cr, ₹4.50K)
+  static String compact(num value) {
+    final absVal = value.abs();
+    final sign = value < 0 ? '-' : '';
+    if (absVal >= 10000000) {
+      return '$sign₹${(absVal / 10000000).toStringAsFixed(2)}Cr';
+    } else if (absVal >= 100000) {
+      return '$sign₹${(absVal / 100000).toStringAsFixed(2)}L';
+    } else if (absVal >= 1000) {
+      return '$sign₹${(absVal / 1000).toStringAsFixed(2)}K';
+    }
+    return format(value);
+  }
+
+  /// Formats with explicit sign (+₹500 / -₹500)
+  static String formatSigned(num value) {
+    if (value > 0) return '+${format(value)}';
+    if (value < 0) return '-${format(value.abs())}';
+    return format(value);
+  }
+
   /// Parses a dynamic string or number safely into double
   static double parse(dynamic value) {
     if (value == null) return 0.0;
@@ -42,5 +63,13 @@ class CurrencyHelper {
 extension CurrencyFormatting on num {
   String toINR({bool showDecimals = false, bool compactSymbol = false}) {
     return CurrencyHelper.format(this, showDecimals: showDecimals, compactSymbol: compactSymbol);
+  }
+
+  String toCompactINR() {
+    return CurrencyHelper.compact(this);
+  }
+
+  String toSignedINR() {
+    return CurrencyHelper.formatSigned(this);
   }
 }

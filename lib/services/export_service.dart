@@ -348,8 +348,8 @@ class ExportService {
                 oddRowDecoration: pw.BoxDecoration(color: _lightGrey),
                 data: List<List<dynamic>>.generate(friends.length, (index) {
                   final f = friends[index];
-                  final fGet = int.tryParse(f["total_get"]?.toString() ?? '0') ?? 0;
-                  final fGive = int.tryParse(f["total_give"]?.toString() ?? '0') ?? 0;
+                  final fGet = (double.tryParse(f["total_get"]?.toString() ?? '0') ?? 0.0).round();
+                  final fGive = (double.tryParse(f["total_give"]?.toString() ?? '0') ?? 0.0).round();
                   final diff = fGet - fGive;
 
                   return [
@@ -577,7 +577,7 @@ class ExportService {
 
       for (var r in mRecords) {
         final mode = (r["Payment_Mode"] ?? "").toString();
-        final amt = double.tryParse(r["Amount"]?.toString() ?? '0')?.toInt() ?? 0;
+        final amt = (double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0).round();
         if (mode == "Add CASH") {
           mIncome += amt;
           mCashAdded += amt;
@@ -784,17 +784,45 @@ class ExportService {
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(
-                  "FinTrack",
-                  style: pw.TextStyle(
-                    fontSize: 24,
-                    fontWeight: pw.FontWeight.bold,
-                    color: _darkGreen,
-                  ),
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Container(
+                      width: 22,
+                      height: 22,
+                      margin: const pw.EdgeInsets.only(right: 6),
+                      decoration: pw.BoxDecoration(
+                        color: _primaryGreen,
+                        shape: pw.BoxShape.circle,
+                      ),
+                      alignment: pw.Alignment.center,
+                      child: pw.Text(
+                        "F",
+                        style: const pw.TextStyle(
+                          color: PdfColors.white,
+                          fontWeight: pw.FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    pw.Text(
+                      "FinTrack",
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                        color: _darkGreen,
+                      ),
+                    ),
+                  ],
                 ),
+                pw.SizedBox(height: 2),
                 pw.Text(
                   subtitle,
                   style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                ),
+                pw.Text(
+                  "Smart • Transparent • Personal Financial Intelligence",
+                  style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey500),
                 ),
               ],
             ),

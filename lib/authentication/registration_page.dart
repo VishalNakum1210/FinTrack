@@ -18,9 +18,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
 
   bool isLoading = false;
   bool isPasswordVisible = false;
+  bool isConfirmPasswordVisible = false;
 
   int failedAttempts = 0;
   Timer? _throttleTimer;
@@ -31,8 +33,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
     emailController.dispose();
     phoneController.dispose();
     passwordController.dispose();
+    confirmPasswordController.dispose();
     _throttleTimer?.cancel();
     super.dispose();
+  }
+
+  int _getPasswordStrength(String pass) {
+    if (pass.isEmpty) return 0;
+    int score = 0;
+    if (pass.length >= 6) score++;
+    if (pass.length >= 8 && RegExp(r'[a-zA-Z]').hasMatch(pass) && RegExp(r'[0-9]').hasMatch(pass)) score++;
+    if (pass.length >= 10 && RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(pass)) score++;
+    return score;
   }
 
   Future<void> checkDetails() async {
@@ -45,11 +57,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
     String phoneNumber = phoneController.text.trim();
     String email = emailController.text.trim();
     String password = passwordController.text.trim();
+    String confirmPassword = confirmPasswordController.text.trim();
 
     if (name.isEmpty ||
         phoneNumber.isEmpty ||
         email.isEmpty ||
-        password.isEmpty) {
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
       Fluttertoast.showToast(msg: "Please fill all fields");
       return;
     }
@@ -69,6 +83,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
       Fluttertoast.showToast(
         msg: "Password must be at least 6 characters and contain letters & numbers",
       );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      Fluttertoast.showToast(msg: "Passwords do not match");
       return;
     }
 
@@ -318,6 +337,77 @@ class _RegistrationPageState extends State<RegistrationPage> {
                           ),
                         ),
 
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: passwordController,
+                          builder: (context, val, _) {
+                            final pass = val.text;
+                            if (pass.isEmpty) return const SizedBox.shrink();
+                            final strength = _getPasswordStrength(pass);
+                            final color = strength <= 1
+                                ? Colors.red
+                                : strength == 2
+                                    ? Colors.orange
+                                    : const Color(0xFF8BC24A);
+                            final label = strength <= 1
+                                ? "Weak"
+                                : strength == 2
+                                    ? "Medium"
+                                    : "Strong";
+
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8, bottom: 4),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: strength / 3.0,
+                                        backgroundColor: Colors.grey.shade200,
+                                        color: color,
+                                        minHeight: 5,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: color,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        TextField(
+                          controller: confirmPasswordController,
+                          obscureText: !isConfirmPasswordVisible,
+                          maxLength: 64,
+                          decoration: inputDecoration(
+                            "Confirm Password",
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                isConfirmPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: const Color(0xFF8BC24A),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  isConfirmPasswordVisible = !isConfirmPasswordVisible;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+
                         const SizedBox(height: 15),
 
                         Align(
@@ -341,7 +431,16 @@ class _RegistrationPageState extends State<RegistrationPage> {
                           ),
                         ),
 
-                        const SizedBox(height: 25),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 14, bottom: 6),
+                          child: Text(
+                            "By registering, you agree to FinTrack's Terms of Service and Privacy Policy.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 11.5, color: Colors.black54),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
 
                         SizedBox(
                           width: double.infinity,

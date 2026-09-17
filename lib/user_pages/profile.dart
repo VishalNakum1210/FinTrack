@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/profile_pages/change_password_page.dart';
 import 'package:fin_track/profile_pages/feedback_page.dart';
@@ -51,6 +52,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  bool _deleteCooldown = false;
+
   Future<void> deleteUser() async {
     if (isActionLoading) return;
     if (mounted) {
@@ -58,15 +61,59 @@ class _ProfilePageState extends State<ProfilePage> {
         isActionLoading = true;
       });
     }
+
     try {
       final user = FirebaseAuth.instance.currentUser;
-      final phone = user?.email?.split('@').first ?? (await SessionManager.getPhoneNumber() ?? "");
-      if (phone.isNotEmpty && phone.length == 10) {
-        await FirebaseDatabase.instance.ref("Friends/$phone").remove();
-        await FirebaseDatabase.instance.ref("Expenses/$phone").remove();
-        await FirebaseDatabase.instance.ref("user_details/$phone").remove();
+      if (user == null) {
+        Fluttertoast.showToast(msg: "No active user found. Please re-login.");
+        if (mounted) setState(() => isActionLoading = false);
+        return;
       }
-      await user?.delete();
+
+      final phone = await SessionManager.getPhoneNumber() ??
+          (user.email?.split('@').first ?? "");
+
+      // 1. Delete Firebase Auth user FIRST to prevent accidental data loss
+      bool authDeleted = false;
+      try {
+        await user.delete();
+        authDeleted = true;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'requires-recent-login') {
+          // Prompt for password re-auth
+          if (mounted) {
+            setState(() => isActionLoading = false);
+            final password = await _promptPasswordForReauth();
+            if (password != null && password.isNotEmpty) {
+              setState(() => isActionLoading = true);
+              final credential = EmailAuthProvider.credential(
+                email: user.email!,
+                password: password,
+              );
+              await user.reauthenticateWithCredential(credential);
+              await user.delete();
+              authDeleted = true;
+            } else {
+              Fluttertoast.showToast(msg: "Authentication cancelled");
+              return;
+            }
+          }
+        } else {
+          Fluttertoast.showToast(msg: e.message ?? "Failed to delete account");
+          if (mounted) setState(() => isActionLoading = false);
+          return;
+        }
+      }
+
+      // 2. Only if auth deletion succeeded, clean up RTDB database nodes
+      if (authDeleted && phone.isNotEmpty && phone.length == 10) {
+        try {
+          await FirebaseDatabase.instance.ref("Friends/$phone").remove();
+          await FirebaseDatabase.instance.ref("Expenses/$phone").remove();
+          await FirebaseDatabase.instance.ref("user_details/$phone").remove();
+        } catch (_) {}
+      }
+
       Fluttertoast.showToast(msg: "Account deleted successfully");
       if (mounted) {
         context.read<UserProvider>().clearUser();
@@ -80,17 +127,6 @@ class _ProfilePageState extends State<ProfilePage> {
         MaterialPageRoute(builder: (context) => const LoginPage()),
         (route) => false,
       );
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'requires-recent-login') {
-        Fluttertoast.showToast(msg: "Please re-login before deleting your account.");
-      } else {
-        Fluttertoast.showToast(msg: e.message ?? "Failed to delete account");
-      }
-      if (mounted) {
-        setState(() {
-          isActionLoading = false;
-        });
-      }
     } catch (e) {
       Fluttertoast.showToast(msg: "Failed to delete account: $e");
       if (mounted) {
@@ -99,6 +135,48 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     }
+  }
+
+  Future<String?> _promptPasswordForReauth() async {
+    final passCtrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Confirm Password"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "For security, please enter your password to confirm account deletion:",
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: passCtrl,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: "Password",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, passCtrl.text.trim()),
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
+    );
   }
 
   final Color themeColor = const Color(0xFF8BC24A);
@@ -388,7 +466,11 @@ class _ProfilePageState extends State<ProfilePage> {
                           child: SizedBox(
                             height: 55,
                             child: ElevatedButton.icon(
-                              onPressed: () async {
+                              onPressed: _deleteCooldown ? null : () async {
+                                setState(() => _deleteCooldown = true);
+                                Timer(const Duration(seconds: 5), () {
+                                  if (mounted) setState(() => _deleteCooldown = false);
+                                });
                                 showDialog(
                                   context: context,
                                   builder: (context) => AlertDialog(

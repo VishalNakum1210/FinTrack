@@ -41,18 +41,33 @@ class _AddFriendsState extends State<AddFriends> {
       return;
     }
 
+    String userPhoneNumber = await SessionManager.getPhoneNumber() ?? "";
+
+    if (userPhoneNumber.isEmpty) {
+      Fluttertoast.showToast(msg: "User not logged in");
+      return;
+    }
+
+    if (phoneNumber == userPhoneNumber) {
+      Fluttertoast.showToast(msg: "You cannot add yourself as a friend");
+      return;
+    }
+
+    if (!mounted) return;
+    final existingFriends = context.read<FriendProvider>().friends;
+    final isDuplicate = existingFriends.any(
+      (f) => (f["friend_number"] ?? "").toString().trim() == phoneNumber,
+    );
+    if (isDuplicate) {
+      Fluttertoast.showToast(msg: "This number is already in your friends list");
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
 
     try {
-      String userPhoneNumber = await SessionManager.getPhoneNumber() ?? "";
-
-      if (userPhoneNumber.isEmpty) {
-        Fluttertoast.showToast(msg: "User not logged in");
-        return;
-      }
-
       DateTime now = DateTime.now();
       if (!mounted) return;
       final success = await context.read<FriendProvider>().addFriend(
@@ -151,7 +166,7 @@ class _AddFriendsState extends State<AddFriends> {
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
                       maxLength: 10,
-                      decoration: inputDecoration("Friend Phone Number").copyWith(counterText: ""),
+                      decoration: inputDecoration("Enter 10-digit mobile number").copyWith(counterText: ""),
                     ),
                     const SizedBox(height: 12),
                     TextField(

@@ -14,13 +14,27 @@ class EditInformationPage extends StatefulWidget {
 
 class _EditInformationPageState extends State<EditInformationPage> {
   final Color themeColor = const Color(0xFF8BC24A);
-  Map<String, String> details = {};
   bool isLoading = true;
+  bool isSaving = false;
+  bool _isDirty = false;
+
+  String _originalName = '';
+  String _originalEmail = '';
+  String _originalAddress = '';
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController mobileController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
+
+  void _checkDirty() {
+    final dirty = nameController.text.trim() != _originalName ||
+        emailController.text.trim() != _originalEmail ||
+        addressController.text.trim() != _originalAddress;
+    if (dirty != _isDirty && mounted) {
+      setState(() => _isDirty = dirty);
+    }
+  }
 
   Widget customField({
     required String label,
@@ -28,6 +42,7 @@ class _EditInformationPageState extends State<EditInformationPage> {
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    int minLines = 1,
     int? maxLength,
   }) {
     return Padding(
@@ -36,6 +51,7 @@ class _EditInformationPageState extends State<EditInformationPage> {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        minLines: minLines,
         maxLength: maxLength,
         decoration: InputDecoration(
           counterText: "",
@@ -64,6 +80,9 @@ class _EditInformationPageState extends State<EditInformationPage> {
 
   @override
   void dispose() {
+    nameController.removeListener(_checkDirty);
+    emailController.removeListener(_checkDirty);
+    addressController.removeListener(_checkDirty);
     nameController.dispose();
     mobileController.dispose();
     emailController.dispose();
@@ -89,32 +108,52 @@ class _EditInformationPageState extends State<EditInformationPage> {
     }
   }
 
-  void getDetails() async {
-    try {
-      String phoneNumber = await SessionManager.getPhoneNumber() ?? "";
-      if (phoneNumber.isNotEmpty) {
-        details = await getUserInformation(phoneNumber);
-        if (mounted) {
-          setState(() {
-            nameController.text = details["name"] ?? "";
-            mobileController.text = details["phone_number"] ?? phoneNumber;
-            emailController.text = details["email"] ?? "";
-            addressController.text = details["address"] ?? details["Address"] ?? "";
-            isLoading = false;
-          });
+  void _populateFromUserProvider() async {
+    final userProvider = context.read<UserProvider>();
+    String phone = userProvider.phoneNumber;
+    if (phone.isEmpty) {
+      phone = await SessionManager.getPhoneNumber() ?? "";
+    }
+
+    if (userProvider.name.isNotEmpty) {
+      _originalName = userProvider.name;
+      _originalEmail = userProvider.email;
+      _originalAddress = userProvider.address;
+
+      nameController.text = _originalName;
+      mobileController.text = phone;
+      emailController.text = _originalEmail;
+      addressController.text = _originalAddress;
+
+      setState(() => isLoading = false);
+    } else {
+      try {
+        if (phone.isNotEmpty) {
+          final details = await getUserInformation(phone);
+          _originalName = details["name"] ?? "";
+          _originalEmail = details["email"] ?? "";
+          _originalAddress = details["address"] ?? details["Address"] ?? "";
+
+          nameController.text = _originalName;
+          mobileController.text = details["phone_number"] ?? phone;
+          emailController.text = _originalEmail;
+          addressController.text = _originalAddress;
         }
-      } else {
-        if (mounted) setState(() => isLoading = false);
-      }
-    } catch (_) {
+      } catch (_) {}
       if (mounted) setState(() => isLoading = false);
     }
+
+    nameController.addListener(_checkDirty);
+    emailController.addListener(_checkDirty);
+    addressController.addListener(_checkDirty);
   }
 
   @override
   void initState() {
     super.initState();
-    getDetails();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _populateFromUserProvider();
+    });
   }
 
   @override
@@ -184,43 +223,65 @@ class _EditInformationPageState extends State<EditInformationPage> {
               width: double.infinity,
               height: 55,
               child: ElevatedButton.icon(
-                onPressed: () async {
-                  String name = nameController.text.trim();
-                  String mobile = mobileController.text.trim();
-                  String email = emailController.text.trim();
-                  String address = addressController.text.trim();
+                onPressed: (!_isDirty || isSaving)
+                    ? null
+                    : () async {
+                        String name = nameController.text.trim();
+                        String mobile = mobileController.text.trim();
+                        String email = emailController.text.trim();
+                        String address = addressController.text.trim();
 
-                  if (name.isEmpty || email.isEmpty) {
-                    Fluttertoast.showToast(msg: "Name and Email cannot be empty");
-                    return;
-                  }
+                        if (name.isEmpty || email.isEmpty) {
+                          Fluttertoast.showToast(msg: "Name and Email cannot be empty");
+                          return;
+                        }
 
-                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,}$');
-                  if (!emailRegex.hasMatch(email)) {
-                    Fluttertoast.showToast(msg: "Please enter a valid email address");
-                    return;
-                  }
+                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,}$');
+                        if (!emailRegex.hasMatch(email)) {
+                          Fluttertoast.showToast(msg: "Please enter a valid email address");
+                          return;
+                        }
 
-                  final success = await updateInformation(name, mobile, email, address);
+                        setState(() => isSaving = true);
+                        final success = await updateInformation(name, mobile, email, address);
+                        if (mounted) setState(() => isSaving = false);
 
-                  if (success) {
-                    Fluttertoast.showToast(
-                      msg: "Information Updated Successfully",
-                    );
-                    if (!context.mounted) return;
-                    Navigator.pop(context, true);
-                  } else {
-                    Fluttertoast.showToast(msg: "Failed to update profile");
-                  }
-                },
-                icon: const Icon(Icons.save),
-                label: const Text(
-                  "Save Changes",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        if (success) {
+                          _originalName = name;
+                          _originalEmail = email;
+                          _originalAddress = address;
+                          _checkDirty();
+
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Profile updated successfully"),
+                              backgroundColor: Color(0xFF8BC24A),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          await Future.delayed(const Duration(milliseconds: 500));
+                          if (context.mounted) Navigator.pop(context, true);
+                        } else {
+                          Fluttertoast.showToast(msg: "Failed to update profile");
+                        }
+                      },
+                icon: isSaving
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save),
+                label: Text(
+                  isSaving ? "Saving..." : "Save Changes",
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: themeColor,
+                  disabledBackgroundColor: Colors.grey.shade300,
                   foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.grey.shade600,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),

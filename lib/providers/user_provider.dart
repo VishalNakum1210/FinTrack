@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:fin_track/get_information/get_user_detail.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider extends ChangeNotifier {
   bool _isLoading = false;
@@ -10,6 +12,8 @@ class UserProvider extends ChangeNotifier {
   String _email = "";
   String _phoneNumber = "";
   String _address = "";
+
+  static const String _cacheKey = 'cached_user_profile';
 
   bool get isLoading => _isLoading;
   bool get hasError => _hasError;
@@ -32,9 +36,35 @@ class UserProvider extends ChangeNotifier {
         _name = (details["name"] ?? "User").toString();
         _email = (details["email"] ?? "").toString();
         _address = (details["address"] ?? details["Address"] ?? "").toString();
+
+        // Cache profile offline
+        try {
+          final sp = await SharedPreferences.getInstance();
+          await sp.setString(_cacheKey, jsonEncode({
+            'name': _name,
+            'email': _email,
+            'address': _address,
+            'phone_number': _phoneNumber,
+          }));
+        } catch (_) {}
       }
     } catch (_) {
-      _hasError = true;
+      // Offline fallback: restore from cached profile if available
+      try {
+        final sp = await SharedPreferences.getInstance();
+        final cached = sp.getString(_cacheKey);
+        if (cached != null && cached.isNotEmpty) {
+          final data = jsonDecode(cached) as Map<String, dynamic>;
+          _name = (data['name'] ?? _name).toString();
+          _email = (data['email'] ?? _email).toString();
+          _address = (data['address'] ?? _address).toString();
+          _phoneNumber = (data['phone_number'] ?? _phoneNumber).toString();
+        } else {
+          _hasError = true;
+        }
+      } catch (_) {
+        _hasError = true;
+      }
     }
 
     _isLoading = false;
@@ -67,6 +97,16 @@ class UserProvider extends ChangeNotifier {
         email: email,
       );
 
+      try {
+        final sp = await SharedPreferences.getInstance();
+        await sp.setString(_cacheKey, jsonEncode({
+          'name': _name,
+          'email': _email,
+          'address': _address,
+          'phone_number': _phoneNumber,
+        }));
+      } catch (_) {}
+
       notifyListeners();
       return true;
     } catch (_) {
@@ -80,6 +120,9 @@ class UserProvider extends ChangeNotifier {
     _phoneNumber = "";
     _address = "";
     _hasError = false;
+    SharedPreferences.getInstance().then((sp) {
+      sp.remove(_cacheKey);
+    }).catchError((_) {});
     notifyListeners();
   }
 }
