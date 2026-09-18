@@ -137,6 +137,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
         Fluttertoast.showToast(msg: "Phone number is already registered!");
       } else if (e.code == 'weak-password') {
         Fluttertoast.showToast(msg: "Password is too weak");
+      } else if (e.code == 'operation-not-allowed') {
+        Fluttertoast.showToast(
+          msg: "Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication > Sign-in method.",
+        );
       } else {
         Fluttertoast.showToast(msg: e.message ?? "Registration failed");
       }

@@ -150,6 +150,10 @@ class _LoginPageState extends State<LoginPage> {
           Fluttertoast.showToast(
             msg: "Network error. Please check your internet connection.",
           );
+        } else if (e.code == 'operation-not-allowed') {
+          Fluttertoast.showToast(
+            msg: "Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication > Sign-in method.",
+          );
         } else {
           Fluttertoast.showToast(msg: e.message ?? "Authentication failed");
         }
