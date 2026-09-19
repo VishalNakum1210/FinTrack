@@ -32,14 +32,35 @@ class SessionManager {
     required String username,
     required String email,
   }) async {
+    // Preserve existing valid username if caller supplies "User" or empty string
+    String effectiveUsername = username.trim();
+    if (effectiveUsername.isEmpty || effectiveUsername == "User") {
+      final existingUsername = await getUsername();
+      if (existingUsername != null &&
+          existingUsername.trim().isNotEmpty &&
+          existingUsername.trim() != "User") {
+        effectiveUsername = existingUsername.trim();
+      } else {
+        effectiveUsername = "User";
+      }
+    }
+
+    String effectiveEmail = email.trim();
+    if (effectiveEmail.isEmpty) {
+      final existingEmail = await getEmail();
+      if (existingEmail != null && existingEmail.trim().isNotEmpty) {
+        effectiveEmail = existingEmail.trim();
+      }
+    }
+
     final now = DateTime.now().millisecondsSinceEpoch;
     final signature = _generateSignature(phoneNumber, now);
 
     bool secureSuccess = false;
     try {
       await _secureStorage.write(key: _keyPhoneNumber, value: phoneNumber);
-      await _secureStorage.write(key: _keyUsername, value: username);
-      await _secureStorage.write(key: _keyEmail, value: email);
+      await _secureStorage.write(key: _keyUsername, value: effectiveUsername);
+      await _secureStorage.write(key: _keyEmail, value: effectiveEmail);
       await _secureStorage.write(key: _keyLastActive, value: now.toString());
       await _secureStorage.write(key: _keySessionSignature, value: signature);
       secureSuccess = true;
@@ -48,8 +69,8 @@ class SessionManager {
     if (!secureSuccess) {
       final sp = await SharedPreferences.getInstance();
       await sp.setString(_keyPhoneNumber, phoneNumber);
-      await sp.setString(_keyUsername, username);
-      await sp.setString(_keyEmail, email);
+      await sp.setString(_keyUsername, effectiveUsername);
+      await sp.setString(_keyEmail, effectiveEmail);
       await sp.setInt(_keyLastActive, now);
       await sp.setString(_keySessionSignature, signature);
     }
@@ -166,9 +187,41 @@ class SessionManager {
       phone = await _secureStorage.read(key: _keyPhoneNumber);
     } catch (_) {}
     if (phone == null || phone.isEmpty) {
-      final sp = await SharedPreferences.getInstance();
-      phone = sp.getString(_keyPhoneNumber);
+      try {
+        final sp = await SharedPreferences.getInstance();
+        phone = sp.getString(_keyPhoneNumber);
+      } catch (_) {}
     }
     return phone;
+  }
+
+  /// Retrieves the authenticated username securely
+  static Future<String?> getUsername() async {
+    String? username;
+    try {
+      username = await _secureStorage.read(key: _keyUsername);
+    } catch (_) {}
+    if (username == null || username.isEmpty) {
+      try {
+        final sp = await SharedPreferences.getInstance();
+        username = sp.getString(_keyUsername);
+      } catch (_) {}
+    }
+    return username;
+  }
+
+  /// Retrieves the authenticated email securely
+  static Future<String?> getEmail() async {
+    String? email;
+    try {
+      email = await _secureStorage.read(key: _keyEmail);
+    } catch (_) {}
+    if (email == null || email.isEmpty) {
+      try {
+        final sp = await SharedPreferences.getInstance();
+        email = sp.getString(_keyEmail);
+      } catch (_) {}
+    }
+    return email;
   }
 }

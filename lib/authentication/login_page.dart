@@ -8,11 +8,13 @@ import 'package:fin_track/providers/user_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final String? initialPhoneNumber;
+  const LoginPage({super.key, this.initialPhoneNumber});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -28,6 +30,14 @@ class _LoginPageState extends State<LoginPage> {
   int failedAttempts = 0;
   int lockoutSeconds = 0;
   Timer? lockoutTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialPhoneNumber != null && widget.initialPhoneNumber!.isNotEmpty) {
+      username.text = widget.initialPhoneNumber!;
+    }
+  }
 
   @override
   void dispose() {
@@ -71,7 +81,7 @@ class _LoginPageState extends State<LoginPage> {
     String passwordUser = password.text.trim();
 
     if (phoneNumber.isEmpty || passwordUser.isEmpty) {
-      Fluttertoast.showToast(msg: "Please enter all required details");
+      Fluttertoast.showToast(msg: "Please enter your phone number and password");
       return;
     }
     if (phoneNumber.length != 10 || int.tryParse(phoneNumber) == null) {
@@ -98,8 +108,55 @@ class _LoginPageState extends State<LoginPage> {
         String email = "";
         if (event.snapshot.value != null && event.snapshot.value is Map) {
           final values = Map<String, dynamic>.from(event.snapshot.value as Map);
-          name = (values["name"] ?? "User").toString();
-          email = (values["email"] ?? "").toString();
+          for (final key in [
+            'name',
+            'Name',
+            'username',
+            'userName',
+            'fullName',
+            'FullName',
+            'displayName',
+            'DisplayName'
+          ]) {
+            final val = values[key]?.toString().trim();
+            if (val != null && val.isNotEmpty && val != 'User') {
+              name = val;
+              break;
+            }
+          }
+          email = (values["email"] ?? values["Email"] ?? "").toString().trim();
+        }
+
+        // Fallback to FirebaseAuth displayName
+        if (name == "User" || name.isEmpty) {
+          final authName = userCredential.user?.displayName?.trim();
+          if (authName != null && authName.isNotEmpty && authName != "User") {
+            name = authName;
+          }
+        }
+
+        // Fallback to SessionManager cached username
+        if (name == "User" || name.isEmpty) {
+          final sessionName = await SessionManager.getUsername();
+          if (sessionName != null && sessionName.trim().isNotEmpty && sessionName.trim() != "User") {
+            name = sessionName.trim();
+          }
+        }
+
+        // Sync displayName and RTDB if valid name resolved
+        if (name != "User" && name.isNotEmpty) {
+          try {
+            if (userCredential.user?.displayName != name) {
+              await userCredential.user?.updateDisplayName(name);
+            }
+          } catch (_) {}
+          try {
+            if (event.snapshot.value == null ||
+                event.snapshot.value is! Map ||
+                (event.snapshot.value as Map)["name"] == null) {
+              await myRef.update({"name": name, "phone_number": phoneNumber});
+            }
+          } catch (_) {}
         }
 
         await SessionManager.saveSession(
@@ -116,9 +173,10 @@ class _LoginPageState extends State<LoginPage> {
 
         Fluttertoast.showToast(msg: "Login successful");
         if (!mounted) return;
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const NavPageSelector()),
+          (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -131,7 +189,7 @@ class _LoginPageState extends State<LoginPage> {
       } else {
         if (e.code == 'user-not-found') {
           Fluttertoast.showToast(
-            msg: "No account found with this phone number",
+            msg: "No account found. If you registered previously, tap Register to link your data.",
           );
         } else if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
           Fluttertoast.showToast(
@@ -153,6 +211,14 @@ class _LoginPageState extends State<LoginPage> {
         } else if (e.code == 'operation-not-allowed') {
           Fluttertoast.showToast(
             msg: "Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication > Sign-in method.",
+          );
+        } else if (e.code == 'invalid-email') {
+          Fluttertoast.showToast(
+            msg: "Please enter a valid 10-digit phone number.",
+          );
+        } else if (e.code == 'channel-error') {
+          Fluttertoast.showToast(
+            msg: "Please enter your phone number and password.",
           );
         } else {
           Fluttertoast.showToast(msg: e.message ?? "Authentication failed");
@@ -176,6 +242,7 @@ class _LoginPageState extends State<LoginPage> {
   InputDecoration inputDecoration(String hint, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,
+      counterText: "",
       hintStyle: const TextStyle(color: Color(0xFF8BC24A)),
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
@@ -199,7 +266,10 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
         children: [
           // Decorative background circle
           Positioned(
@@ -303,61 +373,71 @@ class _LoginPageState extends State<LoginPage> {
 
                         const SizedBox(height: 30),
 
-                        TextField(
-                          controller: username,
-                          keyboardType: TextInputType.phone,
-                          style: const TextStyle(color: Colors.black87),
-                          decoration: inputDecoration("Phone Number"),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        TextField(
-                          controller: password,
-                          obscureText: !isPasswordVisible,
-                          style: const TextStyle(color: Colors.black87),
-                          decoration: inputDecoration(
-                            "Password",
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                isPasswordVisible
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
-                                color: const Color(0xFF8BC24A),
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  isPasswordVisible = !isPasswordVisible;
-                                });
-                              },
-                            ),
+                          TextField(
+                            controller: username,
+                            keyboardType: TextInputType.phone,
+                            maxLength: 10,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            textInputAction: TextInputAction.next,
+                            style: const TextStyle(color: Colors.black87),
+                            decoration: inputDecoration("Phone Number"),
                           ),
-                        ),
 
-                        const SizedBox(height: 15),
+                          const SizedBox(height: 20),
 
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const RegistrationPage(),
+                          TextField(
+                            controller: password,
+                            obscureText: !isPasswordVisible,
+                            maxLength: 64,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => (isLoading || lockoutSeconds > 0) ? null : checkUserDetails(),
+                            style: const TextStyle(color: Colors.black87),
+                            decoration: inputDecoration(
+                              "Password",
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  isPasswordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: const Color(0xFF8BC24A),
                                 ),
-                              );
-                            },
-                            child: const Text(
-                              "Don't have an account? Sign Up",
-                              style: TextStyle(
-                                color: Color.fromARGB(255, 74, 127, 61),
-                                fontWeight: FontWeight.w600,
+                                onPressed: () {
+                                  setState(() {
+                                    isPasswordVisible = !isPasswordVisible;
+                                  });
+                                },
                               ),
                             ),
                           ),
-                        ),
 
-                        const SizedBox(height: 30),
+                          const SizedBox(height: 15),
+
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: InkWell(
+                              onTap: () {
+                                if (Navigator.canPop(context)) {
+                                  Navigator.pop(context);
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const RegistrationPage(),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: const Text(
+                                "Don't have an account? Sign Up",
+                                style: TextStyle(
+                                  color: Color.fromARGB(255, 74, 127, 61),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
 
                         SizedBox(
                           height: 52,
@@ -401,6 +481,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

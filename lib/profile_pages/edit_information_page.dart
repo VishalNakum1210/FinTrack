@@ -115,8 +115,16 @@ class _EditInformationPageState extends State<EditInformationPage> {
       phone = await SessionManager.getPhoneNumber() ?? "";
     }
 
-    if (userProvider.name.isNotEmpty) {
-      _originalName = userProvider.name;
+    String currentName = userProvider.name;
+    if (currentName.isEmpty || currentName == "User") {
+      final sessionUsername = await SessionManager.getUsername();
+      if (sessionUsername != null && sessionUsername.trim().isNotEmpty && sessionUsername.trim() != "User") {
+        currentName = sessionUsername.trim();
+      }
+    }
+
+    if (currentName.isNotEmpty && currentName != "User") {
+      _originalName = currentName;
       _originalEmail = userProvider.email;
       _originalAddress = userProvider.address;
 
@@ -130,8 +138,19 @@ class _EditInformationPageState extends State<EditInformationPage> {
       try {
         if (phone.isNotEmpty) {
           final details = await getUserInformation(phone);
-          _originalName = details["name"] ?? "";
-          _originalEmail = details["email"] ?? "";
+          String resolvedName = "";
+          for (final k in ['name', 'Name', 'username', 'userName', 'fullName', 'FullName', 'displayName']) {
+            final val = details[k]?.trim();
+            if (val != null && val.isNotEmpty && val != 'User') {
+              resolvedName = val;
+              break;
+            }
+          }
+          if (resolvedName.isEmpty) {
+            resolvedName = await SessionManager.getUsername() ?? "";
+          }
+          _originalName = resolvedName == "User" ? "" : resolvedName;
+          _originalEmail = details["email"] ?? details["Email"] ?? "";
           _originalAddress = details["address"] ?? details["Address"] ?? "";
 
           nameController.text = _originalName;

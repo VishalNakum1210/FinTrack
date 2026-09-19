@@ -13,7 +13,13 @@ Future<Map<String, String>> getUserInformation(String phoneNumber) async {
       Map data = event.snapshot.value as Map;
 
       data.forEach((key, value) {
-        result[key.toString()] = (value ?? "").toString();
+        final keyStr = key.toString();
+        final valStr = (value ?? "").toString();
+        result[keyStr] = valStr;
+        final lowerKey = keyStr.toLowerCase();
+        if (!result.containsKey(lowerKey)) {
+          result[lowerKey] = valStr;
+        }
       });
     }
   } catch (_) {}

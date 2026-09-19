@@ -71,7 +71,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final phoneNumber = await SessionManager.getPhoneNumber() ?? "";
     final user = FirebaseAuth.instance.currentUser;
     if (phoneNumber.isEmpty || user == null) {
-      Fluttertoast.showToast(msg: "User not logged in");
+      Fluttertoast.showToast(msg: "Session expired. Please log in again.");
       return;
     }
 
@@ -110,12 +110,18 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           Fluttertoast.showToast(msg: "Old password is incorrect (${3 - failedAttempts} attempts remaining)");
         }
       } else if (e.code == 'weak-password') {
-        Fluttertoast.showToast(msg: "Password is too weak");
+        Fluttertoast.showToast(msg: "New password is too weak. Please use a stronger password.");
+      } else if (e.code == 'too-many-requests') {
+        Fluttertoast.showToast(msg: "Too many attempts. Please wait a moment before trying again.");
+      } else if (e.code == 'network-request-failed') {
+        Fluttertoast.showToast(msg: "Network error. Please check your internet connection.");
+      } else if (e.code == 'requires-recent-login') {
+        Fluttertoast.showToast(msg: "Security check: Please log in again to change your password.");
       } else {
         Fluttertoast.showToast(msg: e.message ?? "Failed to change password");
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: e.toString());
+      Fluttertoast.showToast(msg: "Unable to change password. Please check your connection and retry.");
     } finally {
       if (mounted) {
         setState(() {
@@ -130,6 +136,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     required TextEditingController controller,
     required bool visible,
     required VoidCallback onTap,
+    TextInputAction textInputAction = TextInputAction.next,
+    ValueChanged<String>? onSubmitted,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
@@ -137,6 +145,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         controller: controller,
         obscureText: !visible,
         maxLength: 64,
+        textInputAction: textInputAction,
+        onSubmitted: onSubmitted,
         decoration: InputDecoration(
           counterText: "",
           labelText: label,
@@ -188,129 +198,137 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         backgroundColor: themeColor,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            CircleAvatar(
-              radius: 55,
-              backgroundColor: themeColor,
-              child: const Icon(
-                Icons.lock,
-                size: 60,
-                color: Colors.white,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 55,
+                backgroundColor: themeColor,
+                child: const Icon(
+                  Icons.lock,
+                  size: 60,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            const SizedBox(height: 30),
-            passwordField(
-              label: "Old Password",
-              controller: oldPasswordController,
-              visible: oldPasswordVisible,
-              onTap: () {
-                setState(() {
-                  oldPasswordVisible = !oldPasswordVisible;
-                });
-              },
-            ),
-            passwordField(
-              label: "New Password",
-              controller: newPasswordController,
-              visible: newPasswordVisible,
-              onTap: () {
-                setState(() {
-                  newPasswordVisible = !newPasswordVisible;
-                });
-              },
-            ),
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: newPasswordController,
-              builder: (context, val, _) {
-                final pass = val.text;
-                if (pass.isEmpty) return const SizedBox.shrink();
-                final strength = _getPasswordStrength(pass);
-                final color = strength <= 1
-                    ? Colors.red
-                    : strength == 2
-                        ? Colors.orange
-                        : const Color(0xFF8BC24A);
-                final label = strength <= 1
-                    ? "Weak"
-                    : strength == 2
-                        ? "Medium"
-                        : "Strong";
+              const SizedBox(height: 30),
+              passwordField(
+                label: "Old Password",
+                controller: oldPasswordController,
+                visible: oldPasswordVisible,
+                textInputAction: TextInputAction.next,
+                onTap: () {
+                  setState(() {
+                    oldPasswordVisible = !oldPasswordVisible;
+                  });
+                },
+              ),
+              passwordField(
+                label: "New Password",
+                controller: newPasswordController,
+                visible: newPasswordVisible,
+                textInputAction: TextInputAction.next,
+                onTap: () {
+                  setState(() {
+                    newPasswordVisible = !newPasswordVisible;
+                  });
+                },
+              ),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: newPasswordController,
+                builder: (context, val, _) {
+                  final pass = val.text;
+                  if (pass.isEmpty) return const SizedBox.shrink();
+                  final strength = _getPasswordStrength(pass);
+                  final color = strength <= 1
+                      ? Colors.red
+                      : strength == 2
+                          ? Colors.orange
+                          : const Color(0xFF8BC24A);
+                  final label = strength <= 1
+                      ? "Weak"
+                      : strength == 2
+                          ? "Medium"
+                          : "Strong";
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: strength / 3.0,
-                            backgroundColor: Colors.grey.shade200,
-                            color: color,
-                            minHeight: 5,
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: strength / 3.0,
+                              backgroundColor: Colors.grey.shade200,
+                              color: color,
+                              minHeight: 5,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: color,
+                        const SizedBox(width: 8),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            passwordField(
-              label: "Confirm Password",
-              controller: confirmPasswordController,
-              visible: confirmPasswordVisible,
-              onTap: () {
-                setState(() {
-                  confirmPasswordVisible = !confirmPasswordVisible;
-                });
-              },
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: isLoading ? null : changePassword,
-                icon: const Icon(Icons.save),
-                label: isLoading
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                      ],
+                    ),
+                  );
+                },
+              ),
+              passwordField(
+                label: "Confirm Password",
+                controller: confirmPasswordController,
+                visible: confirmPasswordVisible,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => isLoading ? null : changePassword(),
+                onTap: () {
+                  setState(() {
+                    confirmPasswordVisible = !confirmPasswordVisible;
+                  });
+                },
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  onPressed: isLoading ? null : changePassword,
+                  icon: const Icon(Icons.save),
+                  label: isLoading
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          "Update Password",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      )
-                    : const Text(
-                        "Update Password",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: themeColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: themeColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
