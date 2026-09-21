@@ -1,6 +1,7 @@
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
+import 'package:fin_track/utils/category_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -42,6 +43,18 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
   void _onAmountChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _addToAmount(double delta) {
+    final current = double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
+    final newVal = current + delta;
+    final str = newVal.truncateToDouble() == newVal ? newVal.toInt().toString() : newVal.toStringAsFixed(2);
+    amountController.text = str;
+    amountController.selection = TextSelection.fromPosition(TextPosition(offset: str.length));
+  }
+
+  void _clearAmount() {
+    amountController.clear();
   }
 
   @override
@@ -129,14 +142,14 @@ class _SplitBillPageState extends State<SplitBillPage> {
           children: [
             const Text(
               "Confirm Bill Split",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
             ),
             const SizedBox(height: 14),
-            Text("Total Bill: ₹$totalAmountStr", style: const TextStyle(fontSize: 15)),
+            Text("Total Bill: ₹$totalAmountStr", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            Text("Your Share: ₹$myShareStr (to Passbook)", style: const TextStyle(fontSize: 14, color: Color(0xFF2E7D32))),
+            Text("Your Share: ₹$myShareStr (to Passbook)", style: const TextStyle(fontSize: 14, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            Text("Each Friend: ₹$sharePerPersonStr (${selectedFriendNumbers.length} friends)", style: const TextStyle(fontSize: 14, color: Color(0xFFE65100))),
+            Text("Each Friend: ₹$sharePerPersonStr (${selectedFriendNumbers.length} friends)", style: const TextStyle(fontSize: 14, color: Color(0xFFE65100), fontWeight: FontWeight.w600)),
             const SizedBox(height: 20),
             Row(
               children: [
@@ -145,8 +158,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     onPressed: () => Navigator.pop(ctx, false),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
                     ),
-                    child: const Text("Cancel"),
+                    child: const Text("Cancel", style: TextStyle(color: Color(0xFF64748B))),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -158,7 +172,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text("Confirm"),
+                    child: const Text("Confirm & Split", style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -229,23 +243,6 @@ class _SplitBillPageState extends State<SplitBillPage> {
     }
   }
 
-  InputDecoration _inputDeco(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: Colors.grey.shade50,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      enabledBorder: OutlineInputBorder(
-        borderSide: const BorderSide(width: 1.5, color: Color(0xFF8BC24A)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(width: 2, color: Color(0xFF689F38)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     const Color primary = Color(0xFF8BC24A);
@@ -265,11 +262,11 @@ class _SplitBillPageState extends State<SplitBillPage> {
         : (sharePerPerson * selectedFriendNumbers.length).toStringAsFixed(2);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FBF2),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
-          "Split Bill with Friends",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          "Split Bill",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: primary,
@@ -279,160 +276,20 @@ class _SplitBillPageState extends State<SplitBillPage> {
         children: [
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Header Info Banner
+                  // 1. Hero Total Bill Card with Quick Add Chips
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF8BC24A), Color(0xFF689F38)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
                       boxShadow: [
                         BoxShadow(
-                          color: primary.withValues(alpha: .25),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 12,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.group_work_rounded, color: Colors.white, size: 28),
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Multi-Friend Bill Splitter",
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              SizedBox(height: 3),
-                              Text(
-                                "Your share goes to Passbook, and each friend's share goes into their ledger.",
-                                style: TextStyle(color: Colors.white70, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 1. Bill Details Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "1. Bill Details",
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF33691E)),
-                        ),
-                        const SizedBox(height: 16),
-
-                        TextField(
-                          controller: amountController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          maxLength: 10,
-                          decoration: _inputDeco("Total Bill Amount (₹)").copyWith(counterText: ""),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        TextField(
-                          controller: descriptionController,
-                          maxLength: 150,
-                          decoration: _inputDeco("Bill Description (e.g. Dinner, Taxi)"),
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        TextField(
-                          readOnly: true,
-                          decoration: _inputDeco("Date: ${DateFormat('dd MMM yyyy').format(selectedDate)}").copyWith(
-                            suffixIcon: const Icon(Icons.calendar_month_rounded, color: primary),
-                          ),
-                          onTap: pickDate,
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                initialValue: selectedCategory,
-                                decoration: _inputDeco("Category").copyWith(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                ),
-                                items: categories
-                                    .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14))))
-                                    .toList(),
-                                onChanged: (val) {
-                                  if (val != null) setState(() => selectedCategory = val);
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                initialValue: selectedMode,
-                                decoration: _inputDeco("Payment").copyWith(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                ),
-                                items: paymentModes
-                                    .map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 14))))
-                                    .toList(),
-                                onChanged: (val) {
-                                  if (val != null) setState(() => selectedMode = val);
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 2. Select Friends Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
                       ],
@@ -444,12 +301,277 @@ class _SplitBillPageState extends State<SplitBillPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              "2. Select Friends to Split With",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF33691E)),
+                              "TOTAL BILL AMOUNT",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            if (amountController.text.isNotEmpty)
+                              GestureDetector(
+                                onTap: _clearAmount,
+                                child: Text(
+                                  "Clear",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade400,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "₹",
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: primary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: amountController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                maxLength: 10,
+                                style: const TextStyle(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1E293B),
+                                  letterSpacing: -0.5,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: "0.00",
+                                  hintStyle: TextStyle(color: Color(0xFFCBD5E1)),
+                                  border: InputBorder.none,
+                                  counterText: "",
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _quickAddChip("+100", () => _addToAmount(100)),
+                              _quickAddChip("+500", () => _addToAmount(500)),
+                              _quickAddChip("+1,000", () => _addToAmount(1000)),
+                              _quickAddChip("+2,000", () => _addToAmount(2000)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // 2. Bill Meta (Description, Date, Category, Payment)
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Bill Information",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: descriptionController,
+                          maxLength: 150,
+                          style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                          decoration: InputDecoration(
+                            hintText: "Enter bill title (e.g. Dinner, Movie, Uber)",
+                            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+                            prefixIcon: const Icon(Icons.receipt_long_rounded, color: primary, size: 22),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            counterText: "",
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: primary, width: 1.8),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: pickDate,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.calendar_month_rounded, color: primary, size: 20),
+                                const SizedBox(width: 10),
+                                Text(
+                                  DateFormat('dd MMMM yyyy').format(selectedDate),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                                const Spacer(),
+                                const Text(
+                                  "Change",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    isExpanded: true,
+                                    value: selectedCategory,
+                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: primary),
+                                    items: categories.map((c) {
+                                      return DropdownMenuItem(
+                                        value: c,
+                                        child: Row(
+                                          children: [
+                                            Icon(CategoryTheme.getIcon(c), size: 16, color: CategoryTheme.getColor(c)),
+                                            const SizedBox(width: 6),
+                                            Text(c, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) setState(() => selectedCategory = val);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    isExpanded: true,
+                                    value: selectedMode,
+                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: primary),
+                                    items: paymentModes.map((m) {
+                                      final isOnline = m.contains("Online");
+                                      return DropdownMenuItem(
+                                        value: m,
+                                        child: Row(
+                                          children: [
+                                            Icon(isOnline ? Icons.credit_card_rounded : Icons.payments_rounded, size: 16, color: primary),
+                                            const SizedBox(width: 6),
+                                            Text(isOnline ? "Online" : "Cash", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) setState(() => selectedMode = val);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // 3. Select Friends to Split With
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Flexible(
+                              child: Text(
+                                "Select Friends to Split",
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
                             ),
                             if (friends.isNotEmpty)
-                              TextButton(
-                                onPressed: () {
+                              InkWell(
+                                onTap: () {
                                   setState(() {
                                     if (selectedFriendNumbers.length == friends.length) {
                                       selectedFriendNumbers.clear();
@@ -460,14 +582,26 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                     }
                                   });
                                 },
-                                child: Text(
-                                  selectedFriendNumbers.length == friends.length ? "Deselect All" : "Select All",
-                                  style: const TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 12.5),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F8E9),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    selectedFriendNumbers.length == friends.length ? "Deselect All" : "Select All",
+                                    style: const TextStyle(
+                                      color: Color(0xFF558B2F),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
                                 ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
 
                         if (friends.isEmpty)
                           Padding(
@@ -492,30 +626,36 @@ class _SplitBillPageState extends State<SplitBillPage> {
                               final number = (friend["friend_number"] ?? "").toString();
                               final isSelected = selectedFriendNumbers.contains(number);
 
-                              return CheckboxListTile(
-                                value: isSelected,
-                                activeColor: primary,
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
-                                subtitle: Text(number, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                                secondary: CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: isSelected ? primary.withValues(alpha: 0.15) : Colors.grey.shade100,
-                                  child: Icon(
-                                    Icons.person_rounded,
-                                    color: isSelected ? primary : Colors.grey.shade600,
-                                    size: 18,
+                              return Material(
+                                color: Colors.transparent,
+                                child: CheckboxListTile(
+                                  value: isSelected,
+                                  activeColor: primary,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                  subtitle: Text(number, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                                  secondary: CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: isSelected ? primary.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
+                                    child: Text(
+                                      name.isNotEmpty ? name[0].toUpperCase() : 'F',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: isSelected ? primary : const Color(0xFF64748B),
+                                      ),
+                                    ),
                                   ),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        selectedFriendNumbers.add(number);
+                                      } else {
+                                        selectedFriendNumbers.remove(number);
+                                      }
+                                    });
+                                  },
                                 ),
-                                onChanged: (val) {
-                                  setState(() {
-                                    if (val == true) {
-                                      selectedFriendNumbers.add(number);
-                                    } else {
-                                      selectedFriendNumbers.remove(number);
-                                    }
-                                  });
-                                },
                               );
                             },
                           ),
@@ -523,16 +663,23 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                  // 3. Live Breakdown Summary Card
+                  // 4. Dynamic Split Calculation Card
                   if (totalAmount > 0 && selectedFriendNumbers.isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F8E9),
-                        borderRadius: BorderRadius.circular(20),
+                        color: const Color(0xFFF7FEE7),
+                        borderRadius: BorderRadius.circular(22),
                         border: Border.all(color: primary.withValues(alpha: 0.5)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,79 +688,97 @@ class _SplitBillPageState extends State<SplitBillPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
-                                "Live Split Calculation",
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2E7D32)),
+                                "Live Calculation",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14.5,
+                                  color: Color(0xFF1E293B),
+                                ),
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: primary.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  "$totalPeople People Split",
-                                  style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold, fontSize: 12),
+                                  "$totalPeople People",
+                                  style: const TextStyle(
+                                    color: Color(0xFF33691E),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 10),
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: primary.withValues(alpha: 0.3)),
+                              ),
+                              child: Text(
+                                "₹$sharePerPersonStr / person",
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 12),
                           const Divider(height: 1),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text("🧾 Your Personal Share (Passbook):", style: TextStyle(fontSize: 13)),
+                              const Text("🧾 Your Personal Share (Passbook):", style: TextStyle(fontSize: 12.5, color: Color(0xFF475569))),
                               Text(
                                 "₹$myShareStr",
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E7D32), fontSize: 14),
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E7D32), fontSize: 13.5),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                "👥 Each Friend Owes (${selectedFriendNumbers.length} friends):",
-                                style: const TextStyle(fontSize: 13),
+                                "👥 Friends Will Owe (${selectedFriendNumbers.length} friends):",
+                                style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
                               ),
-                              Text(
-                                "₹$sharePerPersonStr",
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFE65100), fontSize: 14),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text("💰 Total You Will Collect:", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                               Text(
                                 "₹$totalCollectStr",
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1565C0), fontSize: 14),
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFE65100), fontSize: 13.5),
                               ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                   ],
 
-                  // Confirm Button
+                  // 5. Confirm & Record Split Button
                   SizedBox(
-                    height: 52,
+                    height: 54,
                     child: ElevatedButton.icon(
                       onPressed: (isLoading || totalAmount <= 0 || selectedFriendNumbers.isEmpty) ? null : handleSplitBill,
-                      icon: const Icon(Icons.call_split_rounded, color: Colors.white),
+                      icon: const Icon(Icons.call_split_rounded, color: Colors.white, size: 20),
                       label: Text(
-                        "Split ₹$totalAmountStr with $totalPeople People",
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        totalAmount > 0 && selectedFriendNumbers.isNotEmpty
+                            ? "Confirm Split (₹$totalAmountStr • ₹$sharePerPersonStr/person)"
+                            : "Select Friends & Enter Bill",
+                        style: const TextStyle(color: Colors.white, fontSize: 15.5, fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primary,
-                        elevation: 4,
+                        elevation: 2,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -621,7 +786,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -629,12 +794,39 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
           if (isLoading)
             Container(
-              color: Colors.black45,
+              color: Colors.black38,
               child: const Center(
                 child: CircularProgressIndicator(color: primary),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _quickAddChip(String label, VoidCallback onTap) {
+    const Color primary = Color(0xFF8BC24A);
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F8E9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: primary.withValues(alpha: 0.4)),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF558B2F),
+            ),
+          ),
+        ),
       ),
     );
   }

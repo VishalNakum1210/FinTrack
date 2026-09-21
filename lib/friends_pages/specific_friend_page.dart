@@ -4,6 +4,7 @@ import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/services/export_service.dart';
+import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/date_helper.dart';
 import 'package:fin_track/widgets/confirm_dialog.dart';
@@ -22,6 +23,7 @@ class Specificfriendpage extends StatefulWidget {
 }
 
 class _SpecificfriendpageState extends State<Specificfriendpage> {
+  static const Color primaryGreen = CategoryTheme.primaryGreen;
   StreamSubscription<DatabaseEvent>? _sub;
   String _userPhone = '';
 
@@ -112,12 +114,12 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
     try {
       if (!mounted) return;
       await context.read<FriendProvider>().deleteFriendTransaction(
-        userPhone: _userPhone,
-        friendNumber: widget.friendNumber,
-        recordKey: key,
-        isGive: isGive,
-        amount: amount,
-      );
+            userPhone: _userPhone,
+            friendNumber: widget.friendNumber,
+            recordKey: key,
+            isGive: isGive,
+            amount: amount,
+          );
       Fluttertoast.showToast(msg: 'Record deleted');
     } catch (e) {
       Fluttertoast.showToast(msg: '$e');
@@ -127,74 +129,23 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
   }
 
   Future<void> _editRecord(Map<String, dynamic> record) async {
-    final amountCtrl = TextEditingController(text: record['Amount']?.toString() ?? '');
-    final descCtrl = TextEditingController(text: record['Description']?.toString() ?? '');
+    if (!mounted) return;
+    final result = await showModalBottomSheet<Map<String, String>?>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _EditRecordBottomSheet(record: record),
+    );
+
+    if (result == null || !mounted) return;
+    final newAmount = result['amount'] ?? '';
+    final newDesc = result['desc'] ?? '';
+    if (newAmount.isEmpty) return;
 
     try {
-      if (!mounted) return;
-      final saved = await showModalBottomSheet<bool>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        builder: (ctx) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 20, right: 20, top: 24,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Edit Transaction',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 18),
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  maxLength: 10,
-                  decoration: InputDecoration(
-                    labelText: 'Amount',
-                    counterText: '',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: descCtrl,
-                  maxLength: 150,
-                  decoration: InputDecoration(
-                    labelText: 'Description',
-                    counterText: '',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8BC24A),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-
-      if (saved != true) return;
-      final newAmount = amountCtrl.text.trim();
-      final newDesc = descCtrl.text.trim();
-      if (newAmount.isEmpty) return;
-
       final ref = FirebaseDatabase.instance
           .ref('Friends/$_userPhone/${widget.friendNumber}/Records/${record['key']}');
       await ref.update({'Amount': newAmount, 'Description': newDesc});
@@ -202,22 +153,18 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
       final oldAmt = (double.tryParse(record['Amount']?.toString() ?? '0') ?? 0.0).round();
       final newAmt = (double.tryParse(newAmount) ?? 0.0).round();
       final diff = newAmt - oldAmt;
-      if (diff != 0) {
+      if (diff != 0 && mounted) {
         final isGive = record['Type'] == 'Take Money From Friend';
         final friendRef = FirebaseDatabase.instance.ref('Friends/$_userPhone/${widget.friendNumber}');
-        if (!mounted) return;
         await context.read<FriendProvider>().adjustLedger(
-          friendRef: friendRef,
-          field: isGive ? 'total_give' : 'total_get',
-          delta: diff,
-        );
+              friendRef: friendRef,
+              field: isGive ? 'total_give' : 'total_get',
+              delta: diff,
+            );
       }
-      Fluttertoast.showToast(msg: 'Transaction updated successfully');
+      Fluttertoast.showToast(msg: 'Transaction updated');
     } catch (e) {
       Fluttertoast.showToast(msg: 'Failed to update: $e');
-    } finally {
-      amountCtrl.dispose();
-      descCtrl.dispose();
     }
   }
 
@@ -240,29 +187,59 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
 
   @override
   Widget build(BuildContext context) {
-    const Color primaryColor = Color(0xFF8BC24A);
+    final friendName = (_friendData['friend_name'] ?? widget.friendName).toString();
+    final friendNumber = (_friendData['friend_number'] ?? widget.friendNumber).toString();
+    final net = _totalGet - _totalGive;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: primaryColor,
-        title: Text(
-          _friendData['friend_name'] ?? widget.friendName,
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              friendName,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+                fontSize: 17,
+                letterSpacing: -0.3,
+              ),
+            ),
+            Text(
+              friendNumber,
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+          ],
         ),
         actions: [
           IconButton(
             tooltip: 'Export PDF Ledger',
-            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.picture_as_pdf_rounded, color: primaryGreen, size: 20),
+            ),
             onPressed: _exportPdf,
           ),
           const SizedBox(width: 8),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        heroTag: "friend_fab",
+        backgroundColor: primaryGreen,
+        elevation: 4,
         onPressed: () async {
           final result = await Navigator.push(
             context,
@@ -272,290 +249,546 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
           ) ?? false;
           if (result == true) _startStream();
         },
-        icon: const Icon(Icons.add),
-        label: const Text('Add'),
+        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+        label: const Text('Add Entry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: primaryColor))
+          ? const Center(child: CircularProgressIndicator(color: primaryGreen))
           : _friendData.isEmpty
               ? const Center(child: Text('Friend Not Found'))
-              : Column(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.all(15),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(22),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF8BC24A), Color(0xFF7CB342)],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primaryColor.withValues(alpha: .35),
-                            blurRadius: 15,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          CircleAvatar(
-                            radius: 35,
-                            backgroundColor: Colors.white,
-                            child: Text(
-                              (_friendData['friend_name'] ?? 'F').toString().isNotEmpty
-                                  ? (_friendData['friend_name'] ?? 'F').toString()[0].toUpperCase()
-                                  : 'F',
-                              style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            (_friendData['friend_name'] ?? '').toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            (_friendData['friend_number'] ?? '').toString(),
-                            style: const TextStyle(color: Colors.white70, fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 15),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(15),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: .08),
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'You Get',
-                                    style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _totalGet.toINR(compactSymbol: true),
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(15),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withValues(alpha: .08),
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'You Want to Give',
-                                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _totalGive.toINR(compactSymbol: true),
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(horizontal: 15),
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: .05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          const Text('Net Balance', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                          const SizedBox(height: 6),
-                          Text(
-                            (_totalGet - _totalGive).abs().toINR(compactSymbol: true),
-                            style: TextStyle(
-                              color: (_totalGet >= _totalGive) ? Colors.green : Colors.red,
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 15),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Transactions',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: _records.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.handshake_outlined, size: 64, color: Colors.grey.shade400),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'No transactions yet',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const Text(
-                                    'Tap the + button to add a transaction',
-                                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.only(bottom: 25, left: 10, right: 10),
-                              itemCount: _records.length,
-                              itemBuilder: (context, index) {
-                                final record = _records[index];
-                                final isGive = record['Type'] == 'Take Money From Friend';
-                                final amount = (double.tryParse(record['Amount']?.toString() ?? '0') ?? 0.0).round();
-                                final key = (record['key'] ?? '').toString();
+              : SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. HERO FRIEND PROFILE CARD
+                      _buildHeroFriendCard(friendName, friendNumber),
+                      const SizedBox(height: 14),
 
-                                return InkWell(
-                                  onTap: () => _editRecord(record),
-                                  onLongPress: () async {
-                                    final confirmed = await showDeleteConfirmDialog(
-                                      context,
-                                      title: 'Delete Record',
-                                      message: 'Are you sure you want to delete this record?',
-                                    );
-                                    if (confirmed == true && key.isNotEmpty) {
-                                      await _deleteRecord(key, isGive, amount);
-                                    }
-                                  },
-                                  child: _transactionCard(
-                                    amount: amount.toINR(compactSymbol: true),
-                                    title: (record['Type'] ?? '').toString(),
-                                    note: (record['Description'] ?? '').toString(),
-                                    date: (record['Date'] ?? '').toString(),
-                                    isGive: isGive,
-                                  ),
-                                );
-                              },
+                      // 2. SIDE-BY-SIDE METRICS (You Get vs You Give)
+                      _buildDualMetricsCard(),
+                      const SizedBox(height: 12),
+
+                      // 3. NET SETTLEMENT STATUS CARD
+                      _buildNetSettlementCard(net),
+                      const SizedBox(height: 20),
+
+                      // 4. TRANSACTION HISTORY HEADER
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Transaction History',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1E293B),
+                              letterSpacing: -0.2,
                             ),
-                    ),
-                  ],
+                          ),
+                          Text(
+                            "${_records.length} ${_records.length == 1 ? 'entry' : 'entries'}",
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 5. TRANSACTION LIST
+                      if (_records.isEmpty)
+                        _buildEmptyHistory()
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _records.length,
+                          itemBuilder: (context, index) {
+                            final record = _records[index];
+                            final isGive = record['Type'] == 'Take Money From Friend';
+                            final amount =
+                                (double.tryParse(record['Amount']?.toString() ?? '0') ?? 0.0).round();
+                            final key = (record['key'] ?? '').toString();
+
+                            return _buildRecordCard(
+                              record: record,
+                              isGive: isGive,
+                              amount: amount,
+                              keyStr: key,
+                            );
+                          },
+                        ),
+                    ],
+                  ),
                 ),
     );
   }
 
-  static Widget _transactionCard({
-    required String amount,
-    required String title,
-    required String note,
-    required String date,
-    required bool isGive,
-  }) {
+  Widget _buildHeroFriendCard(String name, String number) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(15),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF8BC24A), Color(0xFF689F38)],
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: .05),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF689F38).withValues(alpha: .30),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 22,
-            backgroundColor: isGive
-                ? Colors.red.withValues(alpha: .12)
-                : Colors.green.withValues(alpha: .12),
-            child: Image.asset(
-              isGive ? 'assets/image/SpentPic.png' : 'assets/image/GetPic.png',
+            radius: 30,
+            backgroundColor: Colors.white,
+            child: Text(
+              name.isNotEmpty ? name[0].toUpperCase() : 'F',
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: primaryGreen,
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 4),
-                Text(note, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                const SizedBox(height: 4),
-                Text(date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(
+                  number,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13.5),
+                ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDualMetricsCard() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFC8E6C9)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.arrow_downward_rounded, size: 14, color: Color(0xFF2E7D32)),
+                    SizedBox(width: 4),
+                    Text(
+                      'You Will Get',
+                      style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _totalGet.toINR(),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      color: Color(0xFF2E7D32),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFFFCDD2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.arrow_upward_rounded, size: 14, color: Color(0xFFC62828)),
+                    SizedBox(width: 4),
+                    Text(
+                      'You Will Give',
+                      style: TextStyle(color: Color(0xFFC62828), fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _totalGive.toINR(),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      color: Color(0xFFC62828),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNetSettlementCard(int net) {
+    final isOwed = net >= 0;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text(
+                'Net Balance',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 2),
               Text(
-                amount,
+                net == 0 ? "All Settled ✓" : net.abs().toINR(),
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: isGive ? Colors.red : Colors.green,
+                  color: net == 0
+                      ? const Color(0xFF64748B)
+                      : isOwed
+                          ? const Color(0xFF2E7D32)
+                          : const Color(0xFFC62828),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Hold to delete',
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
-              ),
             ],
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isOwed ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              net == 0
+                  ? "0 Balance"
+                  : isOwed
+                      ? "Owed to you"
+                      : "You owe",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isOwed ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecordCard({
+    required Map<String, dynamic> record,
+    required bool isGive,
+    required int amount,
+    required String keyStr,
+  }) {
+    final title = (record['Type'] ?? '').toString();
+    final note = (record['Description'] ?? '').toString();
+    final date = (record['Date'] ?? '').toString();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _editRecord(record),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                // Direction icon
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: isGive ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isGive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                    color: isGive ? const Color(0xFFC62828) : const Color(0xFF2E7D32),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14.5,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      if (note.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          note,
+                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Text(
+                        DateHelper.formatDisplay(date),
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Amount & Actions
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isGive ? "-${amount.toINR()}" : "+${amount.toINR()}",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15.5,
+                        color: isGive ? const Color(0xFFC62828) : const Color(0xFF2E7D32),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+                      onPressed: () => _editRecord(record),
+                      tooltip: "Edit",
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                      onPressed: () async {
+                        final confirmed = await showDeleteConfirmDialog(
+                          context,
+                          title: 'Delete Record',
+                          message: 'Are you sure you want to delete this record?',
+                        );
+                        if (confirmed == true && keyStr.isNotEmpty) {
+                          await _deleteRecord(keyStr, isGive, amount);
+                        }
+                      },
+                      tooltip: "Delete",
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyHistory() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.handshake_outlined, size: 48, color: Color(0xFF94A3B8)),
+          SizedBox(height: 12),
+          Text(
+            'No Transactions Yet',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Tap "+ Add Entry" below to record a loan, repayment, or shared bill.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
           ),
         ],
       ),
     );
   }
 }
+
+class _EditRecordBottomSheet extends StatefulWidget {
+  final Map<String, dynamic> record;
+  const _EditRecordBottomSheet({required this.record});
+
+  @override
+  State<_EditRecordBottomSheet> createState() => _EditRecordBottomSheetState();
+}
+
+class _EditRecordBottomSheetState extends State<_EditRecordBottomSheet> {
+  late final TextEditingController _amountCtrl;
+  late final TextEditingController _descCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountCtrl = TextEditingController(text: widget.record['Amount']?.toString() ?? '');
+    _descCtrl = TextEditingController(text: widget.record['Description']?.toString() ?? '');
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const Color primaryGreen = Color(0xFF8BC24A);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 18),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const Text(
+            'Edit Ledger Record',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            maxLength: 10,
+            decoration: InputDecoration(
+              labelText: 'Amount (₹)',
+              counterText: '',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _descCtrl,
+            maxLength: 150,
+            decoration: InputDecoration(
+              labelText: 'Note / Description',
+              counterText: '',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              final amt = _amountCtrl.text.trim();
+              final desc = _descCtrl.text.trim();
+              if (amt.isEmpty) {
+                Fluttertoast.showToast(msg: 'Please enter an amount');
+                return;
+              }
+              Navigator.pop(context, {'amount': amt, 'desc': desc});
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+}
+

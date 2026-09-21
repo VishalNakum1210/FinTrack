@@ -37,12 +37,20 @@ class _NavPageSelectorState extends State<NavPageSelector> {
           index: selectedIndex,
           children: _pages,
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selectedIndex,
-          height: 70,
-          backgroundColor: Colors.white,
-          indicatorColor: Colors.green.shade100,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
+            ),
+          ),
+          child: NavigationBar(
+            selectedIndex: selectedIndex,
+            height: 68,
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 0,
+            indicatorColor: const Color(0xFFDCEDC8),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           onDestinationSelected: (int index) {
             setState(() {
               selectedIndex = index;
@@ -69,7 +77,8 @@ class _NavPageSelectorState extends State<NavPageSelector> {
               selectedIcon: Icon(Icons.manage_accounts),
               label: "Profile",
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

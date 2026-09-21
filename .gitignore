@@ -53,6 +53,10 @@ app.*.map.json
 
 # Backup archives
 *.zip
+lib old/
+lib old.zip
+lib_old/
+lib-old/
 
 # Future layout mockups & UI/UX design specifications
 future layout/

@@ -2,6 +2,7 @@ import 'package:fin_track/friends_pages/split_bill_page.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
+import 'package:fin_track/utils/category_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -51,9 +52,21 @@ class _AddSpentState extends State<AddSpent> {
 
   void _onAmountChanged() {
     _saveDraft();
-    if (isSplitWithFriend && mounted) {
+    if (mounted) {
       setState(() {});
     }
+  }
+
+  void _addToAmount(double delta) {
+    final current = double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
+    final newVal = current + delta;
+    final str = newVal.truncateToDouble() == newVal ? newVal.toInt().toString() : newVal.toStringAsFixed(2);
+    amountController.text = str;
+    amountController.selection = TextSelection.fromPosition(TextPosition(offset: str.length));
+  }
+
+  void _clearAmount() {
+    amountController.clear();
   }
 
   void _saveDraft() async {
@@ -240,41 +253,9 @@ class _AddSpentState extends State<AddSpent> {
     }
   }
 
-  InputDecoration inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: Colors.grey.shade50,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      enabledBorder: OutlineInputBorder(
-        borderSide: const BorderSide(width: 2, color: Color(0xFF8BC24A)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(width: 2.5, color: Color(0xFF8BC24A)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-    );
-  }
-
-  InputDecorationTheme inputTheme() {
-    return InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.grey.shade50,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      enabledBorder: OutlineInputBorder(
-        borderSide: const BorderSide(width: 2, color: Color(0xFF8BC24A)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(width: 2.5, color: Color(0xFF8BC24A)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    const Color primary = Color(0xFF8BC24A);
     final friendProvider = context.watch<FriendProvider>();
     final friends = friendProvider.friends;
     final isSpending = selectedMode.startsWith("Spent");
@@ -286,366 +267,684 @@ class _AddSpentState extends State<AddSpent> {
     final friendSharePreviewStr = friendSharePreview.truncateToDouble() == friendSharePreview ? friendSharePreview.toInt().toString() : friendSharePreview.toStringAsFixed(2);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FBF2),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
           "Add Transaction",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
-        backgroundColor: const Color(0xFF8BC24A),
+        backgroundColor: primary,
         elevation: 0,
       ),
       body: Stack(
         children: [
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 15,
-                      offset: Offset(0, 5),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 1. Hero Amount Card with Quick Add Chips
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      "New Transaction Details",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF8BC24A),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    TextField(
-                      controller: amountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      maxLength: 10,
-                      decoration: inputDecoration("Enter Total Amount (₹)").copyWith(counterText: ""),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    TextField(
-                      controller: descriptionController,
-                      maxLength: 150,
-                      decoration: inputDecoration("Enter Description / Note"),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    TextField(
-                      readOnly: true,
-                      decoration: inputDecoration(
-                        "Date: ${DateFormat('dd MMM yyyy').format(selectedDate)}",
-                      ).copyWith(
-                        suffixIcon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BC24A)),
-                      ),
-                      onTap: pickDate,
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    Builder(
-                      builder: (context) {
-                        final expenseProvider = context.watch<ExpenseProvider>();
-                        final recentCats = expenseProvider.records
-                            .map((r) => (r["Category"] ?? "").toString())
-                            .where((c) => c.isNotEmpty && categories.contains(c))
-                            .toSet()
-                            .take(4)
-                            .toList();
-
-                        if (recentCats.isEmpty) return const SizedBox.shrink();
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              "Recent Categories",
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
+                              "TRANSACTION AMOUNT",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                                color: Color(0xFF64748B),
+                              ),
                             ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: [
-                                for (final cat in recentCats)
-                                  ActionChip(
-                                    label: Text(cat),
-                                    backgroundColor: selectedCategory == cat
-                                        ? const Color(0xFF8BC24A)
-                                        : Colors.grey.shade100,
-                                    labelStyle: TextStyle(
-                                      color: selectedCategory == cat ? Colors.white : Colors.black87,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
-                                    ),
-                                    onPressed: () {
-                                      setState(() => selectedCategory = cat);
-                                    },
+                            if (amountController.text.isNotEmpty)
+                              GestureDetector(
+                                onTap: _clearAmount,
+                                child: Text(
+                                  "Clear",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade400,
                                   ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
+                                ),
+                              ),
                           ],
-                        );
-                      },
-                    ),
-
-                    DropdownMenu<String>(
-                      width: MediaQuery.of(context).size.width - 84,
-                      initialSelection: selectedCategory,
-                      label: const Text("Select Category"),
-                      dropdownMenuEntries: categories
-                          .map(
-                            (item) => DropdownMenuEntry(
-                              value: item,
-                              label: item,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "₹",
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: primary,
+                              ),
                             ),
-                          )
-                          .toList(),
-                      onSelected: (value) {
-                        if (value != null) {
-                          setState(() {
-                            selectedCategory = value;
-                          });
-                        }
-                      },
-                      inputDecorationTheme: inputTheme(),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    DropdownMenu<String>(
-                      width: MediaQuery.of(context).size.width - 84,
-                      initialSelection: selectedMode,
-                      label: const Text("Select Payment Mode"),
-                      dropdownMenuEntries: paymentModes
-                          .map(
-                            (item) => DropdownMenuEntry(
-                              value: item,
-                              label: item,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: amountController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                maxLength: 10,
+                                style: const TextStyle(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1E293B),
+                                  letterSpacing: -0.5,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: "0.00",
+                                  hintStyle: TextStyle(color: Color(0xFFCBD5E1)),
+                                  border: InputBorder.none,
+                                  counterText: "",
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
                             ),
-                          )
-                          .toList(),
-                      onSelected: (value) {
-                        if (value != null) {
-                          setState(() {
-                            selectedMode = value;
-                          });
-                        }
-                      },
-                      inputDecorationTheme: inputTheme(),
-                    ),
-
-                    // 👥 1-Tap Bill Split Section (Available for Expense transactions)
-                    if (isSpending) ...[
-                      const SizedBox(height: 18),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isSplitWithFriend ? const Color(0xFFF1F8E9) : Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: isSplitWithFriend ? const Color(0xFF8BC24A) : Colors.grey.shade300,
-                            width: isSplitWithFriend ? 1.5 : 1,
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        // Quick Add Chips
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _quickAddChip("+100", () => _addToAmount(100)),
+                              _quickAddChip("+500", () => _addToAmount(500)),
+                              _quickAddChip("+1,000", () => _addToAmount(1000)),
+                              _quickAddChip("+2,000", () => _addToAmount(2000)),
+                            ],
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // 2. Category Selector Section
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: isSplitWithFriend ? const Color(0xFF8BC24A).withValues(alpha: 0.2) : Colors.grey.shade200,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        Icons.group_rounded,
-                                        size: 20,
-                                        color: isSplitWithFriend ? const Color(0xFF558B2F) : Colors.grey.shade600,
-                                      ),
+                            const Text(
+                              "Select Category",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: CategoryTheme.getBgColor(selectedCategory),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    CategoryTheme.getIcon(selectedCategory),
+                                    size: 14,
+                                    color: CategoryTheme.getColor(selectedCategory),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    selectedCategory,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: CategoryTheme.getColor(selectedCategory),
                                     ),
-                                    const SizedBox(width: 10),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Category Pills Grid/Wrap
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: categories.map((cat) {
+                            final isSelected = selectedCategory == cat;
+                            final catColor = CategoryTheme.getColor(cat);
+                            final catBg = CategoryTheme.getBgColor(cat);
+
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedCategory = cat;
+                                  // Auto adjust payment mode if category is Add Money
+                                  if (cat == "Add Money" && selectedMode.startsWith("Spent")) {
+                                    selectedMode = "Add CASH";
+                                  } else if (cat != "Add Money" && selectedMode.startsWith("Add")) {
+                                    selectedMode = "Spent Online";
+                                  }
+                                });
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? catBg : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSelected ? catColor : const Color(0xFFE2E8F0),
+                                    width: isSelected ? 1.8 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      CategoryTheme.getIcon(cat),
+                                      size: 16,
+                                      color: isSelected ? catColor : const Color(0xFF64748B),
+                                    ),
+                                    const SizedBox(width: 6),
                                     Text(
-                                      "Split Bill with Friend",
+                                      cat,
                                       style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14.5,
-                                        color: isSplitWithFriend ? const Color(0xFF33691E) : Colors.black87,
+                                        fontSize: 12.5,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: isSelected ? catColor : const Color(0xFF334155),
                                       ),
                                     ),
                                   ],
                                 ),
-                                Switch.adaptive(
-                                  value: isSplitWithFriend,
-                                  activeTrackColor: const Color(0xFF8BC24A),
-                                  activeThumbColor: Colors.white,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      isSplitWithFriend = val;
-                                      if (val && friends.isNotEmpty && selectedFriendNumber == null) {
-                                        selectedFriendNumber = friends.first["friend_number"];
-                                        selectedFriendName = friends.first["friend_name"];
-                                      }
-                                    });
-                                  },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // 3. Payment Mode & Type Selector
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Payment Mode",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _paymentModePill("Spent Online", "Online Spent", Icons.credit_card_rounded, primary),
+                            const SizedBox(width: 8),
+                            _paymentModePill("Spent Cash", "Cash Spent", Icons.payments_rounded, const Color(0xFFFFA000)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _paymentModePill("Add Online", "Add Online", Icons.account_balance_rounded, const Color(0xFF2196F3)),
+                            const SizedBox(width: 8),
+                            _paymentModePill("Add CASH", "Add Cash", Icons.savings_rounded, const Color(0xFF43A047)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // 4. Date & Description Note
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Date picker row
+                        InkWell(
+                          onTap: pickDate,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.calendar_month_rounded, color: primary, size: 20),
+                                const SizedBox(width: 10),
+                                Text(
+                                  DateFormat('dd MMMM yyyy').format(selectedDate),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                                const Spacer(),
+                                const Text(
+                                  "Change",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ],
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Note TextField
+                        TextField(
+                          controller: descriptionController,
+                          maxLength: 150,
+                          style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                          decoration: InputDecoration(
+                            hintText: "Add note / description (e.g. Grocery, Lunch)",
+                            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+                            prefixIcon: const Icon(Icons.edit_note_rounded, color: primary, size: 22),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            counterText: "",
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: primary, width: 1.8),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                            if (isSplitWithFriend) ...[
-                              const SizedBox(height: 12),
-                              const Divider(height: 1),
-                              const SizedBox(height: 12),
-
-                              if (friends.isEmpty)
-                                Text(
-                                  "No friends found. Add friends in the Friends tab to split bills.",
-                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5),
-                                )
-                              else ...[
-                                DropdownMenu<String>(
-                                  width: MediaQuery.of(context).size.width - 116,
-                                  initialSelection: selectedFriendNumber ?? friends.first["friend_number"],
-                                  label: const Text("Select Friend"),
-                                  dropdownMenuEntries: friends.map((f) {
-                                    final name = (f["friend_name"] ?? "Friend").toString();
-                                    final number = (f["friend_number"] ?? "").toString();
-                                    return DropdownMenuEntry(
-                                      value: number,
-                                      label: "$name ($number)",
-                                    );
-                                  }).toList(),
-                                  onSelected: (val) {
-                                    if (val != null) {
-                                      final matched = friends.firstWhere(
-                                        (f) => f["friend_number"] == val,
-                                        orElse: () => {"friend_name": "Friend"},
-                                      );
-                                      setState(() {
-                                        selectedFriendNumber = val;
-                                        selectedFriendName = matched["friend_name"];
-                                      });
-                                    }
-                                  },
-                                  inputDecorationTheme: inputTheme(),
-                                ),
-
-                                if (currentAmount > 0) ...[
-                                  const SizedBox(height: 14),
+                  // 5. 👥 1-Tap Bill Split Section (Available for Expense transactions)
+                  if (isSpending) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: isSplitWithFriend ? const Color(0xFFF7FEE7) : Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: isSplitWithFriend ? primary : const Color(0xFFE2E8F0),
+                          width: isSplitWithFriend ? 1.5 : 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: const Color(0xFF8BC24A).withValues(alpha: 0.5)),
+                                      color: isSplitWithFriend ? primary.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
+                                      shape: BoxShape.circle,
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          "Your Expense: ₹$mySharePreviewStr",
-                                          style: const TextStyle(
-                                            color: Color(0xFF558B2F),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12.5,
-                                          ),
-                                        ),
-                                        Text(
-                                          "Friend Owes: ₹$friendSharePreviewStr",
-                                          style: const TextStyle(
-                                            color: Color(0xFFE65100),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12.5,
-                                          ),
-                                        ),
-                                      ],
+                                    child: Icon(
+                                      Icons.group_rounded,
+                                      size: 20,
+                                      color: isSplitWithFriend ? primary : const Color(0xFF64748B),
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
-                                  Center(
-                                    child: TextButton.icon(
-                                      onPressed: () async {
-                                        final res = await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (context) => const SplitBillPage()),
-                                        );
-                                        if (res == true && context.mounted) {
-                                          Navigator.pop(context, true);
-                                        }
-                                      },
-                                      icon: const Icon(Icons.group_work_rounded, size: 16, color: Color(0xFF558B2F)),
-                                      label: const Text(
-                                        "Split with 2+ friends? Open Group Splitter ➔",
+                                  const SizedBox(width: 10),
+                                  const Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Split Bill with Friend",
                                         style: TextStyle(
-                                          color: Color(0xFF558B2F),
-                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 14.5,
+                                          color: Color(0xFF1E293B),
                                         ),
                                       ),
-                                    ),
+                                      Text(
+                                        "Split 50/50 instantly",
+                                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
                                   ),
                                 ],
+                              ),
+                              Switch.adaptive(
+                                value: isSplitWithFriend,
+                                activeTrackColor: primary,
+                                activeThumbColor: Colors.white,
+                                onChanged: (val) {
+                                  setState(() {
+                                    isSplitWithFriend = val;
+                                    if (val && friends.isNotEmpty && selectedFriendNumber == null) {
+                                      selectedFriendNumber = friends.first["friend_number"];
+                                      selectedFriendName = friends.first["friend_name"];
+                                    }
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+
+                          if (isSplitWithFriend) ...[
+                            const SizedBox(height: 14),
+                            const Divider(height: 1),
+                            const SizedBox(height: 14),
+
+                            if (friends.isEmpty)
+                              const Text(
+                                "No friends found. Add friends in the Friends tab to split bills.",
+                                style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
+                              )
+                            else ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    isExpanded: true,
+                                    value: selectedFriendNumber ?? friends.first["friend_number"],
+                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: primary),
+                                    items: friends.map((f) {
+                                      final name = (f["friend_name"] ?? "Friend").toString();
+                                      final number = (f["friend_number"] ?? "").toString();
+                                      return DropdownMenuItem<String>(
+                                        value: number,
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 12,
+                                              backgroundColor: primary.withValues(alpha: 0.2),
+                                              child: Text(
+                                                name.isNotEmpty ? name[0].toUpperCase() : 'F',
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primary),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              "$name ($number)",
+                                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        final matched = friends.firstWhere(
+                                          (f) => f["friend_number"] == val,
+                                          orElse: () => {"friend_name": "Friend"},
+                                        );
+                                        setState(() {
+                                          selectedFriendNumber = val;
+                                          selectedFriendName = matched["friend_name"];
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+
+                              if (currentAmount > 0) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: primary.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        "Your Expense: ₹$mySharePreviewStr",
+                                        style: const TextStyle(
+                                          color: Color(0xFF2E7D32),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12.5,
+                                        ),
+                                      ),
+                                      Text(
+                                        "Friend Owes: ₹$friendSharePreviewStr",
+                                        style: const TextStyle(
+                                          color: Color(0xFFC62828),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ],
+
+                              const SizedBox(height: 8),
+                              Center(
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    final res = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const SplitBillPage()),
+                                    );
+                                    if (res == true && context.mounted) {
+                                      Navigator.pop(context, true);
+                                    }
+                                  },
+                                  icon: const Icon(Icons.group_work_rounded, size: 16, color: primary),
+                                  label: const Text(
+                                    "Split with 2+ friends? Open Group Splitter ➔",
+                                    style: TextStyle(
+                                      color: primary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
                           ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 28),
-
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: isLoading ? null : getAllDetails,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8BC24A),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          isSplitWithFriend ? "Save & Split Bill" : "Save Transaction",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+
+                  const SizedBox(height: 24),
+
+                  // 6. Save Button
+                  SizedBox(
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : getAllDetails,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primary,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Text(
+                        isSplitWithFriend ? "Save & Split Bill" : "Save Transaction",
+                        style: const TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
           ),
 
           if (isLoading)
             Container(
-              color: Colors.black45,
+              color: Colors.black38,
               child: const Center(
-                child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
+                child: CircularProgressIndicator(color: primary),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _quickAddChip(String label, VoidCallback onTap) {
+    const Color primary = Color(0xFF8BC24A);
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F8E9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: primary.withValues(alpha: 0.4)),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF558B2F),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _paymentModePill(String modeKey, String label, IconData icon, Color color) {
+    final isSelected = selectedMode == modeKey;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            selectedMode = modeKey;
+            // If selecting income, sync category if necessary
+            if (modeKey.startsWith("Add") && selectedCategory != "Add Money") {
+              selectedCategory = "Add Money";
+            }
+          });
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.12) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? color : const Color(0xFFE2E8F0),
+              width: isSelected ? 1.8 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: isSelected ? color : const Color(0xFF64748B)),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    color: isSelected ? color : const Color(0xFF334155),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
