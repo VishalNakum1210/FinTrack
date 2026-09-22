@@ -13,6 +13,7 @@ class PassbookTransactionTile extends StatelessWidget {
   final double? runningBalance;
   final String? splitFriendName;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
 
   const PassbookTransactionTile({
     super.key,
@@ -25,6 +26,7 @@ class PassbookTransactionTile extends StatelessWidget {
     this.runningBalance,
     this.splitFriendName,
     required this.onTap,
+    this.onEdit,
   });
 
   @override
@@ -186,6 +188,46 @@ class PassbookTransactionTile extends StatelessWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                    if (onEdit != null) ...[
+                      const SizedBox(height: 5),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onEdit,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFF8BC24A).withValues(alpha: 0.4),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.edit_outlined,
+                                  size: 11,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                                SizedBox(width: 3),
+                                Text(
+                                  "Edit",
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ],

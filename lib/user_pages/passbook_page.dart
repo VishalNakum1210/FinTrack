@@ -1,14 +1,15 @@
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
-import 'package:fin_track/services/export_service.dart';
 import 'package:fin_track/user_pages/add_spent.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/date_helper.dart';
 import 'package:fin_track/widgets/confirm_dialog.dart';
 import 'package:fin_track/widgets/dual_flow_card.dart';
+import 'package:fin_track/widgets/edit_expense_modal.dart';
 import 'package:fin_track/widgets/error_retry_widget.dart';
+import 'package:fin_track/widgets/export_statement_modal.dart';
 import 'package:fin_track/widgets/month_carousel.dart';
 import 'package:fin_track/widgets/passbook_transaction_tile.dart';
 import 'package:fin_track/widgets/smart_insight_banner.dart';
@@ -43,10 +44,9 @@ class PassbookPageState extends State<PassbookApp> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
-  // Pagination & Cache
+  // Pagination & Display
   int _displayLimit = 50;
   List<Map<String, dynamic>> _cachedSorted = [];
-  String _lastSortKey = '';
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -284,29 +284,58 @@ class PassbookPageState extends State<PassbookApp> {
               ),
             ],
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                        side: BorderSide(color: Colors.red.shade200),
+                        backgroundColor: Colors.red.shade50.withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final confirmed = await showDeleteConfirmDialog(
+                          context,
+                          title: "Delete Record",
+                          message: "Are you sure you want to delete this record?",
+                        );
+                        if (confirmed == true && key.isNotEmpty) {
+                          await deleteRecord(key);
+                        }
+                      },
+                    ),
+                  ),
                 ),
-                icon: const Icon(Icons.delete_outline, size: 20),
-                label: const Text("Delete Transaction", style: TextStyle(fontWeight: FontWeight.bold)),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final confirmed = await showDeleteConfirmDialog(
-                    context,
-                    title: "Delete Record",
-                    message: "Are you sure you want to delete this record?",
-                  );
-                  if (confirmed == true && key.isNotEmpty) {
-                    await deleteRecord(key);
-                  }
-                },
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF8BC24A),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text("Edit", style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final result = await showEditExpenseModal(context: context, record: item);
+                        if (result == true && mounted) {
+                          setState(() {});
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -332,32 +361,23 @@ class PassbookPageState extends State<PassbookApp> {
     required int spentCash,
     required int spentOnline,
   }) async {
-    if (records.isEmpty) {
+    final userProvider = context.read<UserProvider>();
+    final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
+    final phone = userProvider.phoneNumber;
+    final allRecords = context.read<ExpenseProvider>().records;
+
+    if (allRecords.isEmpty) {
       Fluttertoast.showToast(msg: "No records to export");
       return;
     }
 
-    final userProvider = context.read<UserProvider>();
-    final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
-    final phone = userProvider.phoneNumber;
-    final expenseProv = context.read<ExpenseProvider>();
-    final addCash = expenseProv.addCash;
-    final addOnline = expenseProv.addOnline;
-    final currentBalance = income - expense;
-
-    Fluttertoast.showToast(msg: "Generating PDF Statement...");
-    await ExportService.exportPassbookPdf(
+    await showExportStatementModal(
+      context: context,
       userName: userName,
       phoneNumber: phone,
-      records: records,
-      totalIncome: income,
-      totalExpense: expense,
-      currentBalance: currentBalance,
-      addCash: addCash,
-      spentCash: spentCash,
-      addOnline: addOnline,
-      spentOnline: spentOnline,
-      filterCategory: selectedCategory,
+      records: allRecords,
+      initialCategory: selectedCategory,
+      initialDateRange: customDateRange,
     );
   }
 
@@ -500,43 +520,38 @@ class PassbookPageState extends State<PassbookApp> {
         }
 
         // 5. Sort Records
-        final sortKey =
-            '${filtered.length}_${currentSort}_${selectedCategory}_${selectedMonth?.toIso8601String()}_$_searchQuery';
-        if (sortKey != _lastSortKey) {
-          filtered.sort((a, b) {
-            final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
-            final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
-            final amtA = double.tryParse(a["Amount"]?.toString() ?? '0') ?? 0.0;
-            final amtB = double.tryParse(b["Amount"]?.toString() ?? '0') ?? 0.0;
+        filtered.sort((a, b) {
+          final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
+          final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
+          final amtA = double.tryParse(a["Amount"]?.toString() ?? '0') ?? 0.0;
+          final amtB = double.tryParse(b["Amount"]?.toString() ?? '0') ?? 0.0;
 
-            if (currentSort == "Highest Amount") {
-              return amtB.compareTo(amtA);
-            } else if (currentSort == "Lowest Amount") {
-              return amtA.compareTo(amtB);
-            }
+          if (currentSort == "Highest Amount") {
+            return amtB.compareTo(amtA);
+          } else if (currentSort == "Lowest Amount") {
+            return amtA.compareTo(amtB);
+          }
 
-            int cmp = 0;
-            if (dateA != null && dateB != null) {
-              cmp = currentSort == "Oldest First"
-                  ? dateA.compareTo(dateB)
-                  : dateB.compareTo(dateA);
-            } else if (dateA != null) {
-              cmp = -1;
-            } else if (dateB != null) {
-              cmp = 1;
-            }
+          int cmp = 0;
+          if (dateA != null && dateB != null) {
+            cmp = currentSort == "Oldest First"
+                ? dateA.compareTo(dateB)
+                : dateB.compareTo(dateA);
+          } else if (dateA != null) {
+            cmp = -1;
+          } else if (dateB != null) {
+            cmp = 1;
+          }
 
-            if (cmp != 0) return cmp;
+          if (cmp != 0) return cmp;
 
-            final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
-            final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
-            return currentSort == "Oldest First"
-                ? tA.compareTo(tB)
-                : tB.compareTo(tA);
-          });
-          _cachedSorted = filtered;
-          _lastSortKey = sortKey;
-        }
+          final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
+          final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
+          return currentSort == "Oldest First"
+              ? tA.compareTo(tB)
+              : tB.compareTo(tA);
+        });
+        _cachedSorted = filtered;
 
         final displayedRecords = _cachedSorted.take(_displayLimit).toList();
 
@@ -1071,6 +1086,12 @@ class PassbookPageState extends State<PassbookApp> {
                 runningBalance: runningBal,
                 splitFriendName: splitFriend,
                 onTap: () => _showTransactionDetails(context, item),
+                onEdit: () async {
+                  final result = await showEditExpenseModal(context: context, record: item);
+                  if (result == true && mounted) {
+                    setState(() {});
+                  }
+                },
               ),
             ),
           ],

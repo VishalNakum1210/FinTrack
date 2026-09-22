@@ -408,6 +408,21 @@ class FriendProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  @visibleForTesting
+  void setFriendsForTesting(
+    List<Map<String, dynamic>> friends, {
+    int totalGet = 0,
+    int totalGive = 0,
+  }) {
+    _friends.clear();
+    _friends.addAll(friends);
+    _totalGet = totalGet;
+    _totalGive = totalGive;
+    _isLoading = false;
+    _hasError = false;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();

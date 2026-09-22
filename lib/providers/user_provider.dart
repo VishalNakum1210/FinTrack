@@ -284,4 +284,20 @@ class UserProvider extends ChangeNotifier {
     }).catchError((_) {});
     notifyListeners();
   }
+
+  @visibleForTesting
+  void setUserForTesting({
+    required String name,
+    required String email,
+    required String phoneNumber,
+    String address = '',
+  }) {
+    _name = name;
+    _email = email;
+    _phoneNumber = phoneNumber;
+    _address = address;
+    _isLoading = false;
+    _hasError = false;
+    notifyListeners();
+  }
 }

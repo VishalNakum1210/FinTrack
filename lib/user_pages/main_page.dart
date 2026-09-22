@@ -8,6 +8,7 @@ import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/date_helper.dart';
 import 'package:fin_track/widgets/confirm_dialog.dart';
+import 'package:fin_track/widgets/edit_expense_modal.dart';
 import 'package:fin_track/widgets/error_retry_widget.dart';
 import 'package:fin_track/widgets/passbook_transaction_tile.dart';
 import 'package:flutter/material.dart';
@@ -172,32 +173,61 @@ class _UserMainPageState extends State<UserMainPage> {
               style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                        side: BorderSide(color: Colors.red.shade200),
+                        backgroundColor: Colors.red.shade50.withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final confirmed = await showDeleteConfirmDialog(
+                          context,
+                          title: "Delete Record",
+                          message: "Are you sure you want to delete this record?",
+                        );
+                        if (confirmed == true && key.isNotEmpty) {
+                          final phone = await SessionManager.getPhoneNumber() ?? "";
+                          if (context.mounted && phone.isNotEmpty) {
+                            await context.read<ExpenseProvider>().deleteExpense(phoneNumber: phone, key: key);
+                          }
+                        }
+                      },
+                    ),
+                  ),
                 ),
-                icon: const Icon(Icons.delete_outline, size: 20),
-                label: const Text("Delete Transaction", style: TextStyle(fontWeight: FontWeight.bold)),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final confirmed = await showDeleteConfirmDialog(
-                    context,
-                    title: "Delete Record",
-                    message: "Are you sure you want to delete this record?",
-                  );
-                  if (confirmed == true && key.isNotEmpty) {
-                    final phone = await SessionManager.getPhoneNumber() ?? "";
-                    if (context.mounted && phone.isNotEmpty) {
-                      await context.read<ExpenseProvider>().deleteExpense(phoneNumber: phone, key: key);
-                    }
-                  }
-                },
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF8BC24A),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text("Edit", style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final result = await showEditExpenseModal(context: context, record: item);
+                        if (result == true && mounted) {
+                          setState(() {});
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -384,6 +414,8 @@ class _UserMainPageState extends State<UserMainPage> {
                               currentBalance: currentBalance,
                               totalIncome: totalIncome,
                               totalExpense: totalExpense,
+                              bankBalance: onlineBalance,
+                              cashBalance: cashBalance,
                               last7Expense: last7Expense,
                               prev7Expense: prev7Expense,
                             ),
@@ -467,6 +499,12 @@ class _UserMainPageState extends State<UserMainPage> {
                                     runningBalance: runningBal,
                                     splitFriendName: splitFriend,
                                     onTap: () => _showTransactionDetails(context, record),
+                                    onEdit: () async {
+                                      final result = await showEditExpenseModal(context: context, record: record);
+                                      if (result == true && mounted) {
+                                        setState(() {});
+                                      }
+                                    },
                                   );
                                 },
                               ),
@@ -516,12 +554,14 @@ class _UserMainPageState extends State<UserMainPage> {
     required int currentBalance,
     required int totalIncome,
     required int totalExpense,
+    required int bankBalance,
+    required int cashBalance,
     required double last7Expense,
     required double prev7Expense,
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
@@ -585,7 +625,7 @@ class _UserMainPageState extends State<UserMainPage> {
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
           // Main Balance
           FittedBox(
@@ -601,7 +641,134 @@ class _UserMainPageState extends State<UserMainPage> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // Dual Account Pills: Bank / Online & Cash in Hand
+          Row(
+            children: [
+              // Bank Account Pill
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_rounded,
+                          color: Colors.white,
+                          size: 15,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Bank / Online",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                bankBalance.toINR(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // Cash in Hand Pill
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.payments_rounded,
+                          color: Colors.white,
+                          size: 15,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Cash in Hand",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                cashBalance.toINR(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
 
           // Bottom Dual Inflow / Outflow Capsules
           Row(
@@ -611,7 +778,7 @@ class _UserMainPageState extends State<UserMainPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -632,7 +799,7 @@ class _UserMainPageState extends State<UserMainPage> {
                                 "+${totalIncome.toINR()}",
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 13.5,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -651,7 +818,7 @@ class _UserMainPageState extends State<UserMainPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -672,7 +839,7 @@ class _UserMainPageState extends State<UserMainPage> {
                                 "-${totalExpense.toINR()}",
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 13.5,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

@@ -1,10 +1,11 @@
 import 'dart:async';
+import 'package:fin_track/authentication/login_page.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/profile_pages/change_password_page.dart';
+import 'package:fin_track/profile_pages/edit_information_page.dart';
 import 'package:fin_track/profile_pages/feedback_page.dart';
 import 'package:fin_track/profile_pages/personal_information_page.dart';
 import 'package:fin_track/profile_pages/report_page.dart';
-import 'package:fin_track/authentication/login_page.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
@@ -13,7 +14,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -24,10 +24,21 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  bool isActionLoading = false;
+  static const Color _primaryGreen = Color(0xFF8BC24A);
+  static const Color _darkGreen = Color(0xFF689F38);
+  static const Color _canvasBg = Color(0xFFF8FAFC);
+  static const Color _textDark = Color(0xFF1E293B);
+  static const Color _textMuted = Color(0xFF64748B);
+  static const Color _borderGrey = Color(0xFFE2E8F0);
 
-  String formatIndianNumber(int number) {
-    return NumberFormat('#,##,##0', 'en_IN').format(number);
+  bool isActionLoading = false;
+  bool _deleteCooldown = false;
+  Timer? _cooldownTimer;
+
+  @override
+  void dispose() {
+    _cooldownTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> logout() async {
@@ -51,8 +62,6 @@ class _ProfilePageState extends State<ProfilePage> {
       (route) => false,
     );
   }
-
-  bool _deleteCooldown = false;
 
   Future<void> deleteUser() async {
     if (isActionLoading) return;
@@ -170,7 +179,10 @@ class _ProfilePageState extends State<ProfilePage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(ctx, passCtrl.text.trim()),
             child: const Text("Confirm"),
           ),
@@ -179,25 +191,70 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  final Color themeColor = const Color(0xFF8BC24A);
-
-  Widget menuTile({
-    required IconData icon,
-    required String title,
-    VoidCallback? onTap,
-  }) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: themeColor.withValues(alpha: 0.15),
-          child: Icon(icon, color: themeColor),
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-        onTap: onTap,
+        title: const Text("Log Out"),
+        content: const Text("Are you sure you want to log out of FinTrack?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              logout();
+            },
+            child: const Text("Log Out"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog() {
+    setState(() => _deleteCooldown = true);
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _deleteCooldown = false);
+    });
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text("Delete Account"),
+        content: const Text(
+          "Are you sure you want to permanently delete your account? All expense and friends ledger data will be deleted.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              await deleteUser();
+            },
+            child: const Text("Delete"),
+          ),
+        ],
       ),
     );
   }
@@ -206,330 +263,512 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Consumer2<UserProvider, ExpenseProvider>(
       builder: (context, userProvider, expenseProvider, _) {
-        final userName = userProvider.name;
-        final email = userProvider.email.isNotEmpty ? userProvider.email : "Not Provided";
+        final userName = userProvider.name.isNotEmpty && userProvider.name != "User"
+            ? userProvider.name
+            : "Vishal";
+        final phone = userProvider.phoneNumber;
+        final email = userProvider.email.isNotEmpty ? userProvider.email : "user@fintrack.app";
+        final userSubtitle = phone.isNotEmpty
+            ? (phone.startsWith("+") ? phone : "+91 $phone")
+            : email;
+
         final totalExpense = expenseProvider.totalExpense;
         final recordCount = expenseProvider.records.length;
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
-          appBar: AppBar(
-            title: const Text(
-              "Profile",
-              style: TextStyle(fontWeight: FontWeight.bold),
+        if (isActionLoading) {
+          return const Scaffold(
+            backgroundColor: _canvasBg,
+            body: Center(
+              child: CircularProgressIndicator(color: _primaryGreen),
             ),
-            centerTitle: true,
-            backgroundColor: themeColor,
-            foregroundColor: Colors.white,
-            elevation: 0,
-          ),
-          body: (isActionLoading)
-              ? Center(
-                  child: CircularProgressIndicator(color: themeColor),
-                )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      /// Profile Header
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 25),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              blurRadius: 8,
-                              spreadRadius: 1,
-                              color: Colors.black.withValues(alpha: 0.05),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundColor: themeColor,
-                              child: const Icon(
-                                Icons.person,
-                                size: 60,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 15),
-                            Text(
-                              userName,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(email, style: TextStyle(color: Colors.grey[600])),
-                          ],
-                        ),
-                      ),
+          );
+        }
 
-                      const SizedBox(height: 20),
+        return Scaffold(
+          backgroundColor: _canvasBg,
+          body: SingleChildScrollView(
+            child: Column(
+              children: [
+                // 1. TOP CURVED GREEN HEADER
+                _buildGreenHeader(),
 
-                      /// Statistics Card
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: themeColor,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.account_balance_wallet,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  "Expense Summary",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                Column(
-                                  children: [
-                                    const Text(
-                                      "Total Expenses",
-                                      style: TextStyle(color: Colors.white70),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      totalExpense.toINR(compactSymbol: true),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  height: 50,
-                                  width: 1,
-                                  color: Colors.white54,
-                                ),
-                                Column(
-                                  children: [
-                                    const Text(
-                                      "Records",
-                                      style: TextStyle(color: Colors.white70),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      "$recordCount",
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 25),
-
-                  /// Menu Section
-                  menuTile(
-                    icon: Icons.person_outline,
-                    title: "Personal Information",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PersonalInformationPage(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  menuTile(
-                    icon: Icons.lock_outline,
-                    title: "Change Password",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ChangePasswordPage(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  menuTile(
-                    icon: Icons.bar_chart,
-                    title: "Reports",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const Reportpage()),
-                      );
-                    },
-                  ),
-
-                  menuTile(
-                    icon: Icons.help_outline,
-                    title: "Feedback",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const FeedbackPage()),
-                      );
-                    },
-                  ),
-
-                  Container(
-                    padding: const EdgeInsets.only(left: 10, right: 10),
-                    child: Row(
+                // 2. OVERLAPPING USER PROFILE CARD (60px Avatar + Edit Profile Pill)
+                Transform.translate(
+                  offset: const Offset(0, -50),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 55,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    title: const Text("Logout Account"),
-                                    content: const Text(
-                                      "Are you sure you want to Logout this Account?",
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text("Cancel"),
-                                      ),
-
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                          logout();
-                                        },
-                                        child: const Text("Logout"),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.logout),
-                              label: const Text(
-                                "Logout",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                              ),
-                            ),
-                          ),
+                        _buildUserProfileHeaderCard(
+                          userName: userName,
+                          subtitle: userSubtitle,
                         ),
 
-                        const SizedBox(width: 10),
+                        const SizedBox(height: 16),
 
-                        Expanded(
-                          child: SizedBox(
-                            height: 55,
-                            child: ElevatedButton.icon(
-                              onPressed: _deleteCooldown ? null : () async {
-                                setState(() => _deleteCooldown = true);
-                                Timer(const Duration(seconds: 5), () {
-                                  if (mounted) setState(() => _deleteCooldown = false);
-                                });
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    title: const Text("Delete Account"),
-                                    content: const Text(
-                                      "Are you sure you want to delete this Account?",
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text("Cancel"),
-                                      ),
-
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        onPressed: () async {
-                                          Navigator.pop(context);
-                                          await deleteUser();
-                                        },
-                                        child: const Text("Delete"),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.delete),
-                              label: const Text(
-                                "Delete",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                              ),
-                            ),
-                          ),
+                        // 3. BALANCED SUMMARY CARDS (Card 1: Total Spent, Card 2: Records)
+                        _buildBalancedSummaryCards(
+                          totalExpense: totalExpense,
+                          recordCount: recordCount,
                         ),
+
+                        const SizedBox(height: 16),
+
+                        // 4. ACTION NAVIGATION TILES (14px Corner Radius)
+                        _buildNavigationTiles(),
+
+                        const SizedBox(height: 14),
+
+                        // 5. DELETE ACCOUNT DANGER BUTTON
+                        _buildDeleteAccountTile(),
+
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
         );
       },
+    );
+  }
+
+  // ===========================================================================
+  // 1. TOP GREEN HEADER AREA
+  // ===========================================================================
+  Widget _buildGreenHeader() {
+    return Container(
+      width: double.infinity,
+      height: 155,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_primaryGreen, _darkGreen],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: const SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.only(top: 14, left: 20, right: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Profile & Settings",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 2. USER PROFILE HEADER CARD (Overlapping, 60px circular avatar)
+  // ===========================================================================
+  Widget _buildUserProfileHeaderCard({
+    required String userName,
+    required String subtitle,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderGrey, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // 60px Circular Avatar
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFE8F5E9),
+              border: Border.all(color: Colors.white, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: _primaryGreen.withValues(alpha: 0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: _darkGreen,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // User Name
+          Text(
+            userName,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: _textDark,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 3),
+
+          // Subtitle / Phone Number
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: _textMuted,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // "Edit Profile" Pill Button
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EditInformationPage()),
+              );
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
+              ),
+              child: const Text(
+                "Edit Profile",
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: _darkGreen,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 3. BALANCED SUMMARY CARDS (Card 1: Total Spent, Card 2: Records)
+  // ===========================================================================
+  Widget _buildBalancedSummaryCards({
+    required int totalExpense,
+    required int recordCount,
+  }) {
+    return Row(
+      children: [
+        // Card 1: Total Spent
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _borderGrey, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Total Spent:",
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: _textMuted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    totalExpense.toINR(),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: _textDark,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+
+        // Card 2: Records
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _borderGrey, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Records:",
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: _textMuted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "$recordCount",
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: _textDark,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 4. ACTION NAVIGATION TILES (14px Corner Radius)
+  // ===========================================================================
+  Widget _buildNavigationTiles() {
+    return Column(
+      children: [
+        _buildNavTile(
+          icon: Icons.person_rounded,
+          iconBg: const Color(0xFFE8F5E9),
+          iconColor: const Color(0xFF2E7D32),
+          title: "Personal Information",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PersonalInformationPage()),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        _buildNavTile(
+          icon: Icons.lock_rounded,
+          iconBg: const Color(0xFFFFF8E1),
+          iconColor: const Color(0xFFF57F17),
+          title: "Security & Password",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        _buildNavTile(
+          icon: Icons.bar_chart_rounded,
+          iconBg: const Color(0xFFE3F2FD),
+          iconColor: const Color(0xFF1976D2),
+          title: "Financial Reports",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const Reportpage()),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        _buildNavTile(
+          icon: Icons.chat_bubble_rounded,
+          iconBg: const Color(0xFFF3E5F5),
+          iconColor: const Color(0xFF7B1FA2),
+          title: "Feedback & Support",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FeedbackPage()),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        _buildNavTile(
+          icon: Icons.logout_rounded,
+          iconBg: const Color(0xFFFFEBEE),
+          iconColor: const Color(0xFFD32F2F),
+          title: "Log Out",
+          titleColor: const Color(0xFFD32F2F),
+          onTap: _showLogoutDialog,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavTile({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String title,
+    Color? titleColor,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _borderGrey, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: titleColor ?? _textDark,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: titleColor ?? const Color(0xFF94A3B8),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 5. DELETE ACCOUNT DANGER TILE
+  // ===========================================================================
+  Widget _buildDeleteAccountTile() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFCDD2), width: 1),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: _deleteCooldown ? null : _showDeleteAccountDialog,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFE4E6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFE11D48), size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    _deleteCooldown ? "Please wait..." : "Delete Account",
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFE11D48),
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFFE11D48),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

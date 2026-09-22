@@ -186,28 +186,52 @@ class ExpenseProvider extends ChangeNotifier {
         return tB.compareTo(tA);
       });
 
-      _highestTransaction = 0;
-      _biggestCategory = "No Data";
-      _biggestCategoryAmount = 0;
-
-      final catTotals = categoryTotals;
-      catTotals.forEach((cat, amount) {
-        if (amount > _biggestCategoryAmount) {
-          _biggestCategoryAmount = amount;
-          _biggestCategory = cat;
-        }
-      });
-      for (var r in _records) {
-        final mode = (r["Payment_Mode"] ?? "").toString();
-        final amount = (double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0).round();
-        if (!mode.startsWith("Add") && amount > _highestTransaction) {
-          _highestTransaction = amount;
-        }
-      }
+      _recalculateDerivedTotals();
     } else {
       _highestTransaction = 0;
       _biggestCategory = "No Data";
       _biggestCategoryAmount = 0;
+    }
+  }
+
+  void _recalculateDerivedTotals() {
+    _spentCash = 0;
+    _spentOnline = 0;
+    _addCash = 0;
+    _addOnline = 0;
+
+    for (final map in _records) {
+      final mode = (map["Payment_Mode"] ?? "").toString();
+      final amount = (double.tryParse(map["Amount"]?.toString() ?? '0') ?? 0.0).round();
+      if (mode == "Spent Cash") {
+        _spentCash += amount;
+      } else if (mode == "Spent Online") {
+        _spentOnline += amount;
+      } else if (mode == "Add CASH") {
+        _addCash += amount;
+      } else if (mode == "Add Online") {
+        _addOnline += amount;
+      }
+    }
+
+    _highestTransaction = 0;
+    _biggestCategory = "No Data";
+    _biggestCategoryAmount = 0;
+
+    final catTotals = categoryTotals;
+    catTotals.forEach((cat, amount) {
+      if (amount > _biggestCategoryAmount) {
+        _biggestCategoryAmount = amount;
+        _biggestCategory = cat;
+      }
+    });
+
+    for (var r in _records) {
+      final mode = (r["Payment_Mode"] ?? "").toString();
+      final amount = (double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0).round();
+      if (!mode.startsWith("Add") && amount > _highestTransaction) {
+        _highestTransaction = amount;
+      }
     }
   }
 
@@ -247,8 +271,52 @@ class ExpenseProvider extends ChangeNotifier {
   }) async {
     if (phoneNumber.isEmpty || key.isEmpty) return false;
     try {
+      final idx = _records.indexWhere((r) => r['key'] == key);
+      if (idx != -1) {
+        _records.removeAt(idx);
+        _recalculateDerivedTotals();
+        notifyListeners();
+      }
       final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber/$key");
       await ref.remove();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> updateExpense({
+    required String phoneNumber,
+    required String key,
+    required String amount,
+    required String category,
+    required String paymentMode,
+    required String description,
+    required String date,
+  }) async {
+    if (phoneNumber.isEmpty || key.isEmpty) return false;
+    try {
+      // Optimistically update local record list so all consumers update immediately
+      final idx = _records.indexWhere((r) => r['key'] == key);
+      if (idx != -1) {
+        _records[idx]['Amount'] = amount;
+        _records[idx]['Category'] = category;
+        _records[idx]['Payment_Mode'] = paymentMode;
+        _records[idx]['Description'] = description;
+        _records[idx]['Date'] = date;
+        _records[idx]['_parsedDate'] = DateHelper.parse(date);
+        _recalculateDerivedTotals();
+        notifyListeners();
+      }
+
+      final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber/$key");
+      await ref.update({
+        "Amount": amount,
+        "Category": category,
+        "Payment_Mode": paymentMode,
+        "Description": description,
+        "Date": date,
+      });
       return true;
     } catch (_) {
       return false;
@@ -303,6 +371,15 @@ class ExpenseProvider extends ChangeNotifier {
     _isLoading = false;
     _hasError = false;
     _errorMessage = "";
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setRecordsForTesting(List<Map<String, dynamic>> records) {
+    _records.clear();
+    _records.addAll(records);
+    _isLoading = false;
+    _hasError = false;
     notifyListeners();
   }
 
