@@ -1,4 +1,5 @@
 import 'package:fin_track/friends_pages/add_friends.dart';
+import 'package:fin_track/friends_pages/add_friend_spent.dart';
 import 'package:fin_track/friends_pages/specific_friend_page.dart';
 import 'package:fin_track/friends_pages/split_bill_page.dart';
 import 'package:fin_track/get_information/session_manager.dart';
@@ -69,6 +70,115 @@ class _FriendPageState extends State<FriendPage> {
     );
   }
 
+  String _getInitials(String name) {
+    final clean = name.trim();
+    if (clean.isEmpty) return "F";
+    final parts = clean.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.length == 1) {
+      return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return "${parts[0][0]}${parts[1][0]}".toUpperCase();
+  }
+
+  void _showSettleModal(String friendName, String friendNumber, int net) {
+    if (net == 0) {
+      Fluttertoast.showToast(msg: "All settled up with $friendName! No outstanding balance.");
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        final isOwed = net > 0;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Settle with $friendName",
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isOwed ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isOwed ? "Amount to Collect:" : "Amount to Pay:",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isOwed ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                        ),
+                      ),
+                      Text(
+                        net.abs().toINR(),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isOwed ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddFriendExpenses(friendNumber: friendNumber),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
+                    label: Text(
+                      isOwed ? "Record Received Settlement" : "Record Payment Made",
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreen,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<FriendProvider>(
@@ -102,33 +212,34 @@ class _FriendPageState extends State<FriendPage> {
 
         final totalGet = friendProvider.totalGet;
         final totalGive = friendProvider.totalGive;
-        final netBalance = totalGet - totalGive;
         final isLoading = friendProvider.isLoading;
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
           appBar: AppBar(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.white,
+            backgroundColor: primaryGreen,
             elevation: 0,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+            ),
             titleSpacing: 16,
-            title: const Column(
+            title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   "Friends & Split Ledger",
                   style: TextStyle(
-                    color: Color(0xFF1E293B),
+                    color: Colors.white,
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
                     letterSpacing: -0.3,
                   ),
                 ),
                 Text(
-                  "Track group balances & settle up",
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 11,
+                  "${allFriends.length} ${allFriends.length == 1 ? 'Friend' : 'Friends'}",
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -138,12 +249,12 @@ class _FriendPageState extends State<FriendPage> {
               IconButton(
                 tooltip: "Export PDF Summary",
                 icon: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.picture_as_pdf_rounded, color: primaryGreen, size: 20),
+                  child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
                 ),
                 onPressed: () => exportAllFriendsToPdf(allFriends, totalGet, totalGive),
               ),
@@ -167,27 +278,22 @@ class _FriendPageState extends State<FriendPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 1. OVERALL BALANCE HERO CARD
-                            _buildOverallBalanceCard(
+                            // 1. SEARCH BAR + ADD FRIEND BUTTON
+                            _buildSearchAndAddBar(),
+                            const SizedBox(height: 16),
+
+                            // 2. OVERALL BALANCE BANNER (You Get vs You Owe)
+                            _buildOverallBalanceBanner(
                               totalGet: totalGet,
                               totalGive: totalGive,
-                              netBalance: netBalance,
                             ),
                             const SizedBox(height: 16),
 
-                            // 2. QUICK ACTION DOCK (Add Friend + Split Bill)
-                            _buildActionDock(),
-                            const SizedBox(height: 16),
-
-                            // 3. SEARCH DOCK
-                            _buildSearchDock(),
-                            const SizedBox(height: 12),
-
-                            // 4. SORT PILLS ROW
-                            _buildSortRow(displayedFriends.length),
+                            // 3. SORT PILLS & SPLIT BILL QUICK ACTION ROW
+                            _buildSortAndActionRow(displayedFriends.length),
                             const SizedBox(height: 14),
 
-                            // 5. FRIENDS LIST
+                            // 4. FRIENDS LIST
                             if (displayedFriends.isEmpty)
                               _buildEmptyState()
                             else
@@ -209,219 +315,73 @@ class _FriendPageState extends State<FriendPage> {
     );
   }
 
-  Widget _buildOverallBalanceCard({
-    required int totalGet,
-    required int totalGive,
-    required int netBalance,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF8BC24A), Color(0xFF689F38)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF689F38).withValues(alpha: .30),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Net Ledger Position",
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      netBalance >= 0 ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
-                      size: 13,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      netBalance >= 0 ? "You are owed" : "You owe",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              netBalance.abs().toINR(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              // You Get Capsule
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.arrow_downward_rounded, color: Colors.white, size: 16),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "You Will Get",
-                              style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w500),
-                            ),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                totalGet.toINR(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-
-              // You Give Capsule
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 16),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "You Will Give",
-                              style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w500),
-                            ),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                totalGive.toINR(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionDock() {
+  Widget _buildSearchAndAddBar() {
     return Row(
       children: [
-        // Add Friend Button
         Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
+          child: Container(
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1E293B).withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: searchController,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+              decoration: InputDecoration(
+                hintText: "Search",
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8), size: 20),
+                suffixIcon: searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
+                        onPressed: () {
+                          searchController.clear();
+                          setState(() => searchQuery = "");
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onChanged: (val) => setState(() => searchQuery = val.trim()),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          height: 46,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final res = await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AddFriends()),
               );
+              if (res == true) _loadFriends(force: true);
             },
-            icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-            label: const Text("Add Friend", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryGreen,
-              foregroundColor: Colors.white,
-              elevation: 2,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-
-        // Split Bill Button
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SplitBillPage()),
-              );
-            },
-            icon: const Icon(Icons.call_split_rounded, size: 18, color: Color(0xFF7C3AED)),
+            icon: const Icon(Icons.add, color: primaryGreen, size: 18),
             label: const Text(
-              "Split Bill",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF7C3AED)),
+              "Add Friend",
+              style: TextStyle(
+                color: primaryGreen,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
             ),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFF7C3AED), width: 1.4),
-              backgroundColor: const Color(0xFFF5F3FF),
-              padding: const EdgeInsets.symmetric(vertical: 13),
+              side: const BorderSide(color: primaryGreen, width: 1.5),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              backgroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              elevation: 0,
             ),
           ),
         ),
@@ -429,65 +389,103 @@ class _FriendPageState extends State<FriendPage> {
     );
   }
 
-  Widget _buildSearchDock() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+  Widget _buildOverallBalanceBanner({
+    required int totalGet,
+    required int totalGive,
+  }) {
+    return Row(
+      children: [
+        // Total You Get Card
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFC8E6C9)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Total You Get:",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    totalGet.toINR(),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2E7D32),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: TextField(
-        controller: searchController,
-        onChanged: (val) => setState(() => searchQuery = val),
-        style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
-        decoration: InputDecoration(
-          hintText: "Search friend by name or phone...",
-          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
-          suffixIcon: searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.cancel, color: Color(0xFF94A3B8), size: 18),
-                  onPressed: () {
-                    searchController.clear();
-                    setState(() => searchQuery = "");
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
-      ),
+        const SizedBox(width: 12),
+
+        // Total You Owe Card
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFFFCDD2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Total You Owe:",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFC62828),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    totalGive.toINR(),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFC62828),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildSortRow(int count) {
+  Widget _buildSortAndActionRow(int count) {
+    final sorts = ["Recent", "Balance", "Name"];
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          "$count ${count == 1 ? 'friend' : 'friends'} in ledger",
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF64748B),
-          ),
-        ),
         Row(
           children: [
-            const Text("Sort: ", style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
-            for (final s in ["Recent", "Balance", "Name"]) ...[
+            for (final s in sorts) ...[
               GestureDetector(
                 onTap: () => setState(() => sortBy = s),
                 child: Container(
-                  margin: const EdgeInsets.only(left: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: sortBy == s ? primaryGreen : Colors.white,
                     borderRadius: BorderRadius.circular(10),
@@ -498,7 +496,7 @@ class _FriendPageState extends State<FriendPage> {
                   child: Text(
                     s,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 11.5,
                       fontWeight: sortBy == s ? FontWeight.bold : FontWeight.w500,
                       color: sortBy == s ? Colors.white : const Color(0xFF64748B),
                     ),
@@ -507,6 +505,35 @@ class _FriendPageState extends State<FriendPage> {
               ),
             ],
           ],
+        ),
+        InkWell(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SplitBillPage()),
+          ),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEDE9FE),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.call_split_rounded, size: 14, color: Color(0xFF6D28D9)),
+                SizedBox(width: 4),
+                Text(
+                  "Split Bill",
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF6D28D9),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -518,21 +545,37 @@ class _FriendPageState extends State<FriendPage> {
     final fGet = (double.tryParse(friend["total_get"]?.toString() ?? '0') ?? 0.0).round();
     final fGive = (double.tryParse(friend["total_give"]?.toString() ?? '0') ?? 0.0).round();
     final net = fGet - fGive;
+    final initials = _getInitials(friendName);
 
-    final avatarColor = Colors.primaries[
-        (friendName.isNotEmpty ? friendName.codeUnitAt(0) : 0) % Colors.primaries.length];
+    Color pillBg;
+    Color pillTextColor;
+    String pillText;
+
+    if (net > 0) {
+      pillBg = const Color(0xFFE8F5E9);
+      pillTextColor = const Color(0xFF2E7D32);
+      pillText = "You will get ${net.toINR()}";
+    } else if (net < 0) {
+      pillBg = const Color(0xFFFFEBEE);
+      pillTextColor = const Color(0xFFC62828);
+      pillText = "You owe ${net.abs().toINR()}";
+    } else {
+      pillBg = const Color(0xFFF1F5F9);
+      pillTextColor = const Color(0xFF64748B);
+      pillText = "All settled up";
+    }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF1E293B).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -570,106 +613,104 @@ class _FriendPageState extends State<FriendPage> {
             }
           },
           child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
+            padding: const EdgeInsets.all(16),
+            child: Column(
               children: [
-                // Avatar
-                CircleAvatar(
-                  radius: 23,
-                  backgroundColor: avatarColor.withValues(alpha: .15),
-                  child: Text(
-                    friendName.isNotEmpty ? friendName[0].toUpperCase() : "F",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: avatarColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-
-                // Friend Name & Mobile
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        friendName,
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E293B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        friendNumber,
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                // Net Balance Pill + Arrow
+                // Top Row: Circular Avatar with Initials + Friend Name & Phone
                 Row(
                   children: [
-                    if (net > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                    Container(
+                      height: 44,
+                      width: 44,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF1E293B),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
                         child: Text(
-                          "Gets ${net.toINR()}",
+                          initials,
                           style: const TextStyle(
-                            color: Color(0xFF2E7D32),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      )
-                    else if (net < 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFEBEE),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          "Owes ${net.abs().toINR()}",
-                          style: const TextStyle(
-                            color: Color(0xFFC62828),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          "Settled ✓",
-                          style: TextStyle(
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 20),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            friendName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            friendNumber,
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Bottom Row: Status Pill + Settle Button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Status Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: pillBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        pillText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: pillTextColor,
+                        ),
+                      ),
+                    ),
+
+                    // Settle Button
+                    SizedBox(
+                      height: 34,
+                      child: OutlinedButton(
+                        onPressed: () => _showSettleModal(friendName, friendNumber, net),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primaryGreen,
+                          side: const BorderSide(color: primaryGreen, width: 1.2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        child: const Text(
+                          "Settle",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -683,36 +724,55 @@ class _FriendPageState extends State<FriendPage> {
   Widget _buildEmptyState() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
+            decoration: BoxDecoration(
+              color: const Color(0xFF8BC24A).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.group_outlined, size: 42, color: Color(0xFF94A3B8)),
+            child: const Icon(Icons.people_alt_outlined, size: 40, color: primaryGreen),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Text(
-            searchQuery.isNotEmpty ? "No friends matching '$searchQuery'" : "No Friends Added Yet",
+            searchQuery.isNotEmpty ? "No friends found matching \"$searchQuery\"" : "No friends added yet",
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Color(0xFF1E293B),
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
           const Text(
-            "Tap 'Add Friend' above to track loans, shared bills, and settlements.",
+            "Add friends to record shared expenses and split bills easily.",
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final res = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddFriends()),
+              );
+              if (res == true) _loadFriends(force: true);
+            },
+            icon: const Icon(Icons.person_add_rounded, size: 18),
+            label: const Text("Add First Friend", style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
           ),
         ],
       ),

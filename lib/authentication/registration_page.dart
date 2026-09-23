@@ -34,6 +34,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
   int failedAttempts = 0;
   Timer? _throttleTimer;
 
+  static const Color _brandGreen = Color(0xFF8BC24A);
+  static const Color _canvasBackground = Color(0xFFF8FAFC);
+  static const Color _primaryText = Color(0xFF1E293B);
+  static const Color _mutedText = Color(0xFF64748B);
+  static const Color _borderColor = Color(0xFFE2E8F0);
+
   @override
   void dispose() {
     nameController.dispose();
@@ -207,24 +213,50 @@ class _RegistrationPageState extends State<RegistrationPage> {
     }
   }
 
-  InputDecoration inputDecoration(String hint, {Widget? suffixIcon}) {
+  InputDecoration _inputDecoration({
+    required String hint,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
     return InputDecoration(
       hintText: hint,
       counterText: "",
-      hintStyle: const TextStyle(color: Color(0xFF8BC24A)),
+      filled: true,
+      fillColor: _canvasBackground,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 14,
+        fontWeight: FontWeight.normal,
+      ),
+      prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(
-          width: 2,
-          color: Color.fromARGB(255, 74, 127, 61),
+          width: 1.2,
+          color: _borderColor,
         ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(
-          width: 2.5,
-          color: Color(0xFF8BC24A),
+          width: 1.8,
+          color: _brandGreen,
+        ),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          width: 1.2,
+          color: Color(0xFFEF4444),
+        ),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          width: 1.8,
+          color: Color(0xFFEF4444),
         ),
       ),
     );
@@ -233,303 +265,457 @@ class _RegistrationPageState extends State<RegistrationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _canvasBackground,
       resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: Stack(
-            children: [
-              // Background Circle
-              Positioned(
-                top: -180,
-                left: -80,
-                child: Container(
-                  width: 600,
-                  height: 700,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF8BC24A),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-
-              // Main Scrollable Content
-              SingleChildScrollView(
-                padding: const EdgeInsets.only(
-                  top: 30,
-                  left: 20,
-                  right: 20,
-                  bottom: 30,
-                ),
-                child: Column(
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Hello",
-                              style: TextStyle(
-                                fontSize: 38,
-                                fontWeight: FontWeight.bold,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Brand Header with App Logo
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            height: 44,
+                            width: 44,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(13),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _brandGreen.withValues(alpha: 0.25),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(13),
+                              child: Image.asset(
+                                'assets/image/AccountApplicationLogo.jpg',
+                                fit: BoxFit.cover,
                               ),
                             ),
-                            Text(
-                              "Join Us Today!",
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Color.fromARGB(255, 74, 127, 61),
-                                fontWeight: FontWeight.w600,
-                              ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            "FinTrack",
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: _primaryText,
+                              letterSpacing: -0.5,
                             ),
-                          ],
-                        ),
-
-                        Container(
-                          height: 75,
-                          width: 75,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Image.asset(
-                            'assets/image/AccountApplicationLogo.jpg',
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    // Registration Card
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                        boxShadow: const [
-                          BoxShadow(
-                            blurRadius: 20,
-                            color: Colors.black12,
-                            offset: Offset(0, 8),
                           ),
                         ],
                       ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            "Register Account",
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF8BC24A),
+
+                      const SizedBox(height: 20),
+
+                      // Screen Title & Subtitle
+                      const Text(
+                        "Create Account",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: _primaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Join FinTrack to manage smart budgets",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _mutedText,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Elevated Registration Card
+                      Container(
+                        padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _primaryText.withValues(alpha: 0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
                             ),
-                          ),
-
-                          const SizedBox(height: 25),
-
-                          TextField(
-                            controller: nameController,
-                            maxLength: 50,
-                            textInputAction: TextInputAction.next,
-                            decoration: inputDecoration("Full Name"),
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          TextField(
-                            controller: emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            maxLength: 100,
-                            textInputAction: TextInputAction.next,
-                            decoration: inputDecoration("Email"),
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          TextField(
-                            controller: phoneController,
-                            keyboardType: TextInputType.phone,
-                            maxLength: 10,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                            textInputAction: TextInputAction.next,
-                            decoration: inputDecoration("Phone Number"),
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          TextField(
-                            controller: passwordController,
-                            obscureText: !isPasswordVisible,
-                            maxLength: 64,
-                            textInputAction: TextInputAction.next,
-                            decoration: inputDecoration(
-                              "Password",
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  isPasswordVisible
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
-                                  color: const Color(0xFF8BC24A),
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    isPasswordVisible = !isPasswordVisible;
-                                  });
-                                },
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Full Name
+                            const Text(
+                              "Full Name",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: nameController,
+                              maxLength: 50,
+                              textInputAction: TextInputAction.next,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                              decoration: _inputDecoration(
+                                hint: "Full Name",
+                                prefixIcon: const Icon(
+                                  Icons.person_outline_rounded,
+                                  color: Color(0xFF94A3B8),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
 
-                          ValueListenableBuilder<TextEditingValue>(
-                            valueListenable: passwordController,
-                            builder: (context, val, _) {
-                              final pass = val.text;
-                              if (pass.isEmpty) return const SizedBox.shrink();
-                              final strength = _getPasswordStrength(pass);
-                              final color = strength <= 1
-                                  ? Colors.red
-                                  : strength == 2
-                                      ? Colors.orange
-                                      : const Color(0xFF8BC24A);
-                              final label = strength <= 1
-                                  ? "Weak"
-                                  : strength == 2
-                                      ? "Medium"
-                                      : "Strong";
+                            const SizedBox(height: 16),
 
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8, bottom: 4),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: ClipRRect(
+                            // Phone Number
+                            const Text(
+                              "Phone Number",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: phoneController,
+                              keyboardType: TextInputType.phone,
+                              maxLength: 10,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              textInputAction: TextInputAction.next,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                              decoration: _inputDecoration(
+                                hint: "10 digit Number",
+                                prefixIcon: Padding(
+                                  padding: const EdgeInsets.only(left: 14, right: 10),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        "🇮🇳 +91",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: _primaryText,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        height: 18,
+                                        width: 1.2,
+                                        color: const Color(0xFFCBD5E1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                suffixIcon: const Icon(
+                                  Icons.phone_outlined,
+                                  color: Color(0xFF94A3B8),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Email Address
+                            const Text(
+                              "Email Address",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              maxLength: 100,
+                              textInputAction: TextInputAction.next,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                              decoration: _inputDecoration(
+                                hint: "Email Address",
+                                prefixIcon: const Icon(
+                                  Icons.email_outlined,
+                                  color: Color(0xFF94A3B8),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Password
+                            const Text(
+                              "Password",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: passwordController,
+                              obscureText: !isPasswordVisible,
+                              maxLength: 64,
+                              textInputAction: TextInputAction.next,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                              decoration: _inputDecoration(
+                                hint: "Password",
+                                prefixIcon: const Icon(
+                                  Icons.lock_outline_rounded,
+                                  color: Color(0xFF94A3B8),
+                                  size: 20,
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    isPasswordVisible
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: const Color(0xFF94A3B8),
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      isPasswordVisible = !isPasswordVisible;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            // Real-time Password Strength Meter Bar
+                            ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: passwordController,
+                              builder: (context, val, _) {
+                                final pass = val.text;
+                                if (pass.isEmpty) return const SizedBox.shrink();
+                                final strength = _getPasswordStrength(pass);
+                                final color = strength <= 1
+                                    ? const Color(0xFFEF4444)
+                                    : strength == 2
+                                        ? const Color(0xFFF59E0B)
+                                        : _brandGreen;
+                                final label = strength <= 1
+                                    ? "Weak"
+                                    : strength == 2
+                                        ? "Medium"
+                                        : "Strong";
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8, bottom: 4),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      ClipRRect(
                                         borderRadius: BorderRadius.circular(4),
                                         child: LinearProgressIndicator(
                                           value: strength / 3.0,
-                                          backgroundColor: Colors.grey.shade200,
+                                          backgroundColor: const Color(0xFFE2E8F0),
                                           color: color,
                                           minHeight: 5,
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      label,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: color,
+                                      const SizedBox(height: 5),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            "Real-time password strength",
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: _mutedText,
+                                            ),
+                                          ),
+                                          Text(
+                                            label,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: color,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          TextField(
-                            controller: confirmPasswordController,
-                            obscureText: !isConfirmPasswordVisible,
-                            maxLength: 64,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => isLoading ? null : checkDetails(),
-                            decoration: inputDecoration(
-                              "Confirm Password",
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  isConfirmPasswordVisible
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
-                                  color: const Color(0xFF8BC24A),
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    isConfirmPasswordVisible = !isConfirmPasswordVisible;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 15),
-
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: InkWell(
-                              child: const Text(
-                                "Already have an account? Sign In",
-                                style: TextStyle(
-                                  color: Color.fromARGB(255, 74, 127, 61),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              onTap: () {
-                                if (Navigator.canPop(context)) {
-                                  Navigator.pop(context);
-                                } else {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const LoginPage(),
-                                    ),
-                                  );
-                                }
+                                    ],
+                                  ),
+                                );
                               },
                             ),
-                          ),
 
-                          const Padding(
-                          padding: EdgeInsets.only(top: 14, bottom: 6),
-                          child: Text(
-                            "By registering, you agree to FinTrack's Terms of Service and Privacy Policy.",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 11.5, color: Colors.black54),
-                          ),
-                        ),
+                            const SizedBox(height: 16),
 
-                        const SizedBox(height: 16),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: isLoading ? null : checkDetails,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8BC24A),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                            // Confirm Password
+                            const Text(
+                              "Confirm Password",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: confirmPasswordController,
+                              obscureText: !isConfirmPasswordVisible,
+                              maxLength: 64,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => isLoading ? null : checkDetails(),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                              decoration: _inputDecoration(
+                                hint: "Confirm Password",
+                                prefixIcon: const Icon(
+                                  Icons.lock_outline_rounded,
+                                  color: Color(0xFF94A3B8),
+                                  size: 20,
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    isConfirmPasswordVisible
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: const Color(0xFF94A3B8),
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      isConfirmPasswordVisible = !isConfirmPasswordVisible;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 14),
+
+                            // Terms and Privacy Note
+                            const Center(
+                              child: Text(
+                                "By registering, you agree to FinTrack's Terms of Service and Privacy Policy.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: _mutedText,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // Primary CTA: Register Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton(
+                                onPressed: isLoading ? null : checkDetails,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _brandGreen,
+                                  disabledBackgroundColor: const Color(0xFFCBD5E1),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  "Register & Get Started",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 22),
+
+                      // Footer Sign In Link
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            "Already have an account? ",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _mutedText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              if (Navigator.canPop(context)) {
+                                Navigator.pop(context);
+                              } else {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const LoginPage(),
+                                  ),
+                                );
+                              }
+                            },
                             child: const Text(
-                              "Submit",
+                              "Log In",
                               style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
+                                fontSize: 14,
+                                color: _brandGreen,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
 
@@ -537,15 +723,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
               Container(
                 height: double.infinity,
                 width: double.infinity,
-                color: Colors.black45,
+                color: Colors.black26,
                 child: const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
+                  child: CircularProgressIndicator(color: _brandGreen),
                 ),
               ),
           ],
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

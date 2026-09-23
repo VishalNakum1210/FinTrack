@@ -1,6 +1,7 @@
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +18,12 @@ class _AddFriendsState extends State<AddFriends> {
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController noteController = TextEditingController();
   bool isLoading = false;
+
+  static const Color _primaryGreen = Color(0xFF8BC24A);
+  static const Color _canvasBg = Color(0xFFF8FAFC);
+  static const Color _primaryText = Color(0xFF1E293B);
+  static const Color _mutedText = Color(0xFF64748B);
+  static const Color _borderColor = Color(0xFFE2E8F0);
 
   @override
   void dispose() {
@@ -44,7 +51,7 @@ class _AddFriendsState extends State<AddFriends> {
     String userPhoneNumber = await SessionManager.getPhoneNumber() ?? "";
 
     if (userPhoneNumber.isEmpty) {
-      Fluttertoast.showToast(msg: "User not logged in");
+      Fluttertoast.showToast(msg: "User session expired. Please log in again.");
       return;
     }
 
@@ -96,19 +103,27 @@ class _AddFriendsState extends State<AddFriends> {
     }
   }
 
-  InputDecoration inputDecoration(String hint) {
+  InputDecoration _inputDecoration({
+    required String hint,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
     return InputDecoration(
       hintText: hint,
+      counterText: "",
       filled: true,
-      fillColor: Colors.grey.shade50,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      fillColor: _canvasBg,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
-        borderSide: const BorderSide(width: 2, color: Color(0xFF8BC24A)),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(width: 1.2, color: _borderColor),
       ),
       focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(width: 2.5, color: Color(0xFF8BC24A)),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(width: 1.8, color: _primaryGreen),
       ),
     );
   }
@@ -116,95 +131,161 @@ class _AddFriendsState extends State<AddFriends> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FBF2),
+      backgroundColor: _canvasBg,
       appBar: AppBar(
         title: const Text(
           "Add Friend",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
-        backgroundColor: const Color(0xFF8BC24A),
+        backgroundColor: _primaryGreen,
         elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+        ),
       ),
       body: Stack(
         children: [
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
-              child: Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 15,
-                      offset: Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      "Friend Details",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF8BC24A),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: nameController,
-                      maxLength: 50,
-                      decoration: inputDecoration("Friend Name"),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: phoneController,
-                      keyboardType: TextInputType.phone,
-                      maxLength: 10,
-                      decoration: inputDecoration("Enter 10-digit mobile number").copyWith(counterText: ""),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: noteController,
-                      maxLength: 150,
-                      decoration: inputDecoration("Note (Optional)"),
-                    ),
-                    const SizedBox(height: 28),
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: isLoading ? null : setFriendDetails,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8BC24A),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _primaryText.withValues(alpha: 0.05),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
                         ),
-                        child: const Text(
-                          "Save Friend",
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Friend Information",
                           style: TextStyle(
-                            color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
+                            color: _primaryText,
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          "Add a friend to track loans, borrow amounts, and split bills",
+                          style: TextStyle(fontSize: 13, color: _mutedText),
+                        ),
+                        const SizedBox(height: 22),
+
+                        // Full Name
+                        const Text(
+                          "Full Name",
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _primaryText),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: nameController,
+                          maxLength: 50,
+                          textInputAction: TextInputAction.next,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _primaryText),
+                          decoration: _inputDecoration(
+                            hint: "Friend's Name",
+                            prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF94A3B8), size: 20),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Mobile Number
+                        const Text(
+                          "Mobile Number",
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _primaryText),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: phoneController,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 10,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          textInputAction: TextInputAction.next,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _primaryText),
+                          decoration: _inputDecoration(
+                            hint: "10 digit Number",
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.only(left: 14, right: 10),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text("🇮🇳 +91", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _primaryText)),
+                                  const SizedBox(width: 8),
+                                  Container(height: 18, width: 1.2, color: const Color(0xFFCBD5E1)),
+                                ],
+                              ),
+                            ),
+                            suffixIcon: const Icon(Icons.phone_outlined, color: Color(0xFF94A3B8), size: 20),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Note
+                        const Text(
+                          "Note / Tag (Optional)",
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _primaryText),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: noteController,
+                          maxLength: 150,
+                          textInputAction: TextInputAction.done,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _primaryText),
+                          decoration: _inputDecoration(
+                            hint: "e.g. Roommate, Colleague",
+                            prefixIcon: const Icon(Icons.description_outlined, color: Color(0xFF94A3B8), size: 20),
+                          ),
+                        ),
+                        const SizedBox(height: 26),
+
+                        // Save Friend Button
+                        SizedBox(
+                          height: 52,
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: isLoading ? null : setFriendDetails,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primaryGreen,
+                              disabledBackgroundColor: const Color(0xFFCBD5E1),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              "Save Friend",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
+
           if (isLoading)
             Container(
-              color: Colors.black45,
+              color: Colors.black26,
               child: const Center(
-                child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
+                child: CircularProgressIndicator(color: _primaryGreen),
               ),
             ),
         ],

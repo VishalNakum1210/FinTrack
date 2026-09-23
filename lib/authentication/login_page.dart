@@ -31,6 +31,12 @@ class _LoginPageState extends State<LoginPage> {
   int lockoutSeconds = 0;
   Timer? lockoutTimer;
 
+  static const Color _brandGreen = Color(0xFF8BC24A);
+  static const Color _canvasBackground = Color(0xFFF8FAFC);
+  static const Color _primaryText = Color(0xFF1E293B);
+  static const Color _mutedText = Color(0xFF64748B);
+  static const Color _borderColor = Color(0xFFE2E8F0);
+
   @override
   void initState() {
     super.initState();
@@ -239,25 +245,51 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  InputDecoration inputDecoration(String hint, {Widget? suffixIcon}) {
+  InputDecoration _inputDecoration({
+    required String hint,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
     return InputDecoration(
       hintText: hint,
       counterText: "",
-      hintStyle: const TextStyle(color: Color(0xFF8BC24A)),
+      filled: true,
+      fillColor: _canvasBackground,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 14,
+        fontWeight: FontWeight.normal,
+      ),
+      prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(
-          width: 2,
-          color: Color.fromARGB(255, 74, 127, 61),
+          width: 1.2,
+          color: _borderColor,
         ),
-        borderRadius: BorderRadius.circular(15),
       ),
       focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(
-          width: 2.5,
-          color: Color(0xFF8BC24A),
+          width: 1.8,
+          color: _brandGreen,
         ),
-        borderRadius: BorderRadius.circular(15),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          width: 1.2,
+          color: Color(0xFFEF4444),
+        ),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          width: 1.8,
+          color: Color(0xFFEF4444),
+        ),
       ),
     );
   }
@@ -265,223 +297,311 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _canvasBackground,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => FocusScope.of(context).unfocus(),
         child: Stack(
-        children: [
-          // Decorative background circle
-          Positioned(
-            top: -180,
-            left: -80,
-            child: Container(
-              width: 600,
-              height: 700,
-              decoration: const BoxDecoration(
-                color: Color(0xFF8BC24A),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
-
-                  // Header with welcome text and logo
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      // FinTrack Brand Header with App Logo
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            "Hello",
-                            style: TextStyle(
-                              fontSize: 38,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                          Container(
+                            height: 44,
+                            width: 44,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(13),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _brandGreen.withValues(alpha: 0.25),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(13),
+                              child: Image.asset(
+                                'assets/image/AccountApplicationLogo.jpg',
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
-                          Text(
-                            "Welcome Back!",
+                          const SizedBox(width: 12),
+                          const Text(
+                            "FinTrack",
                             style: TextStyle(
-                              fontSize: 18,
-                              color: Color.fromARGB(255, 74, 127, 61),
-                              fontWeight: FontWeight.w600,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: _primaryText,
+                              letterSpacing: -0.5,
                             ),
                           ),
                         ],
                       ),
 
+                      const SizedBox(height: 22),
+
+                      // Welcome Back Title & Subtitle
+                      const Text(
+                        "Welcome Back!",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: _primaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Log in to track your personal finances",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _mutedText,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // Elevated Authentication Card
                       Container(
-                        height: 75,
-                        width: 75,
-                        clipBehavior: Clip.antiAlias,
+                        padding: const EdgeInsets.all(22),
                         decoration: BoxDecoration(
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: const [
+                          boxShadow: [
                             BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 8,
-                              offset: Offset(0, 4),
+                              color: _primaryText.withValues(alpha: 0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
-                        child: Image.asset(
-                          'assets/image/AccountApplicationLogo.jpg',
-                          fit: BoxFit.cover,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Phone Number Label & Input
+                            const Text(
+                              "Phone Number",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: username,
+                              keyboardType: TextInputType.phone,
+                              maxLength: 10,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              textInputAction: TextInputAction.next,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                              decoration: _inputDecoration(
+                                hint: "Enter 10 digit number",
+                                prefixIcon: Padding(
+                                  padding: const EdgeInsets.only(left: 14, right: 10),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        "🇮🇳 +91",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: _primaryText,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        height: 18,
+                                        width: 1.2,
+                                        color: const Color(0xFFCBD5E1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                suffixIcon: const Icon(
+                                  Icons.phone_outlined,
+                                  color: Color(0xFF94A3B8),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 18),
+
+                            // Password Label & Input
+                            const Text(
+                              "Password",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: password,
+                              obscureText: !isPasswordVisible,
+                              maxLength: 64,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => (isLoading || lockoutSeconds > 0)
+                                  ? null
+                                  : checkUserDetails(),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryText,
+                              ),
+                              decoration: _inputDecoration(
+                                hint: "Password",
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    isPasswordVisible
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: const Color(0xFF94A3B8),
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      isPasswordVisible = !isPasswordVisible;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // Forgot Password Link
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Fluttertoast.showToast(
+                                    msg: "Please contact support or admin to reset your credentials.",
+                                  );
+                                },
+                                child: const Text(
+                                  "Forgot Password?",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: _mutedText,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // Primary CTA: Log In Button
+                            SizedBox(
+                              height: 52,
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: (isLoading || lockoutSeconds > 0)
+                                    ? null
+                                    : checkUserDetails,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _brandGreen,
+                                  disabledBackgroundColor: const Color(0xFFCBD5E1),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: Text(
+                                  lockoutSeconds > 0
+                                      ? "Locked (${lockoutSeconds}s)"
+                                      : "Log In",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
 
-                  const SizedBox(height: 40),
+                      const SizedBox(height: 24),
 
-                  // Login Card
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: const [
-                        BoxShadow(
-                          blurRadius: 20,
-                          color: Colors.black12,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Center(
-                          child: Text(
-                            "Login Account",
+                      // Sign Up Footer Link
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            "Don't have an account? ",
                             style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF8BC24A),
+                              fontSize: 14,
+                              color: _mutedText,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ),
-
-                        const SizedBox(height: 30),
-
-                          TextField(
-                            controller: username,
-                            keyboardType: TextInputType.phone,
-                            maxLength: 10,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                            textInputAction: TextInputAction.next,
-                            style: const TextStyle(color: Colors.black87),
-                            decoration: inputDecoration("Phone Number"),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          TextField(
-                            controller: password,
-                            obscureText: !isPasswordVisible,
-                            maxLength: 64,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => (isLoading || lockoutSeconds > 0) ? null : checkUserDetails(),
-                            style: const TextStyle(color: Colors.black87),
-                            decoration: inputDecoration(
-                              "Password",
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  isPasswordVisible
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
-                                  color: const Color(0xFF8BC24A),
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    isPasswordVisible = !isPasswordVisible;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 15),
-
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: InkWell(
-                              onTap: () {
-                                if (Navigator.canPop(context)) {
-                                  Navigator.pop(context);
-                                } else {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const RegistrationPage(),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: const Text(
-                                "Don't have an account? Sign Up",
-                                style: TextStyle(
-                                  color: Color.fromARGB(255, 74, 127, 61),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 30),
-
-                        SizedBox(
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: (isLoading || lockoutSeconds > 0) ? null : checkUserDetails,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8BC24A),
-                              disabledBackgroundColor: Colors.grey.shade400,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                            ),
-                            child: Text(
-                              lockoutSeconds > 0
-                                  ? "Locked (${lockoutSeconds}s)"
-                                  : "Submit",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
+                          GestureDetector(
+                            onTap: () {
+                              if (Navigator.canPop(context)) {
+                                Navigator.pop(context);
+                              } else {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const RegistrationPage(),
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Text(
+                              "Sign Up",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _brandGreen,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
 
-          if (isLoading)
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.black45,
-              child: const Center(
-                child: CircularProgressIndicator(color: Color(0xFF8BC24A)),
+            if (isLoading)
+              Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.black26,
+                child: const Center(
+                  child: CircularProgressIndicator(color: _brandGreen),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
