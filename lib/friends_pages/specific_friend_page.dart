@@ -155,14 +155,24 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
     final newDesc = result['desc'] ?? '';
     if (newAmount.isEmpty) return;
 
+    final parsedNew = double.tryParse(newAmount.replaceAll(',', '').trim());
+    if (parsedNew == null || parsedNew <= 0) {
+      Fluttertoast.showToast(msg: 'Please enter a valid amount');
+      return;
+    }
+    final cleanNewAmount = parsedNew.truncateToDouble() == parsedNew
+        ? parsedNew.toInt().toString()
+        : parsedNew.toStringAsFixed(2);
+
     try {
+      final oldAmt = (double.tryParse(record['Amount']?.toString() ?? '0') ?? 0.0).round();
+      final newAmt = parsedNew.round();
+      final diff = newAmt - oldAmt;
+
       final ref = FirebaseDatabase.instance
           .ref('Friends/$_userPhone/${widget.friendNumber}/Records/${record['key']}');
-      await ref.update({'Amount': newAmount, 'Description': newDesc});
+      await ref.update({'Amount': cleanNewAmount, 'Description': newDesc});
 
-      final oldAmt = (double.tryParse(record['Amount']?.toString() ?? '0') ?? 0.0).round();
-      final newAmt = (double.tryParse(newAmount) ?? 0.0).round();
-      final diff = newAmt - oldAmt;
       if (diff != 0 && mounted) {
         final isGive = record['Type'] == 'Take Money From Friend';
         final friendRef = FirebaseDatabase.instance.ref('Friends/$_userPhone/${widget.friendNumber}');
@@ -172,6 +182,8 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
               delta: diff,
             );
       }
+      record['Amount'] = cleanNewAmount;
+      record['Description'] = newDesc;
       Fluttertoast.showToast(msg: 'Transaction updated');
     } catch (e) {
       Fluttertoast.showToast(msg: 'Failed to update: $e');
@@ -273,9 +285,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                         MaterialPageRoute(
                           builder: (_) => AddFriendExpenses(friendNumber: widget.friendNumber),
                         ),
-                      ).then((res) {
-                        if (res == true) _startStream();
-                      });
+                      );
                     },
                     icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
                     label: Text(
@@ -546,14 +556,13 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
           child: SizedBox(
             height: 48,
             child: OutlinedButton.icon(
-              onPressed: () async {
-                final result = await Navigator.push(
+              onPressed: () {
+                Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => AddFriendExpenses(friendNumber: widget.friendNumber),
                   ),
                 );
-                if (result == true) _startStream();
               },
               icon: const Icon(Icons.add, color: primaryGreen, size: 18),
               label: const Text(
@@ -823,10 +832,11 @@ class _EditRecordBottomSheetState extends State<_EditRecordBottomSheet> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                final amt = _amountCtrl.text.trim();
+                final amt = _amountCtrl.text.replaceAll(',', '').trim();
                 final desc = _descCtrl.text.trim();
-                if (amt.isEmpty) {
-                  Fluttertoast.showToast(msg: 'Please enter an amount');
+                final parsedAmt = double.tryParse(amt);
+                if (amt.isEmpty || parsedAmt == null || parsedAmt <= 0) {
+                  Fluttertoast.showToast(msg: 'Please enter a valid amount');
                   return;
                 }
                 Navigator.pop(context, {'amount': amt, 'desc': desc});

@@ -118,9 +118,15 @@ void main() {
 
       expect(find.text("Are you sure you want to permanently delete your account? All expense and friends ledger data will be deleted."), findsOneWidget);
       expect(find.text("Cancel"), findsOneWidget);
+      expect(find.text("Delete (5s)"), findsOneWidget);
+      final initialBtn = find.widgetWithText(ElevatedButton, "Delete (5s)");
+      expect(tester.widget<ElevatedButton>(initialBtn).enabled, isFalse);
 
-      // Advance cooldown timer to cleanly complete test
+      // Advance countdown timer 5 seconds to unlock safety gate
       await tester.pump(const Duration(seconds: 5));
+      expect(find.text("Delete Permanently"), findsOneWidget);
+      final unlockedBtn = find.widgetWithText(ElevatedButton, "Delete Permanently");
+      expect(tester.widget<ElevatedButton>(unlockedBtn).enabled, isTrue);
     });
 
     testWidgets('tapping Edit Profile navigates to EditInformationPage', (tester) async {

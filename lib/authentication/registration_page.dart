@@ -3,6 +3,7 @@ import 'package:fin_track/get_information/hash_password.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/authentication/login_page.dart';
 import 'package:fin_track/nav_bar.dart';
+import 'package:fin_track/profile_pages/terms_and_privacy_page.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
@@ -632,15 +633,38 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             const SizedBox(height: 14),
 
                             // Terms and Privacy Note
-                            const Center(
-                              child: Text(
-                                "By registering, you agree to FinTrack's Terms of Service and Privacy Policy.",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: _mutedText,
-                                  height: 1.4,
-                                ),
+                            Center(
+                              child: Wrap(
+                                alignment: WrapAlignment.center,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  const Text(
+                                    "By registering, you agree to FinTrack's ",
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: _mutedText,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const TermsAndPrivacyPage(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text(
+                                      "Terms of Service & Privacy Policy",
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: _brandGreen,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
 

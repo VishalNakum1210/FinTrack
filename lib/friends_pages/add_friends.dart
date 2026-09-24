@@ -66,8 +66,31 @@ class _AddFriendsState extends State<AddFriends> {
       (f) => (f["friend_number"] ?? "").toString().trim() == phoneNumber,
     );
     if (isDuplicate) {
-      Fluttertoast.showToast(msg: "This number is already in your friends list");
-      return;
+      final shouldUpdate = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("Friend Already Exists"),
+          content: Text(
+            "A friend with number $phoneNumber is already in your list. Would you like to update their name and note?",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("Update"),
+            ),
+          ],
+        ),
+      );
+      if (shouldUpdate != true) return;
     }
 
     setState(() {
@@ -77,7 +100,7 @@ class _AddFriendsState extends State<AddFriends> {
     try {
       DateTime now = DateTime.now();
       if (!mounted) return;
-      final success = await context.read<FriendProvider>().addFriend(
+      final result = await context.read<FriendProvider>().addFriend(
         userPhone: userPhoneNumber,
         friendName: name,
         friendNumber: phoneNumber,
@@ -85,15 +108,19 @@ class _AddFriendsState extends State<AddFriends> {
         date: DateFormat('dd/MM/yyyy').format(now),
       );
 
-      if (success) {
+      if (result == AddFriendResult.added) {
         Fluttertoast.showToast(msg: "Friend added successfully");
         if (!mounted) return;
         Navigator.pop(context, true);
+      } else if (result == AddFriendResult.updated) {
+        Fluttertoast.showToast(msg: "Friend details updated successfully");
+        if (!mounted) return;
+        Navigator.pop(context, true);
       } else {
-        Fluttertoast.showToast(msg: "Failed to add friend");
+        Fluttertoast.showToast(msg: "Failed to save friend details");
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Failed to add friend: $e");
+      Fluttertoast.showToast(msg: "Failed to save friend: $e");
     } finally {
       if (mounted) {
         setState(() {

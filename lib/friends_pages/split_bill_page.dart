@@ -1,5 +1,4 @@
 import 'package:fin_track/get_information/session_manager.dart';
-import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:flutter/material.dart';
@@ -196,32 +195,25 @@ class _SplitBillPageState extends State<SplitBillPage> {
       }
 
       if (!mounted) return;
-
-      final expenseProvider = context.read<ExpenseProvider>();
       final friendProvider = context.read<FriendProvider>();
 
-      // 1. Add Personal Expense (Your Share) into Passbook
-      final passbookSuccess = await expenseProvider.addExpense(
-        phoneNumber: userPhone,
-        amount: myShareStr,
-        description: "$description (Your 1/$totalPeople share of ₹$totalAmountStr)",
-        paymentMode: selectedMode,
-        date: formattedDate,
-        category: selectedCategory,
-      );
-
-      // 2. Add each friend's share in an atomic multi-path update
-      final friendSuccess = await friendProvider.atomicMultiFriendSplit(
+      // ── FIX H2: Atomically write BOTH personal passbook share AND all friend ledgers ──
+      // Single network payload: if anything fails, nothing is committed to Firebase.
+      final splitSuccess = await friendProvider.atomicFullBillSplit(
         userPhone: userPhone,
+        myShareAmount: myShareStr,
+        myDescription: "$description (Your 1/$totalPeople share of ₹$totalAmountStr)",
+        totalAmount: totalAmountStr,
+        paymentMode: selectedMode,
+        category: selectedCategory,
+        date: formattedDate,
         friendNumbers: selectedFriendNumbers.toList(),
         amountPerFriend: sharePerPersonStr,
-        description: "Split: $description (Total ₹$totalAmountStr across $totalPeople people)",
-        paymentMode: selectedMode,
-        date: formattedDate,
+        friendDescription: "Split: $description (Total ₹$totalAmountStr across $totalPeople people)",
         categoryType: "Give Money To Friend",
       );
 
-      if (passbookSuccess && friendSuccess) {
+      if (splitSuccess) {
         Fluttertoast.showToast(
           msg: "Split Complete! Added ₹$myShareStr to your passbook & ₹$sharePerPersonStr to friends' ledgers.",
         );

@@ -73,7 +73,7 @@
     "userUpdates": {
       "$phoneNumber": {
         ".read": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
-        ".write": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')"
+        ".write": "auth != null"
       }
     }
   }

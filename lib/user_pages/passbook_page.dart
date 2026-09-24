@@ -2,6 +2,7 @@ import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/user_pages/add_spent.dart';
+import 'package:fin_track/utils/balance_helper.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/date_helper.dart';
@@ -364,9 +365,8 @@ class PassbookPageState extends State<PassbookApp> {
     final userProvider = context.read<UserProvider>();
     final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
     final phone = userProvider.phoneNumber;
-    final allRecords = context.read<ExpenseProvider>().records;
 
-    if (allRecords.isEmpty) {
+    if (records.isEmpty) {
       Fluttertoast.showToast(msg: "No records to export");
       return;
     }
@@ -375,7 +375,7 @@ class PassbookPageState extends State<PassbookApp> {
       context: context,
       userName: userName,
       phoneNumber: phone,
-      records: allRecords,
+      records: records,
       initialCategory: selectedCategory,
       initialDateRange: customDateRange,
     );
@@ -440,37 +440,8 @@ class PassbookPageState extends State<PassbookApp> {
         final isLoading = expenseProvider.isLoading;
         List<Map<String, dynamic>> rawRecords = expenseProvider.records;
 
-        // 1. Calculate running balances chronologically across all user records
-        final chronologicalRecords = List<Map<String, dynamic>>.from(rawRecords);
-        chronologicalRecords.sort((a, b) {
-          final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
-          final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
-          int cmp = 0;
-          if (dateA != null && dateB != null) {
-            cmp = dateA.compareTo(dateB);
-          } else if (dateA != null) {
-            cmp = -1;
-          } else if (dateB != null) {
-            cmp = 1;
-          }
-          if (cmp != 0) return cmp;
-          final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
-          final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
-          return tA.compareTo(tB);
-        });
-
-        double running = 0.0;
-        for (final item in chronologicalRecords) {
-          final method = (item["Payment_Mode"] ?? "").toString();
-          final isIncome = ["Add CASH", "Add Online"].contains(method);
-          final amt = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
-          if (isIncome) {
-            running += amt;
-          } else {
-            running -= amt;
-          }
-          item["_runningBalance"] = running;
-        }
+        // 1. Calculate running balances chronologically across all user records (L3 DRY fix)
+        final chronologicalRecords = BalanceHelper.computeRunningBalances(rawRecords);
 
         // 2. Filter by Category
         List<Map<String, dynamic>> filtered = chronologicalRecords.where((item) {
@@ -1083,7 +1054,7 @@ class PassbookPageState extends State<PassbookApp> {
                 time: DateHelper.formatDisplay(rawDate),
                 amount: amount,
                 isIncome: isIncome,
-                runningBalance: runningBal,
+                runningBalance: (selectedCategory == "All" && _searchQuery.isEmpty) ? runningBal : null,
                 splitFriendName: splitFriend,
                 onTap: () => _showTransactionDetails(context, item),
                 onEdit: () async {

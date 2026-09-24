@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:fin_track/authentication/login_page.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/profile_pages/change_password_page.dart';
+import 'package:fin_track/profile_pages/data_backup_page.dart';
 import 'package:fin_track/profile_pages/edit_information_page.dart';
 import 'package:fin_track/profile_pages/feedback_page.dart';
 import 'package:fin_track/profile_pages/personal_information_page.dart';
 import 'package:fin_track/profile_pages/report_page.dart';
+import 'package:fin_track/profile_pages/terms_and_privacy_page.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
@@ -82,27 +84,42 @@ class _ProfilePageState extends State<ProfilePage> {
       final phone = await SessionManager.getPhoneNumber() ??
           (user.email?.split('@').first ?? "");
 
-      // 1. Delete Firebase Auth user FIRST to prevent accidental data loss
-      bool authDeleted = false;
+      // ── FIX C1: Clean RTDB FIRST while user is still authenticated ──────────
+      // Deleting data before removing the Auth account ensures the RTDB security
+      // rules allow the write. If RTDB cleanup fails, we abort – the Auth account
+      // stays intact and the user can retry. This prevents orphaned data.
+      if (phone.isNotEmpty && phone.length == 10) {
+        try {
+          await FirebaseDatabase.instance.ref("Friends/$phone").remove();
+          await FirebaseDatabase.instance.ref("Expenses/$phone").remove();
+          await FirebaseDatabase.instance.ref("user_details/$phone").remove();
+        } catch (dbErr) {
+          Fluttertoast.showToast(msg: "Failed to clear your data. Account not deleted.");
+          if (mounted) setState(() => isActionLoading = false);
+          return;
+        }
+      }
+
+      // ── Step 2: Now safely delete the Firebase Auth account ─────────────────
       try {
         await user.delete();
-        authDeleted = true;
       } on FirebaseAuthException catch (e) {
         if (e.code == 'requires-recent-login') {
-          // Prompt for password re-auth
           if (mounted) {
+            // ── FIX C2: Reset loading flag BEFORE showing the re-auth dialog ──
             setState(() => isActionLoading = false);
             final password = await _promptPasswordForReauth();
             if (password != null && password.isNotEmpty) {
-              setState(() => isActionLoading = true);
+              // ── FIX C2: Re-enable loading only if user provided credentials ──
+              if (mounted) setState(() => isActionLoading = true);
               final credential = EmailAuthProvider.credential(
                 email: user.email!,
                 password: password,
               );
               await user.reauthenticateWithCredential(credential);
               await user.delete();
-              authDeleted = true;
             } else {
+              // ── FIX C2: User cancelled – isActionLoading already false ──────
               Fluttertoast.showToast(msg: "Authentication cancelled");
               return;
             }
@@ -112,15 +129,6 @@ class _ProfilePageState extends State<ProfilePage> {
           if (mounted) setState(() => isActionLoading = false);
           return;
         }
-      }
-
-      // 2. Only if auth deletion succeeded, clean up RTDB database nodes
-      if (authDeleted && phone.isNotEmpty && phone.length == 10) {
-        try {
-          await FirebaseDatabase.instance.ref("Friends/$phone").remove();
-          await FirebaseDatabase.instance.ref("Expenses/$phone").remove();
-          await FirebaseDatabase.instance.ref("user_details/$phone").remove();
-        } catch (_) {}
       }
 
       Fluttertoast.showToast(msg: "Account deleted successfully");
@@ -222,41 +230,81 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showDeleteAccountDialog() {
-    setState(() => _deleteCooldown = true);
-    _cooldownTimer?.cancel();
-    _cooldownTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted) setState(() => _deleteCooldown = false);
-    });
+    int countdown = 5;
+    Timer? dialogTimer;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text("Delete Account"),
-        content: const Text(
-          "Are you sure you want to permanently delete your account? All expense and friends ledger data will be deleted.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              Navigator.pop(context);
-              await deleteUser();
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          dialogTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+            if (!context.mounted) {
+              timer.cancel();
+              return;
+            }
+            if (countdown > 1) {
+              setDialogState(() {
+                countdown--;
+              });
+            } else {
+              timer.cancel();
+              setDialogState(() {
+                countdown = 0;
+              });
+            }
+          });
+
+          return PopScope(
+            canPop: true,
+            onPopInvokedWithResult: (didPop, result) {
+              dialogTimer?.cancel();
             },
-            child: const Text("Delete"),
-          ),
-        ],
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text("Delete Account"),
+              content: const Text(
+                "Are you sure you want to permanently delete your account? All expense and friends ledger data will be deleted.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    dialogTimer?.cancel();
+                    Navigator.pop(dialogCtx);
+                  },
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: countdown == 0
+                      ? () async {
+                          dialogTimer?.cancel();
+                          setState(() => _deleteCooldown = true);
+                          _cooldownTimer?.cancel();
+                          _cooldownTimer = Timer(const Duration(seconds: 5), () {
+                            if (mounted) setState(() => _deleteCooldown = false);
+                          });
+                          Navigator.pop(dialogCtx);
+                          await deleteUser();
+                        }
+                      : null,
+                  child: Text(
+                    countdown > 0 ? "Delete (${countdown}s)" : "Delete Permanently",
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
-    );
+    ).then((_) {
+      dialogTimer?.cancel();
+    });
   }
 
   @override
@@ -265,7 +313,7 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (context, userProvider, expenseProvider, _) {
         final userName = userProvider.name.isNotEmpty && userProvider.name != "User"
             ? userProvider.name
-            : "Vishal";
+            : "User"; // FIX M2: removed hardcoded "Vishal" personal name
         final phone = userProvider.phoneNumber;
         final email = userProvider.email.isNotEmpty ? userProvider.email : "user@fintrack.app";
         final userSubtitle = phone.isNotEmpty
@@ -630,6 +678,19 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         const SizedBox(height: 10),
         _buildNavTile(
+          icon: Icons.cloud_download_rounded,
+          iconBg: const Color(0xFFE8F5E9),
+          iconColor: const Color(0xFF2E7D32),
+          title: "Cloud Backup & Export",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DataBackupPage()),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        _buildNavTile(
           icon: Icons.chat_bubble_rounded,
           iconBg: const Color(0xFFF3E5F5),
           iconColor: const Color(0xFF7B1FA2),
@@ -638,6 +699,19 @@ class _ProfilePageState extends State<ProfilePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const FeedbackPage()),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        _buildNavTile(
+          icon: Icons.policy_rounded,
+          iconBg: const Color(0xFFE0F2FE),
+          iconColor: const Color(0xFF0284C7),
+          title: "Terms & Privacy Policy",
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TermsAndPrivacyPage()),
             );
           },
         ),

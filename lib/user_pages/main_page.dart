@@ -4,6 +4,7 @@ import 'package:fin_track/profile_pages/report_page.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/user_pages/add_spent.dart';
+import 'package:fin_track/utils/balance_helper.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/date_helper.dart';
@@ -49,7 +50,11 @@ class _UserMainPageState extends State<UserMainPage> {
 
   Future<void> _loadData({bool force = false}) async {
     if (_isLoadingData && !force) return;
-    _isLoadingData = true;
+    if (mounted) {
+      setState(() => _isLoadingData = true);
+    } else {
+      _isLoadingData = true;
+    }
     try {
       final phone = await SessionManager.getPhoneNumber() ?? "";
       if (mounted && phone.isNotEmpty) {
@@ -59,6 +64,8 @@ class _UserMainPageState extends State<UserMainPage> {
     } finally {
       if (mounted) {
         setState(() => _isLoadingData = false);
+      } else {
+        _isLoadingData = false;
       }
     }
   }
@@ -271,37 +278,8 @@ class _UserMainPageState extends State<UserMainPage> {
           }
         }
 
-        // Compute running balances for recent transaction cards
-        final chronologicalRecords = List<Map<String, dynamic>>.from(records);
-        chronologicalRecords.sort((a, b) {
-          final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
-          final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
-          int cmp = 0;
-          if (dateA != null && dateB != null) {
-            cmp = dateA.compareTo(dateB);
-          } else if (dateA != null) {
-            cmp = -1;
-          } else if (dateB != null) {
-            cmp = 1;
-          }
-          if (cmp != 0) return cmp;
-          final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
-          final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
-          return tA.compareTo(tB);
-        });
-
-        double running = 0.0;
-        for (final item in chronologicalRecords) {
-          final method = (item["Payment_Mode"] ?? "").toString();
-          final isIncome = ["Add CASH", "Add Online"].contains(method);
-          final amt = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
-          if (isIncome) {
-            running += amt;
-          } else {
-            running -= amt;
-          }
-          item["_runningBalance"] = running;
-        }
+        // Compute running balances for recent transaction cards (L3 DRY fix)
+        BalanceHelper.computeRunningBalances(records);
 
         // Recent 5 transactions (newest first)
         final recentRecords = List<Map<String, dynamic>>.from(records);
@@ -592,37 +570,47 @@ class _UserMainPageState extends State<UserMainPage> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              if (last7Expense > 0 || prev7Expense > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        last7Expense <= prev7Expense
-                            ? Icons.trending_down_rounded
-                            : Icons.trending_up_rounded,
-                        color: Colors.white,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        last7Expense <= prev7Expense
-                            ? "-${(prev7Expense - last7Expense).round().toINR()} vs last wk"
-                            : "+${(last7Expense - prev7Expense).round().toINR()} vs last wk",
-                        style: const TextStyle(
+              if (last7Expense > 0 || prev7Expense > 0) ...[
+                () {
+                  final diff = (last7Expense - prev7Expense).round();
+                  final bool isDecrease = diff < 0;
+                  final bool isSame = diff == 0;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isSame
+                              ? Icons.trending_flat_rounded
+                              : (isDecrease
+                                  ? Icons.trending_down_rounded
+                                  : Icons.trending_up_rounded),
                           color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          size: 14,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isSame
+                              ? "Same as last wk"
+                              : (isDecrease
+                                  ? "-${diff.abs().toINR()} vs last wk"
+                                  : "+${diff.toINR()} vs last wk"),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }(),
+              ],
             ],
           ),
           const SizedBox(height: 8),

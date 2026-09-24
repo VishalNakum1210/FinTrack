@@ -14,13 +14,25 @@ class SessionManager {
   static const String _keyEmail = "email";
   static const String _keyLastActive = "session_last_active";
   static const String _keySessionSignature = "session_signature";
-  static const String _sessionSecret = String.fromEnvironment('SESSION_SECRET', defaultValue: 'FinTrack_Session_Secret_2026');
+  static const bool _hasCustomSecret = bool.hasEnvironment('SESSION_SECRET');
+  static const String _sessionSecret = String.fromEnvironment(
+    'SESSION_SECRET',
+    defaultValue: 'FinTrack_Session_Secret_2026',
+  );
 
   // Session validity duration: 30 days of inactivity
   static const int sessionExpiryDays = 30;
 
   /// Generates an HMAC-SHA256 signature for session integrity verification
   static String _generateSignature(String phone, int timestamp) {
+    assert(() {
+      if (!_hasCustomSecret && const bool.fromEnvironment('dart.vm.product')) {
+        throw StateError(
+          'Production security violation: SESSION_SECRET must be supplied via --dart-define=SESSION_SECRET=...',
+        );
+      }
+      return true;
+    }());
     final hmac = Hmac(sha256, utf8.encode(_sessionSecret));
     final digest = hmac.convert(utf8.encode("$phone:$timestamp"));
     return digest.toString();

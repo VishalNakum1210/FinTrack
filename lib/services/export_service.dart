@@ -1,9 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:fin_track/utils/date_helper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ExportService {
   static final NumberFormat _currencyFormatter = NumberFormat.currency(
@@ -354,7 +360,7 @@ class ExportService {
                     (index + 1).toString(),
                     _cleanPdfText(r["Date"]),
                     _cleanPdfText(type),
-                    _cleanPdfText(r["Description"]),
+                    _cleanPdfText(r["Description"], maxLength: 80),
                     _cleanPdfText(r["Payment_Mode"]),
                     _currencyFormatter.format(amt),
                   ];
@@ -802,7 +808,7 @@ class ExportService {
                 (overallIndex++).toString(),
                 _cleanPdfText(item["Date"]),
                 _cleanPdfText(item["Category"], defaultVal: "General"),
-                _cleanPdfText(item["Description"]),
+                _cleanPdfText(item["Description"], maxLength: 80),
                 _cleanPdfText(mode.isEmpty ? "-" : mode),
                 debitStr,
                 creditStr,
@@ -814,7 +820,7 @@ class ExportService {
                 (overallIndex++).toString(),
                 _cleanPdfText(item["Date"]),
                 _cleanPdfText(item["Category"], defaultVal: "General"),
-                _cleanPdfText(item["Description"]),
+                _cleanPdfText(item["Description"], maxLength: 80),
                 _cleanPdfText(mode.isEmpty ? "-" : mode),
                 formattedAmt,
               ];
@@ -1186,7 +1192,7 @@ class ExportService {
   // ===========================================================================
   // EMOJI & SPECIAL UNICODE SANITIZER (Prevents Missing Font Glyph Crashes)
   // ===========================================================================
-  static String _cleanPdfText(dynamic value, {String defaultVal = "-"}) {
+  static String _cleanPdfText(dynamic value, {String defaultVal = "-", int? maxLength}) {
     if (value == null) return defaultVal;
     String str = value.toString();
     if (str.trim().isEmpty) return defaultVal;
@@ -1225,6 +1231,156 @@ class ExportService {
     }
 
     final cleaned = buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
-    return cleaned.isEmpty ? defaultVal : cleaned;
+    if (cleaned.isEmpty) return defaultVal;
+    if (maxLength != null && cleaned.length > maxLength) {
+      return "${cleaned.substring(0, maxLength - 3)}...";
+    }
+    return cleaned;
+  }
+
+  // ===========================================================================
+  // 3. FULL JSON DATA BACKUP EXPORT
+  // ===========================================================================
+
+  /// Recursively cleans data structures to ensure everything is JSON encodable.
+  /// Converts DateTime objects into ISO 8601 strings and non-primitive objects to string.
+  static dynamic sanitizeForJson(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) {
+      return value.toIso8601String();
+    }
+    if (value is num || value is bool || value is String) {
+      return value;
+    }
+    if (value is Map) {
+      final cleanMap = <String, dynamic>{};
+      value.forEach((k, v) {
+        cleanMap[k.toString()] = sanitizeForJson(v);
+      });
+      return cleanMap;
+    }
+    if (value is Iterable) {
+      return value.map((item) => sanitizeForJson(item)).toList();
+    }
+    return value.toString();
+  }
+
+  /// Builds the complete FinTrack JSON backup data dictionary
+  static Map<String, dynamic> buildBackupData({
+    required String userName,
+    required String phoneNumber,
+    required List<Map<String, dynamic>> expenses,
+    required List<Map<String, dynamic>> friends,
+  }) {
+    return {
+      "app": "FinTrack",
+      "version": "2.1.0",
+      "exported_at": DateTime.now().toIso8601String(),
+      "user": {
+        "name": userName,
+        "phone_number": phoneNumber,
+      },
+      "total_expenses_count": expenses.length,
+      "total_friends_count": friends.length,
+      "expenses": expenses.map((e) => sanitizeForJson(e)).toList(),
+      "friends": friends.map((f) => sanitizeForJson(f)).toList(),
+    };
+  }
+
+  /// Generates a formatted JSON string for backup export, guaranteed not to throw on complex types
+  static String generateJsonBackupString({
+    required String userName,
+    required String phoneNumber,
+    required List<Map<String, dynamic>> expenses,
+    required List<Map<String, dynamic>> friends,
+  }) {
+    final exportData = buildBackupData(
+      userName: userName,
+      phoneNumber: phoneNumber,
+      expenses: expenses,
+      friends: friends,
+    );
+
+    final encoder = JsonEncoder.withIndent('  ', (nonEncodable) {
+      if (nonEncodable is DateTime) return nonEncodable.toIso8601String();
+      return nonEncodable.toString();
+    });
+
+    return encoder.convert(exportData);
+  }
+
+  /// Exports the full JSON backup by writing to a temporary file and invoking the system share sheet.
+  static Future<void> exportJsonBackup({
+    required String userName,
+    required String phoneNumber,
+    required List<Map<String, dynamic>> expenses,
+    required List<Map<String, dynamic>> friends,
+  }) async {
+    final jsonString = generateJsonBackupString(
+      userName: userName,
+      phoneNumber: phoneNumber,
+      expenses: expenses,
+      friends: friends,
+    );
+    final bytes = Uint8List.fromList(utf8.encode(jsonString));
+    final fileName = 'FinTrack_Backup_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json';
+
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path, mimeType: 'application/json', name: fileName)],
+        subject: 'FinTrack Full Financial Backup',
+        text: 'FinTrack personal data backup archive (JSON format).',
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 4. CSV SPREADSHEET EXPORT
+  // ===========================================================================
+
+  /// Generates tabular CSV string from expense records
+  static String generateCsvString({
+    required List<Map<String, dynamic>> expenses,
+  }) {
+    final buffer = StringBuffer();
+    // CSV Header row
+    buffer.writeln("Date,Category,Payment Mode,Amount,Description,Running Balance");
+
+    for (final record in expenses) {
+      final date = '"${(record["Date"] ?? "").toString().replaceAll('"', '""')}"';
+      final category = '"${(record["Category"] ?? "").toString().replaceAll('"', '""')}"';
+      final mode = '"${(record["Payment_Mode"] ?? "").toString().replaceAll('"', '""')}"';
+      final amount = record["Amount"] ?? "0";
+      final desc = '"${(record["Description"] ?? "").toString().replaceAll('"', '""')}"';
+      final running = record["_runningBalance"]?.toString() ?? "";
+      buffer.writeln("$date,$category,$mode,$amount,$desc,$running");
+    }
+
+    return buffer.toString();
+  }
+
+  /// Exports the CSV spreadsheet by writing to a temporary file and invoking the system share sheet.
+  static Future<void> exportCsvSpreadsheet({
+    required List<Map<String, dynamic>> expenses,
+  }) async {
+    final csvString = generateCsvString(expenses: expenses);
+    final bytes = Uint8List.fromList(utf8.encode(csvString));
+    final fileName = 'FinTrack_Transactions_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
+
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path, mimeType: 'text/csv', name: fileName)],
+        subject: 'FinTrack CSV Transactions',
+        text: 'FinTrack exported transactions spreadsheet (Excel/CSV compatible).',
+      ),
+    );
   }
 }

@@ -270,17 +270,31 @@ class ExpenseProvider extends ChangeNotifier {
     required String key,
   }) async {
     if (phoneNumber.isEmpty || key.isEmpty) return false;
+
+    // ── FIX H3: Optimistic UI update with full rollback on Firebase failure ──
+    Map<String, dynamic>? backup;
+    int removedIdx = -1;
+
     try {
-      final idx = _records.indexWhere((r) => r['key'] == key);
-      if (idx != -1) {
-        _records.removeAt(idx);
+      removedIdx = _records.indexWhere((r) => r['key'] == key);
+      if (removedIdx != -1) {
+        // Save a deep copy for potential rollback
+        backup = Map<String, dynamic>.from(_records[removedIdx]);
+        _records.removeAt(removedIdx);
         _recalculateDerivedTotals();
         notifyListeners();
       }
+
       final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber/$key");
       await ref.remove();
       return true;
     } catch (_) {
+      // Firebase failed — roll back the optimistic removal
+      if (backup != null && removedIdx != -1) {
+        _records.insert(removedIdx, backup);
+        _recalculateDerivedTotals();
+        notifyListeners();
+      }
       return false;
     }
   }

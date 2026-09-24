@@ -8,7 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-
 import 'package:firebase_database/firebase_database.dart';
 
 class SplashPage extends StatefulWidget {
@@ -19,6 +18,12 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
+  static const Color _brandGreen = Color(0xFF8BC24A);
+  static const Color _darkGreen = Color(0xFF2E7D32);
+  static const Color _canvasBackground = Color(0xFFF8FAFC);
+  static const Color _primaryText = Color(0xFF1E293B);
+  static const Color _mutedText = Color(0xFF64748B);
+
   String appVersion = "1.0.0";
 
   Future<void> getVersion() async {
@@ -55,16 +60,29 @@ class _SplashPageState extends State<SplashPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.system_update_rounded, color: Color(0xff0D8A3F)),
-            SizedBox(width: 8),
-            Text("Update Required"),
+            Icon(Icons.system_update_rounded, color: _darkGreen),
+            SizedBox(width: 10),
+            Text(
+              "Update Required",
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                color: _primaryText,
+              ),
+            ),
           ],
         ),
         content: Text(
-          "A newer version of FinTrack (v$minVersion) is required. Please update the app to continue using it.",
+          "A newer version of FinTrack (v$minVersion) is required. Please update the app from the store to continue.",
+          style: const TextStyle(
+            fontSize: 14,
+            color: _mutedText,
+            height: 1.4,
+          ),
         ),
       ),
     );
@@ -73,9 +91,11 @@ class _SplashPageState extends State<SplashPage> {
   Future<void> getDecision() async {
     try {
       final results = await Future.wait([
-        SessionManager.isSessionValid().timeout(const Duration(seconds: 3), onTimeout: () => false),
-        SessionManager.getPhoneNumber().timeout(const Duration(seconds: 3), onTimeout: () => null),
-        Future.delayed(const Duration(milliseconds: 800)),
+        SessionManager.isSessionValid()
+            .timeout(const Duration(seconds: 3), onTimeout: () => false),
+        SessionManager.getPhoneNumber()
+            .timeout(const Duration(seconds: 3), onTimeout: () => null),
+        Future.delayed(const Duration(milliseconds: 900)),
       ]);
 
       if (!mounted) return;
@@ -144,24 +164,30 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FFF8),
-
+      backgroundColor: _canvasBackground,
       body: Center(
         child: SafeArea(
           child: Column(
             children: [
-              const Spacer(),
+              const Spacer(flex: 3),
 
-              // Logo
+              // FinTrack Logo Container with soft modern elevation
               Container(
-                height: 100,
-                width: 100,
+                height: 88,
+                width: 88,
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(22),
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _brandGreen.withValues(alpha: 0.25),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(22),
                   child: Image.asset(
                     "assets/image/AccountApplicationLogo.jpg",
                     fit: BoxFit.cover,
@@ -169,43 +195,109 @@ class _SplashPageState extends State<SplashPage> {
                 ),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 24),
 
+              // Brand Title
               const Text(
                 "FinTrack",
                 style: TextStyle(
-                  fontSize: 38,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xff0D8A3F),
+                  fontSize: 34,
+                  fontWeight: FontWeight.w800,
+                  color: _primaryText,
+                  letterSpacing: -0.6,
                 ),
               ),
 
               const SizedBox(height: 8),
 
-              Text(
-                "Manage Your Money Smartly",
-                style: TextStyle(fontSize: 15, color: Colors.grey.shade600),
+              // Tagline
+              const Text(
+                "Smart Expense Tracking & Split Ledgers",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: _mutedText,
+                ),
               ),
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 18),
 
-              const CircularProgressIndicator(color: Color(0xff0D8A3F)),
-
-              const Spacer(),
-
-              Text(
-                "Version $appVersion",
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+              // Trust & Security Pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFFA5D6A7),
+                    width: 0.8,
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.lock_rounded,
+                      color: _darkGreen,
+                      size: 13,
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      "256-Bit Encrypted • Realtime Sync",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _darkGreen,
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 38),
 
-              Text(
+              // Loading Spinner
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  valueColor: AlwaysStoppedAnimation<Color>(_brandGreen),
+                ),
+              ),
+
+              const Spacer(flex: 3),
+
+              // Version Pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  "v$appVersion",
+                  style: const TextStyle(
+                    color: _mutedText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Copyright
+              const Text(
                 "© 2026 Vishal Nakum",
-                style: TextStyle(color: Colors.grey.shade700, fontSize: 15),
+                style: TextStyle(
+                  color: _mutedText,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
 
-              const SizedBox(height: 5),
+              const SizedBox(height: 12),
             ],
           ),
         ),
