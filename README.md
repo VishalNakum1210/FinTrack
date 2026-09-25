@@ -16,7 +16,7 @@
     <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" /></a>
     <a href="https://firebase.google.com"><img src="https://img.shields.io/badge/Firebase-Realtime%20Database-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase" /></a>
     <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
-    <img src="https://img.shields.io/badge/Tests-54%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" />
+    <img src="https://img.shields.io/badge/Tests-51%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" />
     <img src="https://img.shields.io/badge/Design-Material%203-6750A4?style=for-the-badge&logo=materialdesign&logoColor=white" alt="Material 3" />
     <img src="https://img.shields.io/badge/Security-HMAC--SHA256%20%2B%20Keystore-red?style=for-the-badge&logo=securityscorecard&logoColor=white" alt="Security" />
   </p>
@@ -391,7 +391,7 @@ account/
 │   ├── 09_cloud_backup_and_export.jpeg
 │   └── 10_feedback_and_support.jpeg
 │
-├── test/                              # Automated test suite (54 Passing Tests)
+├── test/                              # Automated test suite (51 Passing Tests)
 │   ├── security/                      # Cryptography and session unit tests
 │   │   ├── hash_password_test.dart
 │   │   └── session_manager_test.dart
@@ -407,7 +407,6 @@ account/
 │       ├── error_retry_widget_test.dart
 │       ├── export_statement_modal_test.dart
 │       ├── feedback_page_test.dart
-│       ├── insight_card_test.dart
 │       ├── nav_bar_test.dart
 │       ├── profile_page_test.dart
 │       ├── report_page_test.dart
@@ -499,7 +498,7 @@ Before running FinTrack, ensure you have:
 
 ## 🧪 Testing & Quality Assurance
 
-FinTrack includes a comprehensive test suite of **54 automated unit, security, and widget tests** covering all critical business logic and UI interactions.
+FinTrack includes a comprehensive test suite of **51 automated unit, security, and widget tests** covering all critical business logic and UI interactions.
 
 ### Run All Tests:
 ```bash

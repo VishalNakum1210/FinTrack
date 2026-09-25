@@ -51,19 +51,7 @@ app.*.map.json
 **/android/key.properties
 **/android/app/upload-keystore.jks
 
-# Backup archives
+# Backup and media archives
 *.zip
-lib old/
-lib old.zip
-lib_old/
-lib-old/
-
-# Future layout mockups & UI/UX design specifications
-future layout/
-app_ui_design_showcase.jpg
-fintrack_detailed_ui_layout.jpg
-fintrack_sub_pages_ui_layout.jpg
-assets/image/app_ui_design_showcase.jpg
-assets/image/fintrack_detailed_ui_layout.jpg
-assets/image/fintrack_sub_pages_ui_layout.jpg
-screenshort/
+*.tar.gz
+*.mp4
