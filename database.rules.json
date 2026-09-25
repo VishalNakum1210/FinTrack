@@ -57,10 +57,10 @@
             ".validate": "newData.isString() && newData.val().length == 10"
           },
           "total_get": {
-            ".validate": "newData.isString()"
+            ".validate": "newData.isString() || newData.isNumber()"
           },
           "total_give": {
-            ".validate": "newData.isString()"
+            ".validate": "newData.isString() || newData.isNumber()"
           },
           "Records": {
             "$recordKey": {
@@ -73,7 +73,7 @@
     "userUpdates": {
       "$phoneNumber": {
         ".read": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')",
-        ".write": "auth != null"
+        ".write": "auth != null && auth.token.email == ($phoneNumber + '@fintrack.app')"
       }
     }
   }

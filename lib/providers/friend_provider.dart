@@ -139,8 +139,8 @@ class FriendProvider extends ChangeNotifier {
         "note": note,
         "date": date,
         "timestamp": ServerValue.timestamp,
-        "total_get": "0",
-        "total_give": "0",
+        "total_get": 0,
+        "total_give": 0,
       });
 
       return AddFriendResult.added;
@@ -174,7 +174,7 @@ class FriendProvider extends ChangeNotifier {
       final calculated = currentVal + delta;
       // Guard against underflow while preserving non-negative aggregate invariant
       final newVal = calculated < 0 ? 0 : calculated;
-      return Transaction.success(newVal.toString());
+      return Transaction.success(newVal);
     });
   }
 
@@ -341,13 +341,13 @@ class FriendProvider extends ChangeNotifier {
         "timestamp": ServerValue.timestamp,
       };
 
+      // 3. Atomically update ledger total in the same payload
+      final parsedFriendAmount = (double.tryParse(friendShareAmount) ?? 0.0).round();
+      multiPathUpdates["Friends/$userPhone/$friendNumber/total_get"] =
+          ServerValue.increment(parsedFriendAmount);
+
       // Single atomic multi-path update
       await dbRef.update(multiPathUpdates);
-
-      // Atomically update ledger total
-      final parsedFriendAmount = (double.tryParse(friendShareAmount) ?? 0.0).round();
-      final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-      await _atomicUpdateLedger(friendRef, "total_get", parsedFriendAmount);
 
       return true;
     } catch (_) {
@@ -370,6 +370,7 @@ class FriendProvider extends ChangeNotifier {
       final dbRef = FirebaseDatabase.instance.ref();
       final Map<String, Object?> multiPathUpdates = {};
       final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
+      final ledgerField = categoryType == "Take Money From Friend" ? "total_give" : "total_get";
 
       for (int i = 0; i < friendNumbers.length; i++) {
         final friendNumber = friendNumbers[i];
@@ -386,20 +387,12 @@ class FriendProvider extends ChangeNotifier {
           "Type": categoryType,
           "timestamp": ServerValue.timestamp,
         };
+
+        multiPathUpdates["Friends/$userPhone/$friendNumber/$ledgerField"] =
+            ServerValue.increment(parsedAmount);
       }
 
       await dbRef.update(multiPathUpdates);
-
-      // Adjust ledgers for all friends
-      for (final friendNumber in friendNumbers) {
-        if (friendNumber.isEmpty) continue;
-        final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-        if (categoryType == "Take Money From Friend") {
-          await _atomicUpdateLedger(friendRef, "total_give", parsedAmount);
-        } else {
-          await _atomicUpdateLedger(friendRef, "total_get", parsedAmount);
-        }
-      }
 
       return true;
     } catch (_) {
@@ -426,6 +419,8 @@ class FriendProvider extends ChangeNotifier {
     try {
       final dbRef = FirebaseDatabase.instance.ref();
       final Map<String, Object?> multiPathUpdates = {};
+      final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
+      final ledgerField = categoryType == "Take Money From Friend" ? "total_give" : "total_get";
 
       // 1. Personal Passbook Entry (Atomic part of the multi-path update)
       final expRef = dbRef.child("Expenses/$userPhone").push();
@@ -441,7 +436,7 @@ class FriendProvider extends ChangeNotifier {
         "timestamp": ServerValue.timestamp,
       };
 
-      // 2. Each Friend's Ledger Entry
+      // 2. Each friend's record AND their ledger increment, in the SAME payload
       for (int i = 0; i < friendNumbers.length; i++) {
         final friendNumber = friendNumbers[i];
         if (friendNumber.isEmpty) continue;
@@ -457,22 +452,14 @@ class FriendProvider extends ChangeNotifier {
           "Type": categoryType,
           "timestamp": ServerValue.timestamp,
         };
+
+        // No separate transaction needed — this commits atomically with everything else.
+        multiPathUpdates["Friends/$userPhone/$friendNumber/$ledgerField"] =
+            ServerValue.increment(parsedAmount);
       }
 
-      // Single atomic multi-path write payload for BOTH personal passbook and all friends
+      // One network call. Either the whole split lands, or none of it does — safe to retry.
       await dbRef.update(multiPathUpdates);
-
-      // 3. Atomically update aggregate ledgers for all friends
-      final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
-      for (final friendNumber in friendNumbers) {
-        if (friendNumber.isEmpty) continue;
-        final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-        if (categoryType == "Take Money From Friend") {
-          await _atomicUpdateLedger(friendRef, "total_give", parsedAmount);
-        } else {
-          await _atomicUpdateLedger(friendRef, "total_get", parsedAmount);
-        }
-      }
 
       return true;
     } catch (_) {
