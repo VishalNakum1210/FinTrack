@@ -1,5 +1,6 @@
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/friend_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -49,6 +50,13 @@ class _AddFriendsState extends State<AddFriends> {
     }
 
     String userPhoneNumber = await SessionManager.getPhoneNumber() ?? "";
+
+    if (userPhoneNumber.isEmpty) {
+      final authEmail = FirebaseAuth.instance.currentUser?.email;
+      if (authEmail != null && authEmail.endsWith('@fintrack.app')) {
+        userPhoneNumber = authEmail.split('@').first;
+      }
+    }
 
     if (userPhoneNumber.isEmpty) {
       Fluttertoast.showToast(msg: "User session expired. Please log in again.");
@@ -117,7 +125,13 @@ class _AddFriendsState extends State<AddFriends> {
         if (!mounted) return;
         Navigator.pop(context, true);
       } else {
-        Fluttertoast.showToast(msg: "Failed to save friend details");
+        if (!mounted) return;
+        final lastErr = context.read<FriendProvider>().lastError;
+        Fluttertoast.showToast(
+          msg: lastErr != null && lastErr.isNotEmpty
+              ? "Failed to save friend: $lastErr"
+              : "Failed to save friend details",
+        );
       }
     } catch (e) {
       Fluttertoast.showToast(msg: "Failed to save friend: $e");
