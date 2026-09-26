@@ -925,6 +925,8 @@ class _UserMainPageState extends State<UserMainPage> {
               const SizedBox(height: 8),
               Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -951,7 +953,7 @@ class _UserMainPageState extends State<UserMainPage> {
       crossAxisCount: 2,
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
-      childAspectRatio: 1.5,
+      childAspectRatio: 1.32,
       children: [
         _buildInsightCard(
           icon: Icons.shopping_bag_outlined,

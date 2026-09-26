@@ -654,40 +654,49 @@ class _AddSpentState extends State<AddSpent> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: isSplitWithFriend ? primary.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.group_rounded,
-                                      size: 20,
-                                      color: isSplitWithFriend ? primary : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "Split Bill with Friend",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14.5,
-                                          color: Color(0xFF1E293B),
-                                        ),
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: isSplitWithFriend ? primary.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
+                                        shape: BoxShape.circle,
                                       ),
-                                      Text(
-                                        "Split 50/50 instantly",
-                                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                      child: Icon(
+                                        Icons.group_rounded,
+                                        size: 20,
+                                        color: isSplitWithFriend ? primary : const Color(0xFF64748B),
                                       ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "Split Bill with Friend",
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14.5,
+                                              color: Color(0xFF1E293B),
+                                            ),
+                                          ),
+                                          Text(
+                                            "Split 50/50 instantly",
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 8),
                               Switch.adaptive(
                                 value: isSplitWithFriend,
                                 activeTrackColor: primary,
@@ -744,9 +753,13 @@ class _AddSpentState extends State<AddSpent> {
                                               ),
                                             ),
                                             const SizedBox(width: 8),
-                                            Text(
-                                              "$name ($number)",
-                                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                                            Expanded(
+                                              child: Text(
+                                                "$name ($number)",
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -780,20 +793,33 @@ class _AddSpentState extends State<AddSpent> {
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        "Your Expense: ₹$mySharePreviewStr",
-                                        style: const TextStyle(
-                                          color: Color(0xFF2E7D32),
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12.5,
+                                      Expanded(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            "Your Expense: ₹$mySharePreviewStr",
+                                            style: const TextStyle(
+                                              color: Color(0xFF2E7D32),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12.5,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                      Text(
-                                        "Friend Owes: ₹$friendSharePreviewStr",
-                                        style: const TextStyle(
-                                          color: Color(0xFFC62828),
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12.5,
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            "Friend Owes: ₹$friendSharePreviewStr",
+                                            style: const TextStyle(
+                                              color: Color(0xFFC62828),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12.5,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],

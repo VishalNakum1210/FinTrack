@@ -886,14 +886,19 @@ class PassbookPageState extends State<PassbookApp> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          "Showing $totalCount ${totalCount == 1 ? 'entry' : 'entries'}",
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF64748B),
+        Expanded(
+          child: Text(
+            "Showing $totalCount ${totalCount == 1 ? 'entry' : 'entries'}",
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(

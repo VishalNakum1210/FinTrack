@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:fin_track/friends_pages/friend_expenses.dart';
 import 'package:fin_track/user_pages/main_page.dart';
 import 'package:fin_track/user_pages/passbook_page.dart';
@@ -137,7 +138,7 @@ class _NavPageSelectorState extends State<NavPageSelector> {
                 builder: (context, constraints) {
                   final totalWidth = constraints.maxWidth;
                   final tabWidth = totalWidth / _navItems.length;
-                  const double pillWidth = 74.0;
+                  final double pillWidth = math.min(74.0, tabWidth - 6);
                   const double pillHeight = 52.0;
                   final double pillLeft =
                       (selectedIndex * tabWidth) + ((tabWidth - pillWidth) / 2);
