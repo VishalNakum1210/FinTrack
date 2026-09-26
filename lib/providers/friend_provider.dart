@@ -509,7 +509,12 @@ class FriendProvider extends ChangeNotifier {
     required List<GroupExpense> expenses,
     required List<PersonSettlement> settlements,
   }) async {
-    if (userPhone.isEmpty || expenses.isEmpty || settlements.isEmpty) return false;
+    final cleanUserPhone = userPhone.trim();
+    if (cleanUserPhone.isEmpty || expenses.isEmpty || settlements.isEmpty) {
+      _lastError = "User phone, expenses, or settlements cannot be empty";
+      return false;
+    }
+
     try {
       final dbRef = FirebaseDatabase.instance.ref();
       final Map<String, Object?> multiPathUpdates = {};
@@ -520,7 +525,7 @@ class FriendProvider extends ChangeNotifier {
         final myParticipant = settlements.firstWhere(
           (s) => s.person.isMe,
           orElse: () => PersonSettlement(
-            person: SplitParticipant(phone: userPhone, name: "You", isMe: true),
+            person: SplitParticipant(phone: cleanUserPhone, name: "You", isMe: true),
             totalPaid: 0,
             totalConsumed: 0,
             netBalance: 0,
@@ -531,17 +536,18 @@ class FriendProvider extends ChangeNotifier {
         final myShare = exp.shareFor(myParticipant.person);
 
         if (myShare > 0.01) {
-          final expRef = dbRef.child("Expenses/$userPhone").push();
+          final expRef = dbRef.child("Expenses/$cleanUserPhone").push();
           final expKey = expRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_exp_$i";
           final payerName = exp.payer.isMe ? "You" : exp.payer.name;
+          final cat = exp.category.trim().isNotEmpty ? exp.category.trim() : "Other";
 
-          multiPathUpdates["Expenses/$userPhone/$expKey"] = {
+          multiPathUpdates["Expenses/$cleanUserPhone/$expKey"] = {
             "key": expKey,
             "Amount": myShare.toStringAsFixed(myShare.truncateToDouble() == myShare ? 0 : 2),
             "Description": "$tripTitle: ${exp.title} (Paid by $payerName)",
             "Payment_Mode": exp.payer.isMe ? paymentMode : "Owed to ${exp.payer.name}",
             "Date": formattedDate,
-            "Category": exp.category,
+            "Category": cat,
             "timestamp": ServerValue.timestamp,
           };
         }
@@ -551,7 +557,7 @@ class FriendProvider extends ChangeNotifier {
       final mySettlement = settlements.firstWhere(
         (s) => s.person.isMe,
         orElse: () => PersonSettlement(
-          person: SplitParticipant(phone: userPhone, name: "You", isMe: true),
+          person: SplitParticipant(phone: cleanUserPhone, name: "You", isMe: true),
           totalPaid: 0,
           totalConsumed: 0,
           netBalance: 0,
@@ -563,69 +569,58 @@ class FriendProvider extends ChangeNotifier {
       // Debts current user owes to friends (You Give)
       for (int i = 0; i < mySettlement.giveLines.length; i++) {
         final line = mySettlement.giveLines[i];
-        final friendPhone = line.otherPerson.phone;
+        final friendPhone = line.otherPerson.phone.trim();
         if (friendPhone.isEmpty) continue;
 
-        final recRef = dbRef.child("Friends/$userPhone/$friendPhone/Records").push();
+        final recRef = dbRef.child("Friends/$cleanUserPhone/$friendPhone/Records").push();
         final recKey = recRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_give_$i";
 
-        multiPathUpdates["Friends/$userPhone/$friendPhone/Records/$recKey"] = {
+        multiPathUpdates["Friends/$cleanUserPhone/$friendPhone/Records/$recKey"] = {
           "key": recKey,
           "Amount": line.amount.toStringAsFixed(line.amount.truncateToDouble() == line.amount ? 0 : 2),
-          "Description": "$tripTitle: ${line.reason}",
+          "Description": tripTitle.trim().isNotEmpty ? tripTitle.trim() : "Group Trip",
           "Payment_Mode": paymentMode,
           "Date": formattedDate,
           "Type": "Take Money From Friend",
           "timestamp": ServerValue.timestamp,
         };
 
-        multiPathUpdates["Friends/$userPhone/$friendPhone/total_give"] =
+        multiPathUpdates["Friends/$cleanUserPhone/$friendPhone/total_give"] =
             ServerValue.increment(line.amount.round());
       }
 
       // Debts friends owe to current user (You Get)
       for (int i = 0; i < mySettlement.getLines.length; i++) {
         final line = mySettlement.getLines[i];
-        final friendPhone = line.otherPerson.phone;
+        final friendPhone = line.otherPerson.phone.trim();
         if (friendPhone.isEmpty) continue;
 
-        final recRef = dbRef.child("Friends/$userPhone/$friendPhone/Records").push();
+        final recRef = dbRef.child("Friends/$cleanUserPhone/$friendPhone/Records").push();
         final recKey = recRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_get_$i";
 
-        multiPathUpdates["Friends/$userPhone/$friendPhone/Records/$recKey"] = {
+        multiPathUpdates["Friends/$cleanUserPhone/$friendPhone/Records/$recKey"] = {
           "key": recKey,
           "Amount": line.amount.toStringAsFixed(line.amount.truncateToDouble() == line.amount ? 0 : 2),
-          "Description": "$tripTitle: ${line.reason}",
+          "Description": tripTitle.trim().isNotEmpty ? tripTitle.trim() : "Group Trip",
           "Payment_Mode": paymentMode,
           "Date": formattedDate,
           "Type": "Give Money To Friend",
           "timestamp": ServerValue.timestamp,
         };
 
-        multiPathUpdates["Friends/$userPhone/$friendPhone/total_get"] =
+        multiPathUpdates["Friends/$cleanUserPhone/$friendPhone/total_get"] =
             ServerValue.increment(line.amount.round());
       }
 
-      // 3. Save Trip Record for historical group trip auditing
-      final tripRef = dbRef.child("Trips/$userPhone").push();
-      final tripKey = tripRef.key ?? DateTime.now().millisecondsSinceEpoch.toString();
-      final totalTripAmount = expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
-
-      multiPathUpdates["Trips/$userPhone/$tripKey"] = {
-        "key": tripKey,
-        "title": tripTitle,
-        "date": formattedDate,
-        "totalAmount": totalTripAmount,
-        "expensesCount": expenses.length,
-        "participantsCount": settlements.length,
-        "timestamp": ServerValue.timestamp,
-      };
-
-      // Atomic commit of all updates
-      await dbRef.update(multiPathUpdates);
+      // Commit all passbook and ledger updates atomically
+      if (multiPathUpdates.isNotEmpty) {
+        await dbRef.update(multiPathUpdates);
+      }
 
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint("FriendProvider.batchSaveMultiSplit error: $e\n$st");
+      _lastError = e.toString();
       return false;
     }
   }

@@ -478,34 +478,40 @@ class _FriendPageState extends State<FriendPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            for (final s in sorts) ...[
-              GestureDetector(
-                onTap: () => setState(() => sortBy = s),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: sortBy == s ? primaryGreen : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: sortBy == s ? primaryGreen : const Color(0xFFE2E8F0),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final s in sorts) ...[
+                  GestureDetector(
+                    onTap: () => setState(() => sortBy = s),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: sortBy == s ? primaryGreen : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: sortBy == s ? primaryGreen : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Text(
+                        s,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: sortBy == s ? FontWeight.bold : FontWeight.w500,
+                          color: sortBy == s ? Colors.white : const Color(0xFF64748B),
+                        ),
+                      ),
                     ),
                   ),
-                  child: Text(
-                    s,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: sortBy == s ? FontWeight.bold : FontWeight.w500,
-                      color: sortBy == s ? Colors.white : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
+                ],
+              ],
+            ),
+          ),
         ),
+        const SizedBox(width: 8),
         InkWell(
           onTap: () => Navigator.push(
             context,
@@ -673,21 +679,26 @@ class _FriendPageState extends State<FriendPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Status Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: pillBg,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        pillText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: pillTextColor,
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: pillBg,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          pillText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: pillTextColor,
+                          ),
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
 
                     // Settle Button
                     SizedBox(

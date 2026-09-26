@@ -565,12 +565,16 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                 );
               },
               icon: const Icon(Icons.add, color: primaryGreen, size: 18),
-              label: const Text(
-                'Add Transaction',
-                style: TextStyle(
-                  color: primaryGreen,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
+              label: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'Add Transaction',
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: primaryGreen,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
                 ),
               ),
               style: OutlinedButton.styleFrom(
@@ -596,11 +600,15 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
               ),
-              child: const Text(
-                'Settle Up',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+              child: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'Settle Up',
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ),
@@ -681,12 +689,19 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                isGive ? "-${amount.toINR()}" : "+${amount.toINR()}",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: isGive ? const Color(0xFFC62828) : const Color(0xFF2E7D32),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 95),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    isGive ? "-${amount.toINR()}" : "+${amount.toINR()}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: isGive ? const Color(0xFFC62828) : const Color(0xFF2E7D32),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 6),

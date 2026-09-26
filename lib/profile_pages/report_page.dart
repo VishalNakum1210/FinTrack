@@ -1225,11 +1225,17 @@ class _ReportPageState extends State<Reportpage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              "Cashflow Comparison",
-              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: _textDark),
+            const Expanded(
+              child: Text(
+                "Cashflow Comparison",
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: _textDark),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
+            const SizedBox(width: 8),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _legendDot(_primaryGreen, "Inflow"),
                 const SizedBox(width: 10),

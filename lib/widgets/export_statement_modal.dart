@@ -651,18 +651,21 @@ class _ExportStatementModalContentState
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                           ),
                           icon: const Icon(
                             Icons.visibility_outlined,
                             size: 19,
                             color: _darkGreen,
                           ),
-                          label: const Text(
-                            "Preview PDF",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              "Preview PDF",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                           onPressed: () => _generatePdf(isShare: false),
@@ -679,18 +682,21 @@ class _ExportStatementModalContentState
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                           ),
                           icon: const Icon(
                             Icons.share_rounded,
                             size: 19,
                             color: Colors.white,
                           ),
-                          label: const Text(
-                            "Download / Share",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              "Download / Share",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                           onPressed: () => _generatePdf(isShare: true),
