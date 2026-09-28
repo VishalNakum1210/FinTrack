@@ -444,7 +444,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           SizedBox(width: 6),
           Flexible(
             child: Text(
-              "FinTrack v2.1.0 • Privacy-First Architecture • Updated Sep 2026",
+              "FinTrack v2.2.0 • Privacy-First Architecture • Updated Sep 2026",
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,

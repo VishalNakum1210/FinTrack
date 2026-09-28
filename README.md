@@ -16,7 +16,7 @@
     <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" /></a>
     <a href="https://firebase.google.com"><img src="https://img.shields.io/badge/Firebase-Realtime%20Database-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase" /></a>
     <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
-    <img src="https://img.shields.io/badge/Tests-62%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" />
+    <img src="https://img.shields.io/badge/Tests-76%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" />
     <img src="https://img.shields.io/badge/Design-Material%203-6750A4?style=for-the-badge&logo=materialdesign&logoColor=white" alt="Material 3" />
     <img src="https://img.shields.io/badge/Security-HMAC--SHA256%20%2B%20Keystore-red?style=for-the-badge&logo=securityscorecard&logoColor=white" alt="Security" />
   </p>
@@ -32,6 +32,7 @@
 ## 📑 Table of Contents
 
 - [✨ Overview](#-overview)
+- [🎥 Live Video Walkthrough](#-live-app-walkthrough--demo)
 - [📸 App Screenshots](#-app-screenshots)
 - [🌟 Key Features](#-key-features)
   - [1. Dual-Wallet Personal Expense & Income Tracker](#1-dual-wallet-personal-expense--income-tracker)
@@ -68,6 +69,23 @@ Unlike standard expense apps that only count what you spend, FinTrack incorporat
 
 > [!TIP]
 > FinTrack runs completely offline with automatic sync! All transactions made while offline are saved to disk (up to 10 MB) and synchronized instantaneously with Firebase Realtime Database once connectivity is restored.
+
+---
+
+## 🎥 Live App Walkthrough & Demo
+
+<div align="center">
+  <a href="./screenRec.mp4">
+    <img src="screenshots/banner.jpg" width="85%" alt="FinTrack Live Demo - Click to Play" />
+  </a>
+  <br><br>
+  <p>
+    <a href="./screenRec.mp4">
+      <b>▶ Click here to Play Video Walkthrough (screenRec.mp4)</b>
+    </a><br>
+    <sub>📱 60 FPS video recording of FinTrack v2.2 running on Android (Click link above to play)</sub>
+  </p>
+</div>
 
 ---
 
@@ -391,7 +409,7 @@ account/
 │   ├── 09_cloud_backup_and_export.jpeg
 │   └── 10_feedback_and_support.jpeg
 │
-├── test/                              # Automated test suite (62 Passing Tests)
+├── test/                              # Automated test suite (76 Passing Tests)
 │   ├── security/                      # Cryptography and session unit tests
 │   │   ├── hash_password_test.dart
 │   │   └── session_manager_test.dart
@@ -500,7 +518,7 @@ Before running FinTrack, ensure you have:
 
 ## 🧪 Testing & Quality Assurance
 
-FinTrack includes a comprehensive test suite of **62 automated unit, security, and widget tests** covering all critical business logic and UI interactions.
+FinTrack includes a comprehensive test suite of **76 automated unit, security, and widget tests** covering all critical business logic and UI interactions.
 
 ### Run All Tests:
 ```bash

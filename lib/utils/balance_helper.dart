@@ -11,21 +11,24 @@ class BalanceHelper {
   ) {
     if (records.isEmpty) return [];
 
-    final chronological = List<Map<String, dynamic>>.from(records);
+    final List<Map<String, dynamic>> chronological = [];
+    for (final r in records) {
+      final copy = Map<String, dynamic>.from(r);
+      copy["_parsedDate"] = (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
+      chronological.add(copy);
+    }
+
     chronological.sort((a, b) {
-      final DateTime? dateA =
-          (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
-      final DateTime? dateB =
-          (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
-      int cmp = 0;
+      final DateTime? dateA = a["_parsedDate"] as DateTime?;
+      final DateTime? dateB = b["_parsedDate"] as DateTime?;
       if (dateA != null && dateB != null) {
-        cmp = dateA.compareTo(dateB);
+        final cmp = dateA.compareTo(dateB);
+        if (cmp != 0) return cmp;
       } else if (dateA != null) {
-        cmp = -1;
+        return -1;
       } else if (dateB != null) {
-        cmp = 1;
+        return 1;
       }
-      if (cmp != 0) return cmp;
       final tA = (a["timestamp"] as num?)?.toInt() ?? 0;
       final tB = (b["timestamp"] as num?)?.toInt() ?? 0;
       return tA.compareTo(tB);
@@ -35,7 +38,10 @@ class BalanceHelper {
     for (final item in chronological) {
       final method = (item["Payment_Mode"] ?? "").toString();
       final isIncome = ["Add CASH", "Add Online"].contains(method);
-      final amt = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
+      final rawAmt = item["Amount"];
+      final double amt = rawAmt is num
+          ? rawAmt.toDouble()
+          : (double.tryParse(rawAmt?.toString() ?? '0') ?? 0.0);
       if (isIncome) {
         running += amt;
       } else {
