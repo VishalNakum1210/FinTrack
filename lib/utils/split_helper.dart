@@ -57,8 +57,12 @@ class GroupExpense {
       return customShares![participant.phone] ?? 0.0;
     }
     if (participants.isEmpty) return 0.0;
-    final equalShare = (amount / participants.length);
-    return ((equalShare * 100).round() / 100);
+    final index = participants.indexOf(participant);
+    final totalCents = (amount * 100).round();
+    final baseCents = totalCents ~/ participants.length;
+    final remainder = totalCents % participants.length;
+    final participantCents = baseCents + (index < remainder ? 1 : 0);
+    return participantCents / 100.0;
   }
 }
 
@@ -115,7 +119,20 @@ class SplitHelper {
     required List<GroupExpense> expenses,
     required List<SplitParticipant> allParticipants,
   }) {
-    if (allParticipants.isEmpty) return [];
+    // Unify all declared participants and any participants referenced in expenses
+    final Map<String, SplitParticipant> participantMap = {};
+    for (final p in allParticipants) {
+      participantMap[p.phone] = p;
+    }
+    for (final exp in expenses) {
+      participantMap.putIfAbsent(exp.payer.phone, () => exp.payer);
+      for (final c in exp.participants) {
+        participantMap.putIfAbsent(c.phone, () => c);
+      }
+    }
+
+    final effectiveParticipants = participantMap.values.toList();
+    if (effectiveParticipants.isEmpty) return [];
 
     final Map<String, double> totalPaidMap = {};
     final Map<String, double> totalConsumedMap = {};
@@ -124,11 +141,11 @@ class SplitHelper {
     final Map<String, Map<String, double>> grossDebts = {};
     final Map<String, Set<String>> pairwiseReasons = {};
 
-    for (final p1 in allParticipants) {
+    for (final p1 in effectiveParticipants) {
       totalPaidMap[p1.phone] = 0.0;
       totalConsumedMap[p1.phone] = 0.0;
       grossDebts[p1.phone] = {};
-      for (final p2 in allParticipants) {
+      for (final p2 in effectiveParticipants) {
         grossDebts[p1.phone]![p2.phone] = 0.0;
       }
     }
@@ -156,7 +173,7 @@ class SplitHelper {
     // Step 2: Bilateral Netting between every pair of participants
     final List<PersonSettlement> result = [];
 
-    for (final p1 in allParticipants) {
+    for (final p1 in effectiveParticipants) {
       final paid = totalPaidMap[p1.phone] ?? 0.0;
       final consumed = totalConsumedMap[p1.phone] ?? 0.0;
       final rawNet = paid - consumed;
@@ -165,7 +182,7 @@ class SplitHelper {
       final List<PersonDebtLine> giveLines = [];
       final List<PersonDebtLine> getLines = [];
 
-      for (final p2 in allParticipants) {
+      for (final p2 in effectiveParticipants) {
         if (p1.phone == p2.phone) continue;
 
         final youOweOther = grossDebts[p1.phone]?[p2.phone] ?? 0.0;

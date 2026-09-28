@@ -1274,7 +1274,7 @@ class ExportService {
   }) {
     return {
       "app": "FinTrack",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "exported_at": DateTime.now().toIso8601String(),
       "user": {
         "name": userName,

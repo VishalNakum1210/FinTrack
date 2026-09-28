@@ -46,7 +46,7 @@ void main() {
       expect(jsonString, isNotEmpty);
       final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
       expect(decoded['app'], 'FinTrack');
-      expect(decoded['version'], '2.1.0');
+      expect(decoded['version'], '2.2.0');
       expect(decoded['user']['name'], 'Vishal Nakum');
       expect(decoded['total_expenses_count'], 1);
       expect(decoded['total_friends_count'], 1);

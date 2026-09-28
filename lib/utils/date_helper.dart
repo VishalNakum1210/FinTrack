@@ -18,7 +18,15 @@ class DateHelper {
 
     // 1. Fast path: ISO-8601 (e.g. 2026-08-28, 2026-08-28T...)
     final iso = DateTime.tryParse(str);
-    if (iso != null) return iso;
+    if (iso != null) {
+      if (str.length >= 10 && str[4] == '-' && str[7] == '-') {
+        final expectedMonth = int.tryParse(str.substring(5, 7));
+        final expectedDay = int.tryParse(str.substring(8, 10));
+        if (expectedMonth != null && expectedMonth != iso.month) return null;
+        if (expectedDay != null && expectedDay != iso.day) return null;
+      }
+      return iso;
+    }
 
     // 2. Fast path: day/month/year (e.g. 28/8/2026 or 28/08/2026)
     if (str.contains('/')) {
@@ -29,14 +37,17 @@ class DateHelper {
         final y = int.tryParse(parts[2]);
         if (d != null && m != null && y != null && y > 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
           final dt = DateTime(y, m, d);
-          if (dt.month == m && dt.day == d) {
+          if (dt.year == y && dt.month == m && dt.day == d) {
             return dt;
           }
         }
+        return null;
       }
       try {
-        return _slashFormat.parse(str);
-      } catch (_) {}
+        return _slashFormat.parseStrict(str);
+      } catch (_) {
+        return null;
+      }
     }
 
     // 3. Fast path: day-month-year (e.g. 28-8-2026 or 28-08-2026)
@@ -47,26 +58,29 @@ class DateHelper {
         final p1 = int.tryParse(parts[1]);
         final p2 = int.tryParse(parts[2]);
         if (p0 != null && p1 != null && p2 != null) {
-          // If first part is 4-digit year
+          // If first part is 4-digit year (yyyy-m-d)
           if (p0 > 1900 && p1 >= 1 && p1 <= 12 && p2 >= 1 && p2 <= 31) {
             final dt = DateTime(p0, p1, p2);
-            if (dt.month == p1 && dt.day == p2) return dt;
+            if (dt.year == p0 && dt.month == p1 && dt.day == p2) return dt;
           }
           // If third part is 4-digit year (d-m-yyyy)
           if (p2 > 1900 && p1 >= 1 && p1 <= 12 && p0 >= 1 && p0 <= 31) {
             final dt = DateTime(p2, p1, p0);
-            if (dt.month == p1 && dt.day == p0) return dt;
+            if (dt.year == p2 && dt.month == p1 && dt.day == p0) return dt;
           }
         }
+        return null;
       }
       try {
-        return _dashFormat.parse(str);
-      } catch (_) {}
+        return _dashFormat.parseStrict(str);
+      } catch (_) {
+        return null;
+      }
     }
 
     // 4. Fallback for text month formats (e.g. "28 Aug 2026")
     try {
-      return _displayFormat.parse(str);
+      return _displayFormat.parseStrict(str);
     } catch (_) {}
 
     return null;
