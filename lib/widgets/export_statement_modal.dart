@@ -161,10 +161,11 @@ class _ExportStatementModalContentState
       // 1. Date Filter
       final dt =
           (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(item["Date"]);
-      if (dt != null) {
-        if (dt.isBefore(_startDate) || dt.isAfter(_endDate)) {
-          return false;
-        }
+      if (dt == null) {
+        return false;
+      }
+      if (dt.isBefore(_startDate) || dt.isAfter(_endDate)) {
+        return false;
       }
 
       // 2. Transaction Type Filter

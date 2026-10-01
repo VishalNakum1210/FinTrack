@@ -322,10 +322,12 @@ class _UserMainPageState extends State<UserMainPage> {
         }
 
         // Compute running balances for recent transaction cards (L3 DRY fix)
-        BalanceHelper.computeRunningBalances(records);
+        final recordsWithBalance =
+            BalanceHelper.computeRunningBalances(records);
 
         // Recent 5 transactions (newest first)
-        final recentRecords = List<Map<String, dynamic>>.from(records);
+        final recentRecords =
+            List<Map<String, dynamic>>.from(recordsWithBalance);
         recentRecords.sort((a, b) {
           final DateTime? dateA =
               (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);

@@ -58,6 +58,9 @@ class InputValidator {
     };
   }
 
+  static bool mode(String value) =>
+      modes.contains(value) || value.startsWith('Owed to ') || value == 'Owed';
+
   static bool transaction({
     required String amount,
     required String description,
@@ -68,7 +71,7 @@ class InputValidator {
   }) =>
       Money.positive(amount) &&
       InputValidator.description(description) &&
-      modes.contains(mode) &&
+      InputValidator.mode(mode) &&
       InputValidator.date(date) &&
       (category == null || categories.contains(category)) &&
       (type == null || friendTypes.contains(type));

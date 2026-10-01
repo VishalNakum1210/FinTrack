@@ -48,6 +48,7 @@ class PassbookPageState extends State<PassbookApp> {
 
   // Pagination & Display
   int _displayLimit = 50;
+  final Set<String> _dismissedKeys = {};
   List<Map<String, dynamic>> _cachedSorted = [];
   final ScrollController _scrollController = ScrollController();
 
@@ -535,13 +536,26 @@ class PassbookPageState extends State<PassbookApp> {
                 dt.month == selectedMonth!.month;
           }).toList();
         } else if (customDateRange != null) {
+          final rangeStart = DateTime(
+            customDateRange!.start.year,
+            customDateRange!.start.month,
+            customDateRange!.start.day,
+          );
+          final rangeEnd = DateTime(
+            customDateRange!.end.year,
+            customDateRange!.end.month,
+            customDateRange!.end.day,
+            23,
+            59,
+            59,
+            999,
+          );
           filtered = filtered.where((item) {
             final dt =
                 (item["_parsedDate"] as DateTime?) ??
                 DateHelper.parse(item["Date"]);
             if (dt == null) return false;
-            return !dt.isBefore(customDateRange!.start) &&
-                !dt.isAfter(customDateRange!.end.add(const Duration(days: 1)));
+            return !dt.isBefore(rangeStart) && !dt.isAfter(rangeEnd);
           }).toList();
         }
 
@@ -561,6 +575,14 @@ class PassbookPageState extends State<PassbookApp> {
                 amt.contains(_searchQuery) ||
                 dt.contains(_searchQuery);
           }).toList();
+        }
+
+        // Exclude items dismissed during this session
+        if (_dismissedKeys.isNotEmpty) {
+          filtered = filtered
+              .where((item) =>
+                  !_dismissedKeys.contains(item["key"]?.toString() ?? ""))
+              .toList();
         }
 
         // 5. Sort Records
@@ -1162,8 +1184,10 @@ class PassbookPageState extends State<PassbookApp> {
             ? DateHelper.formatDisplay(prevDt)
             : "";
 
-        final showHeader =
-            index == 0 || formattedCurrentDate != formattedPrevDate;
+        final isDateSorted =
+            currentSort == "Newest First" || currentSort == "Oldest First";
+        final showHeader = isDateSorted &&
+            (index == 0 || formattedCurrentDate != formattedPrevDate);
 
         // Compute net day total for the header
         double dayNet = 0.0;
@@ -1236,9 +1260,12 @@ class PassbookPageState extends State<PassbookApp> {
                   message: "Are you sure you want to delete this record?",
                 );
               },
-              onDismissed: (_) async {
+              onDismissed: (_) {
                 if (itemKey.isNotEmpty) {
-                  await deleteRecord(itemKey);
+                  setState(() {
+                    _dismissedKeys.add(itemKey);
+                  });
+                  deleteRecord(itemKey);
                 }
               },
               child: PassbookTransactionTile(
@@ -1248,8 +1275,9 @@ class PassbookPageState extends State<PassbookApp> {
                 time: DateHelper.formatDisplay(rawDate),
                 amount: amount,
                 isIncome: isIncome,
-                runningBalance:
-                    (selectedCategory == "All" && _searchQuery.isEmpty)
+                runningBalance: (selectedCategory == "All" &&
+                        _searchQuery.isEmpty &&
+                        isDateSorted)
                     ? runningBal
                     : null,
                 splitFriendName: splitFriend,

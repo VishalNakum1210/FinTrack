@@ -539,7 +539,7 @@ class FriendProvider extends ChangeNotifier {
     // assigned to the current user; no value is created or lost.
     if (categoryType == 'Give Money To Friend'
         ? mine + friend * friendNumbers.length != total
-        : (friendNumbers.length != 1 || mine != friend || mine > total)) {
+        : (friendNumbers.length != 1 || mine + friend != total || mine > total)) {
       _lastError = 'Split shares do not balance with total bill';
       return false;
     }
@@ -607,7 +607,7 @@ class FriendProvider extends ChangeNotifier {
         expenses.length > 100 ||
         !InputValidator.description(tripTitle) ||
         !InputValidator.date(formattedDate) ||
-        !InputValidator.modes.contains(paymentMode)) {
+        !InputValidator.mode(paymentMode)) {
       _lastError = 'Invalid trip details';
       return false;
     }

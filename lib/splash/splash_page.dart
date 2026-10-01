@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:fin_track/services/minimum_version_policy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -76,6 +77,30 @@ class _SplashPageState extends State<SplashPage> {
               height: 1.4,
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                SystemNavigator.pop();
+              },
+              child: const Text(
+                "Exit App",
+                style: TextStyle(color: _mutedText),
+              ),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _darkGreen,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                getDecision();
+              },
+              child: const Text("Check Again"),
+            ),
+          ],
         ),
       ),
     );

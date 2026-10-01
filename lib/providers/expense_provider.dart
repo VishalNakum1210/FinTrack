@@ -290,7 +290,7 @@ class ExpenseProvider extends ChangeNotifier {
       lastError = "Description must be between 1 and 500 characters";
       return false;
     }
-    if (!InputValidator.modes.contains(paymentMode)) {
+    if (!InputValidator.mode(paymentMode)) {
       lastError = "Invalid payment mode";
       return false;
     }
@@ -403,7 +403,7 @@ class ExpenseProvider extends ChangeNotifier {
       lastError = "Description must be between 1 and 500 characters";
       return false;
     }
-    if (!InputValidator.modes.contains(paymentMode)) {
+    if (!InputValidator.mode(paymentMode)) {
       lastError = "Invalid payment mode";
       return false;
     }

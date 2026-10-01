@@ -314,13 +314,15 @@ class UserProvider extends ChangeNotifier {
   }
 
   void clearUser() {
-    final oldCacheKey = 'cached_user_profile_$_phoneNumber';
+    final oldCacheKey = _cacheKey;
+    final phoneKey = 'cached_user_profile_$_phoneNumber';
     _name = "User";
     _email = "";
     _phoneNumber = "";
     _address = "";
     _hasError = false;
     _storage.delete(key: oldCacheKey).catchError((_) {});
+    _storage.delete(key: phoneKey).catchError((_) {});
     notifyListeners();
   }
 

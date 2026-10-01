@@ -1,4 +1,5 @@
 import 'package:fin_track/utils/money.dart';
+import 'package:fin_track/utils/date_helper.dart';
 import 'package:fin_track/friends_pages/add_friends.dart';
 import 'package:fin_track/friends_pages/add_friend_spent.dart';
 import 'package:fin_track/friends_pages/specific_friend_page.dart';
@@ -239,6 +240,32 @@ class _FriendPageState extends State<FriendPage> {
                             0))
                     .abs();
             return balB.compareTo(balA);
+          });
+        } else {
+          // sortBy == "Recent"
+          displayedFriends.sort((a, b) {
+            int getLatestTimestamp(Map<String, dynamic> f) {
+              int maxTs = 0;
+              final raw = f['Records'];
+              if (raw is Map) {
+                for (final r in raw.values) {
+                  if (r is Map) {
+                    final ts = (r['timestamp'] as num?)?.toInt() ?? 0;
+                    if (ts > maxTs) maxTs = ts;
+                  }
+                }
+              }
+              if (maxTs == 0 && f['friend_created_date'] != null) {
+                final dt =
+                    DateHelper.parse(f['friend_created_date'].toString());
+                if (dt != null) maxTs = dt.millisecondsSinceEpoch;
+              }
+              return maxTs;
+            }
+
+            final tsA = getLatestTimestamp(a);
+            final tsB = getLatestTimestamp(b);
+            return tsB.compareTo(tsA);
           });
         }
 

@@ -240,12 +240,20 @@ class _AddSpentState extends State<AddSpent> {
     }
 
     final isSpending = selectedMode.startsWith("Spent");
-    if (isSplitWithFriend && isSpending && selectedFriendNumber == null) {
+    final friends = context.read<FriendProvider>().friends;
+    final effectiveFriendNumber =
+        friends.any((f) => f["friend_number"] == selectedFriendNumber)
+            ? selectedFriendNumber
+            : (friends.isNotEmpty
+                ? friends.first["friend_number"]?.toString()
+                : null);
+    if (isSplitWithFriend && isSpending && effectiveFriendNumber == null) {
       Fluttertoast.showToast(
         msg: "Please select a friend to split the bill with",
       );
       return;
     }
+    selectedFriendNumber = effectiveFriendNumber;
 
     setState(() {
       isLoading = true;
@@ -961,9 +969,14 @@ class _AddSpentState extends State<AddSpent> {
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     isExpanded: true,
-                                    value:
-                                        selectedFriendNumber ??
-                                        friends.first["friend_number"],
+                                    value: friends.any((f) =>
+                                            f["friend_number"] ==
+                                            selectedFriendNumber)
+                                        ? selectedFriendNumber
+                                        : (friends.isNotEmpty
+                                            ? friends.first["friend_number"]
+                                                ?.toString()
+                                            : null),
                                     icon: const Icon(
                                       Icons.arrow_drop_down_rounded,
                                       color: primary,
