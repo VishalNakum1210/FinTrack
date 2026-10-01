@@ -1,5 +1,5 @@
 name: fin_track
-description: "A new Flutter project."
+description: "FinTrack - Smart Personal Expense, Split Bills, and Ledger Tracker."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -68,6 +68,8 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/image/AccountApplicationLogo.jpg"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/image/AccountApplicationLogo.jpg"
 
 flutter:
   uses-material-design: true
