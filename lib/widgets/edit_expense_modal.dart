@@ -1,3 +1,4 @@
+import 'package:fin_track/utils/money.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/utils/category_theme.dart';
@@ -25,13 +26,11 @@ Future<bool?> showEditExpenseModal({
 class EditExpenseModalContent extends StatefulWidget {
   final Map<String, dynamic> record;
 
-  const EditExpenseModalContent({
-    super.key,
-    required this.record,
-  });
+  const EditExpenseModalContent({super.key, required this.record});
 
   @override
-  State<EditExpenseModalContent> createState() => _EditExpenseModalContentState();
+  State<EditExpenseModalContent> createState() =>
+      _EditExpenseModalContentState();
 }
 
 class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
@@ -65,6 +64,7 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
     "Spent Cash",
     "Add Online",
     "Add CASH",
+    "Owed",
   ];
 
   @override
@@ -73,14 +73,17 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
     final rawAmount = (widget.record["Amount"] ?? "").toString();
     final rawDesc = (widget.record["Description"] ?? "").toString();
     final rawCategory = (widget.record["Category"] ?? "Other").toString();
-    final rawMode = (widget.record["Payment_Mode"] ?? "Spent Online").toString();
+    final storedMode = (widget.record["Payment_Mode"] ?? "").toString();
+    final rawMode = storedMode.startsWith('Owed to ') ? 'Owed' : storedMode;
     final rawDate = (widget.record["Date"] ?? "").toString();
 
     _amountCtrl = TextEditingController(text: rawAmount);
     _descCtrl = TextEditingController(text: rawDesc);
 
-    _selectedCategory = _categories.contains(rawCategory) ? rawCategory : "Other";
-    _selectedMode = _paymentModes.contains(rawMode) ? rawMode : "Spent Online";
+    _selectedCategory = _categories.contains(rawCategory)
+        ? rawCategory
+        : "Other";
+    _selectedMode = _paymentModes.contains(rawMode) ? rawMode : '';
     _selectedDate = DateHelper.parse(rawDate) ?? DateTime.now();
   }
 
@@ -94,9 +97,13 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: _selectedDate.isBefore(DateTime(2000))
+          ? DateTime(2000)
+          : (_selectedDate.isAfter(DateTime.now())
+                ? DateTime.now()
+                : _selectedDate),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -117,10 +124,19 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
   }
 
   Future<void> _handleSave() async {
+    if (_isSaving) return;
+    if (!_paymentModes.contains(_selectedMode)) {
+      Fluttertoast.showToast(
+        msg: 'Please select a payment mode for this record.',
+      );
+      return;
+    }
     final amountText = _amountCtrl.text.trim();
     final descText = _descCtrl.text.trim();
 
-    final parsedAmount = double.tryParse(amountText);
+    final parsedAmount = (Money.tryPaise(amountText) == null
+        ? null
+        : Money.rupees(amountText));
     if (parsedAmount == null || parsedAmount <= 0) {
       Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
@@ -145,14 +161,16 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
     final dateStr = DateFormat("dd/MM/yyyy").format(_selectedDate);
 
     final success = await expenseProvider.updateExpense(
-          phoneNumber: phone,
-          key: key,
-          amount: parsedAmount.toStringAsFixed(parsedAmount.truncateToDouble() == parsedAmount ? 0 : 2),
-          category: _selectedCategory,
-          paymentMode: _selectedMode,
-          description: descText,
-          date: dateStr,
-        );
+      phoneNumber: phone,
+      key: key,
+      amount: parsedAmount.toStringAsFixed(
+        parsedAmount.truncateToDouble() == parsedAmount ? 0 : 2,
+      ),
+      category: _selectedCategory,
+      paymentMode: _selectedMode,
+      description: descText,
+      date: dateStr,
+    );
 
     if (mounted) setState(() => _isSaving = false);
 
@@ -160,7 +178,9 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
       Fluttertoast.showToast(msg: "Transaction updated successfully");
       if (mounted) Navigator.pop(context, true);
     } else {
-      Fluttertoast.showToast(msg: "Failed to update transaction");
+      Fluttertoast.showToast(
+        msg: expenseProvider.lastError ?? "Unable to update transaction",
+      );
     }
   }
 
@@ -203,7 +223,11 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
                         color: const Color(0xFFE8F5E9),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.edit_rounded, color: _darkGreen, size: 20),
+                      child: const Icon(
+                        Icons.edit_rounded,
+                        color: _darkGreen,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     const Column(
@@ -236,28 +260,60 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
             // 1. Amount Input
             const Text(
               "Amount",
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textDark),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textDark,
+              ),
             ),
             const SizedBox(height: 6),
             TextField(
               controller: _amountCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _textDark),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: _textDark,
+              ),
               decoration: InputDecoration(
                 prefixIcon: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Text(
                     "₹",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _darkGreen),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: _darkGreen,
+                    ),
                   ),
                 ),
-                prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 0,
+                  minHeight: 0,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _borderGrey)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _borderGrey)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _primaryGreen, width: 1.8)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _borderGrey),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _borderGrey),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: _primaryGreen,
+                    width: 1.8,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -265,7 +321,11 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
             // 2. Category Selector
             const Text(
               "Category",
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textDark),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textDark,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -280,9 +340,14 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
                   onTap: () => setState(() => _selectedCategory = cat),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6.5,
+                    ),
                     decoration: BoxDecoration(
-                      color: isSelected ? catColor.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
+                      color: isSelected
+                          ? catColor.withValues(alpha: 0.15)
+                          : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isSelected ? catColor : const Color(0xFFE2E8F0),
@@ -292,13 +357,19 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(catIcon, size: 14, color: isSelected ? catColor : _textMuted),
+                        Icon(
+                          catIcon,
+                          size: 14,
+                          color: isSelected ? catColor : _textMuted,
+                        ),
                         const SizedBox(width: 5),
                         Text(
                           cat,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: isSelected ? catColor : _textDark,
                           ),
                         ),
@@ -313,7 +384,11 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
             // 3. Payment Mode Selector
             const Text(
               "Payment Mode",
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textDark),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textDark,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -327,15 +402,22 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
                   onTap: () => setState(() => _selectedMode = mode),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? (isIncome ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE))
+                          ? (isIncome
+                                ? const Color(0xFFE8F5E9)
+                                : const Color(0xFFFFEBEE))
                           : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isSelected
-                            ? (isIncome ? _primaryGreen : const Color(0xFFEF5350))
+                            ? (isIncome
+                                  ? _primaryGreen
+                                  : const Color(0xFFEF5350))
                             : const Color(0xFFE2E8F0),
                         width: isSelected ? 1.5 : 1,
                       ),
@@ -344,7 +426,9 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
                       mode,
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                         color: isSelected
                             ? (isIncome ? _darkGreen : const Color(0xFFC62828))
                             : _textDark,
@@ -359,14 +443,21 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
             // 4. Date Picker Row
             const Text(
               "Transaction Date",
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textDark),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textDark,
+              ),
             ),
             const SizedBox(height: 6),
             InkWell(
               onTap: _pickDate,
               borderRadius: BorderRadius.circular(14),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(14),
@@ -374,14 +465,29 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_month_rounded, color: _primaryGreen, size: 20),
+                    const Icon(
+                      Icons.calendar_month_rounded,
+                      color: _primaryGreen,
+                      size: 20,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       DateFormat("dd MMMM yyyy").format(_selectedDate),
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textDark),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _textDark,
+                      ),
                     ),
                     const Spacer(),
-                    const Text("Change", style: TextStyle(fontSize: 12, color: _primaryGreen, fontWeight: FontWeight.bold)),
+                    const Text(
+                      "Change",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _primaryGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -391,7 +497,11 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
             // 5. Description / Note
             const Text(
               "Description / Note (Optional)",
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textDark),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _textDark,
+              ),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -400,13 +510,31 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
               decoration: InputDecoration(
                 counterText: "",
                 hintText: "Enter note (e.g. Lunch, Groceries)",
-                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                hintStyle: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF94A3B8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _borderGrey)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _borderGrey)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _primaryGreen, width: 1.8)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _borderGrey),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _borderGrey),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: _primaryGreen,
+                    width: 1.8,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -420,18 +548,26 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
                   backgroundColor: _primaryGreen,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 onPressed: _isSaving ? null : _handleSave,
                 child: _isSaving
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Text(
                         "Save Changes",
-                        style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
               ),
             ),

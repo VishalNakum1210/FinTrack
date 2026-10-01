@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:fin_track/get_information/hash_password.dart';
+import 'package:fin_track/get_information/password_policy.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -22,7 +22,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   final TextEditingController oldPasswordController = TextEditingController();
   final TextEditingController newPasswordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
 
   bool oldPasswordVisible = false;
   bool newPasswordVisible = false;
@@ -47,13 +48,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   int _getPasswordStrength(String pass) {
     if (pass.isEmpty) return 0;
     int score = 0;
-    if (pass.length >= 6) score++;
-    if (pass.length >= 8 &&
+    if (pass.length >= 12) score++;
+    if (pass.length >= 12 &&
         RegExp(r'[a-zA-Z]').hasMatch(pass) &&
         RegExp(r'[0-9]').hasMatch(pass)) {
       score++;
     }
-    if (pass.length >= 10 &&
+    if (pass.length >= 16 &&
         RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(pass)) {
       score++;
     }
@@ -61,17 +62,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   }
 
   Future<void> changePassword() async {
+    if (isLoading) return;
     if (lockoutUntil != null && DateTime.now().isBefore(lockoutUntil!)) {
       final remaining = lockoutUntil!.difference(DateTime.now()).inSeconds;
       Fluttertoast.showToast(
-        msg: "Too many failed attempts. Locked for ${remaining ~/ 60}m ${remaining % 60}s.",
+        msg:
+            "Too many failed attempts. Locked for ${remaining ~/ 60}m ${remaining % 60}s.",
       );
       return;
     }
 
-    String oldPassword = oldPasswordController.text.trim();
-    String newPassword = newPasswordController.text.trim();
-    String confirmPassword = confirmPasswordController.text.trim();
+    String oldPassword = oldPasswordController.text;
+    String newPassword = newPasswordController.text;
+    String confirmPassword = confirmPasswordController.text;
 
     if (oldPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
       Fluttertoast.showToast(msg: "Please fill all fields");
@@ -84,13 +87,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     }
 
     if (newPassword == oldPassword) {
-      Fluttertoast.showToast(msg: "New password cannot be the same as old password");
+      Fluttertoast.showToast(
+        msg: "New password cannot be the same as old password",
+      );
       return;
     }
 
     if (!isPasswordStrong(newPassword)) {
       Fluttertoast.showToast(
-        msg: "New password must be at least 6 characters and contain letters & numbers",
+        msg: "Use 12–128 characters with letters and numbers or symbols",
       );
       return;
     }
@@ -142,25 +147,41 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               setState(() {});
             }
           });
-          Fluttertoast.showToast(msg: "3 failed attempts. Locked for 5 minutes.");
+          Fluttertoast.showToast(
+            msg: "3 failed attempts. Locked for 5 minutes.",
+          );
         } else {
           Fluttertoast.showToast(
-            msg: "Old password is incorrect (${3 - failedAttempts} attempts remaining)",
+            msg:
+                "Old password is incorrect (${3 - failedAttempts} attempts remaining)",
           );
         }
       } else if (e.code == 'weak-password') {
-        Fluttertoast.showToast(msg: "New password is too weak. Please use a stronger password.");
+        Fluttertoast.showToast(
+          msg: "New password is too weak. Please use a stronger password.",
+        );
       } else if (e.code == 'too-many-requests') {
-        Fluttertoast.showToast(msg: "Too many attempts. Please wait a moment before trying again.");
+        Fluttertoast.showToast(
+          msg: "Too many attempts. Please wait a moment before trying again.",
+        );
       } else if (e.code == 'network-request-failed') {
-        Fluttertoast.showToast(msg: "Network error. Please check your internet connection.");
+        Fluttertoast.showToast(
+          msg: "Network error. Please check your internet connection.",
+        );
       } else if (e.code == 'requires-recent-login') {
-        Fluttertoast.showToast(msg: "Security check: Please log in again to change your password.");
+        Fluttertoast.showToast(
+          msg: "Security check: Please log in again to change your password.",
+        );
       } else {
-        Fluttertoast.showToast(msg: e.message ?? "Failed to change password");
+        Fluttertoast.showToast(
+          msg: "Unable to change password. Please try again.",
+        );
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Unable to change password. Please check your connection and retry.");
+      Fluttertoast.showToast(
+        msg:
+            "Unable to change password. Please check your connection and retry.",
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -221,25 +242,30 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isLocked = lockoutUntil != null && DateTime.now().isBefore(lockoutUntil!);
-    final remainingSeconds = isLocked ? lockoutUntil!.difference(DateTime.now()).inSeconds : 0;
+    final isLocked =
+        lockoutUntil != null && DateTime.now().isBefore(lockoutUntil!);
+    final remainingSeconds = isLocked
+        ? lockoutUntil!.difference(DateTime.now()).inSeconds
+        : 0;
 
     final newPassText = newPasswordController.text;
     final strength = _getPasswordStrength(newPassText);
     final strengthColor = strength <= 1
         ? const Color(0xFFE53935)
         : strength == 2
-            ? const Color(0xFFFB8C00)
-            : const Color(0xFF43A047);
+        ? const Color(0xFFFB8C00)
+        : const Color(0xFF43A047);
     final strengthLabel = strength <= 1
         ? "Weak"
         : strength == 2
-            ? "Medium"
-            : "Strong";
+        ? "Medium"
+        : "Strong";
 
     final confirmText = confirmPasswordController.text;
     final bool passwordsMatch =
-        newPassText.isNotEmpty && confirmText.isNotEmpty && newPassText == confirmText;
+        newPassText.isNotEmpty &&
+        confirmText.isNotEmpty &&
+        newPassText == confirmText;
 
     return Scaffold(
       backgroundColor: _canvasBg,
@@ -283,7 +309,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.lock_clock_rounded, color: Color(0xFFDC2626), size: 22),
+                      const Icon(
+                        Icons.lock_clock_rounded,
+                        color: Color(0xFFDC2626),
+                        size: 22,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -325,7 +355,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: const Color(0xFFE8F5E9),
-                        border: Border.all(color: const Color(0xFFC8E6C9), width: 1.5),
+                        border: Border.all(
+                          color: const Color(0xFFC8E6C9),
+                          width: 1.5,
+                        ),
                       ),
                       child: const Center(
                         child: Icon(
@@ -351,7 +384,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                           ),
                           SizedBox(height: 4),
                           Text(
-                            "Use at least 6 characters with a combination of letters & numbers.",
+                            "Use 12–128 characters with letters and numbers or symbols.",
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w500,
@@ -413,15 +446,20 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     TextField(
                       controller: oldPasswordController,
                       obscureText: !oldPasswordVisible,
-                      maxLength: 64,
+                      maxLength: 128,
                       textInputAction: TextInputAction.next,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                       decoration: _inputDecoration(
                         hintText: "Enter current password",
                         prefixIcon: Icons.lock_outline_rounded,
                         isVisible: oldPasswordVisible,
                         onToggleVisibility: () {
-                          setState(() => oldPasswordVisible = !oldPasswordVisible);
+                          setState(
+                            () => oldPasswordVisible = !oldPasswordVisible,
+                          );
                         },
                       ).copyWith(counterText: ""),
                     ),
@@ -441,15 +479,20 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     TextField(
                       controller: newPasswordController,
                       obscureText: !newPasswordVisible,
-                      maxLength: 64,
+                      maxLength: 128,
                       textInputAction: TextInputAction.next,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                       decoration: _inputDecoration(
                         hintText: "Enter new password",
                         prefixIcon: Icons.vpn_key_outlined,
                         isVisible: newPasswordVisible,
                         onToggleVisibility: () {
-                          setState(() => newPasswordVisible = !newPasswordVisible);
+                          setState(
+                            () => newPasswordVisible = !newPasswordVisible,
+                          );
                         },
                       ).copyWith(counterText: ""),
                     ),
@@ -465,14 +508,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                               child: LinearProgressIndicator(
                                 value: strength / 3.0,
                                 backgroundColor: const Color(0xFFF1F5F9),
-                                valueColor: AlwaysStoppedAnimation<Color>(strengthColor),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  strengthColor,
+                                ),
                                 minHeight: 6,
                               ),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: strengthColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(6),
@@ -505,16 +553,23 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     TextField(
                       controller: confirmPasswordController,
                       obscureText: !confirmPasswordVisible,
-                      maxLength: 64,
+                      maxLength: 128,
                       textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => (isLoading || isLocked) ? null : changePassword(),
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      onSubmitted: (_) =>
+                          (isLoading || isLocked) ? null : changePassword(),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                       decoration: _inputDecoration(
                         hintText: "Re-enter new password",
                         prefixIcon: Icons.check_circle_outline_rounded,
                         isVisible: confirmPasswordVisible,
                         onToggleVisibility: () {
-                          setState(() => confirmPasswordVisible = !confirmPasswordVisible);
+                          setState(
+                            () => confirmPasswordVisible =
+                                !confirmPasswordVisible,
+                          );
                         },
                       ).copyWith(counterText: ""),
                     ),
@@ -525,17 +580,27 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       Row(
                         children: [
                           Icon(
-                            passwordsMatch ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                            passwordsMatch
+                                ? Icons.check_circle_rounded
+                                : Icons.cancel_rounded,
                             size: 14,
-                            color: passwordsMatch ? _darkGreen : const Color(0xFFE53935),
+                            color: passwordsMatch
+                                ? _darkGreen
+                                : const Color(0xFFE53935),
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            passwordsMatch ? "Passwords match" : "Passwords do not match",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: passwordsMatch ? _darkGreen : const Color(0xFFE53935),
+                          Expanded(
+                            child: Text(
+                              passwordsMatch
+                                  ? "Passwords match"
+                                  : "Passwords do not match",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: passwordsMatch
+                                    ? _darkGreen
+                                    : const Color(0xFFE53935),
+                              ),
                             ),
                           ),
                         ],
@@ -566,7 +631,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                           ),
                         )
                       : Text(
-                          isLocked ? "Locked (${remainingSeconds}s)" : "Update Password",
+                          isLocked
+                              ? "Locked (${remainingSeconds}s)"
+                              : "Update Password",
                           style: const TextStyle(
                             fontSize: 15.5,
                             fontWeight: FontWeight.w800,

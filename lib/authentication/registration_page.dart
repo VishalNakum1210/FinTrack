@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:fin_track/get_information/hash_password.dart';
+import 'package:fin_track/get_information/password_policy.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/authentication/login_page.dart';
 import 'package:fin_track/nav_bar.dart';
@@ -26,7 +26,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
 
   bool isLoading = false;
   bool isPasswordVisible = false;
@@ -55,24 +56,31 @@ class _RegistrationPageState extends State<RegistrationPage> {
   int _getPasswordStrength(String pass) {
     if (pass.isEmpty) return 0;
     int score = 0;
-    if (pass.length >= 6) score++;
-    if (pass.length >= 8 && RegExp(r'[a-zA-Z]').hasMatch(pass) && RegExp(r'[0-9]').hasMatch(pass)) score++;
-    if (pass.length >= 10 && RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(pass)) score++;
+    if (pass.length >= 12) score++;
+    if (isPasswordStrong(pass)) score++;
+    if (pass.length >= 16 && isPasswordStrong(pass)) score++;
     return score;
   }
 
   Future<void> checkDetails() async {
+    if (isLoading) return;
     if (failedAttempts >= 5) {
-      Fluttertoast.showToast(msg: "Too many attempts. Please wait before trying again.");
+      Fluttertoast.showToast(
+        msg: "Too many attempts. Please wait before trying again.",
+      );
       return;
     }
 
     String name = nameController.text.trim();
     String phoneNumber = phoneController.text.trim();
     String email = emailController.text.trim().toLowerCase();
-    String password = passwordController.text.trim();
-    String confirmPassword = confirmPasswordController.text.trim();
+    String password = passwordController.text;
+    String confirmPassword = confirmPasswordController.text;
 
+    if (name.length > 50 || email.length > 100) {
+      Fluttertoast.showToast(msg: 'Name or email is too long');
+      return;
+    }
     if (name.isEmpty ||
         phoneNumber.isEmpty ||
         email.isEmpty ||
@@ -95,7 +103,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
     if (!isPasswordStrong(password)) {
       Fluttertoast.showToast(
-        msg: "Password must be at least 6 characters and contain letters & numbers or symbols",
+        msg: "Use 12–128 characters with letters and numbers or symbols",
       );
       return;
     }
@@ -110,10 +118,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
     });
 
     try {
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: "$phoneNumber@fintrack.app",
-        password: password,
-      );
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: "$phoneNumber@fintrack.app",
+            password: password,
+          );
 
       final user = userCredential.user;
       if (user != null) {
@@ -121,18 +130,24 @@ class _RegistrationPageState extends State<RegistrationPage> {
           await user.updateDisplayName(name);
         } catch (_) {}
         try {
-          DatabaseReference ref = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
+          DatabaseReference ref = FirebaseDatabase.instance.ref(
+            "user_details/$phoneNumber",
+          );
           final snapshot = await ref.get().timeout(const Duration(seconds: 8));
-          if (snapshot.exists && snapshot.value is Map) {
+          if (snapshot.exists &&
+              snapshot.value is Map &&
+              (snapshot.value as Map)['deletion_pending'] != true) {
             final existing = Map<String, dynamic>.from(snapshot.value as Map);
             await ref.update({
               "name": name,
               "phone_number": phoneNumber,
               "email": email.isNotEmpty ? email : (existing["email"] ?? ""),
               "address": existing["address"] ?? "Not Entered",
+              if (existing["owner_uid"] == null) "owner_uid": user.uid,
             });
           } else {
             await ref.set({
+              "owner_uid": user.uid,
               "name": name,
               "phone_number": phoneNumber,
               "email": email,
@@ -141,11 +156,16 @@ class _RegistrationPageState extends State<RegistrationPage> {
             });
           }
 
-          await SessionManager.saveSession(
-            phoneNumber: phoneNumber,
-            username: name,
-            email: email,
-          );
+          try {
+            await SessionManager.saveSession(
+              phoneNumber: phoneNumber,
+              username: name,
+              email: email,
+            );
+          } catch (_) {
+            // Firebase owns the authenticated identity. Local cache failure
+            // must not delete a successfully provisioned account/profile.
+          }
 
           if (mounted) {
             context.read<UserProvider>().loadUserSession();
@@ -153,7 +173,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
             context.read<FriendProvider>().fetchFriends(phoneNumber);
           }
 
-          Fluttertoast.showToast(msg: "Registration Successful! Welcome to FinTrack.");
+          Fluttertoast.showToast(
+            msg: "Registration Successful! Welcome to FinTrack.",
+          );
           if (!mounted) return;
           Navigator.pushAndRemoveUntil(
             context,
@@ -161,8 +183,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
             (route) => false,
           );
         } catch (dbError) {
-          await userCredential.user?.delete();
-          Fluttertoast.showToast(msg: "Failed to create profile. Please check connection and retry.");
+          Fluttertoast.showToast(
+            msg:
+                "Account created, but profile setup is pending. Sign in to retry when connected.",
+          );
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -174,12 +198,17 @@ class _RegistrationPageState extends State<RegistrationPage> {
         });
       }
       if (e.code == 'email-already-in-use') {
-        Fluttertoast.showToast(msg: "Phone number is already registered! Please login.");
+        Fluttertoast.showToast(
+          msg: "Unable to register. Try signing in or use different details.",
+        );
       } else if (e.code == 'weak-password') {
-        Fluttertoast.showToast(msg: "Password is too weak. Please use a stronger password.");
+        Fluttertoast.showToast(
+          msg: "Password is too weak. Please use a stronger password.",
+        );
       } else if (e.code == 'operation-not-allowed') {
         Fluttertoast.showToast(
-          msg: "Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication > Sign-in method.",
+          msg:
+              "Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication > Sign-in method.",
         );
       } else if (e.code == 'network-request-failed') {
         Fluttertoast.showToast(
@@ -194,10 +223,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
           msg: "Please enter a valid 10-digit phone number.",
         );
       } else {
-        Fluttertoast.showToast(msg: e.message ?? "Registration failed");
+        Fluttertoast.showToast(msg: "Unable to register. Please try again.");
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Unable to complete setup. Please check connection and retry.");
+      Fluttertoast.showToast(
+        msg: "Unable to complete setup. Please check connection and retry.",
+      );
       failedAttempts++;
       if (failedAttempts >= 5) {
         _throttleTimer?.cancel();
@@ -234,31 +265,19 @@ class _RegistrationPageState extends State<RegistrationPage> {
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          width: 1.2,
-          color: _borderColor,
-        ),
+        borderSide: const BorderSide(width: 1.2, color: _borderColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          width: 1.8,
-          color: _brandGreen,
-        ),
+        borderSide: const BorderSide(width: 1.8, color: _brandGreen),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          width: 1.2,
-          color: Color(0xFFEF4444),
-        ),
+        borderSide: const BorderSide(width: 1.2, color: Color(0xFFEF4444)),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          width: 1.8,
-          color: Color(0xFFEF4444),
-        ),
+        borderSide: const BorderSide(width: 1.8, color: Color(0xFFEF4444)),
       ),
     );
   }
@@ -277,14 +296,20 @@ class _RegistrationPageState extends State<RegistrationPage> {
               child: Center(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Brand Header with App Logo
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
                         children: [
                           Container(
                             height: 44,
@@ -307,7 +332,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
                           const Text(
                             "FinTrack",
                             style: TextStyle(
@@ -407,7 +431,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               controller: phoneController,
                               keyboardType: TextInputType.phone,
                               maxLength: 10,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
                               textInputAction: TextInputAction.next,
                               style: const TextStyle(
                                 fontSize: 15,
@@ -417,7 +443,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               decoration: _inputDecoration(
                                 hint: "10 digit Number",
                                 prefixIcon: Padding(
-                                  padding: const EdgeInsets.only(left: 14, right: 10),
+                                  padding: const EdgeInsets.only(
+                                    left: 14,
+                                    right: 10,
+                                  ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -493,7 +522,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             TextField(
                               controller: passwordController,
                               obscureText: !isPasswordVisible,
-                              maxLength: 64,
+                              maxLength: 128,
                               textInputAction: TextInputAction.next,
                               style: const TextStyle(
                                 fontSize: 15,
@@ -529,44 +558,56 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               valueListenable: passwordController,
                               builder: (context, val, _) {
                                 final pass = val.text;
-                                if (pass.isEmpty) return const SizedBox.shrink();
+                                if (pass.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
                                 final strength = _getPasswordStrength(pass);
                                 final color = strength <= 1
                                     ? const Color(0xFFEF4444)
                                     : strength == 2
-                                        ? const Color(0xFFF59E0B)
-                                        : _brandGreen;
+                                    ? const Color(0xFFF59E0B)
+                                    : _brandGreen;
                                 final label = strength <= 1
                                     ? "Weak"
                                     : strength == 2
-                                        ? "Medium"
-                                        : "Strong";
+                                    ? "Medium"
+                                    : "Strong";
 
                                 return Padding(
-                                  padding: const EdgeInsets.only(top: 8, bottom: 4),
+                                  padding: const EdgeInsets.only(
+                                    top: 8,
+                                    bottom: 4,
+                                  ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(4),
                                         child: LinearProgressIndicator(
                                           value: strength / 3.0,
-                                          backgroundColor: const Color(0xFFE2E8F0),
+                                          backgroundColor: const Color(
+                                            0xFFE2E8F0,
+                                          ),
                                           color: color,
                                           minHeight: 5,
                                         ),
                                       ),
                                       const SizedBox(height: 5),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Text(
-                                            "Real-time password strength",
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: _mutedText,
+                                          const Expanded(
+                                            child: Text(
+                                              "Real-time password strength",
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: _mutedText,
+                                              ),
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
                                           Text(
                                             label,
                                             style: TextStyle(
@@ -598,9 +639,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             TextField(
                               controller: confirmPasswordController,
                               obscureText: !isConfirmPasswordVisible,
-                              maxLength: 64,
+                              maxLength: 128,
                               textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => isLoading ? null : checkDetails(),
+                              onSubmitted: (_) =>
+                                  isLoading ? null : checkDetails(),
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -623,7 +665,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                   ),
                                   onPressed: () {
                                     setState(() {
-                                      isConfirmPasswordVisible = !isConfirmPasswordVisible;
+                                      isConfirmPasswordVisible =
+                                          !isConfirmPasswordVisible;
                                     });
                                   },
                                 ),
@@ -650,7 +693,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => const TermsAndPrivacyPage(),
+                                          builder: (_) =>
+                                              const TermsAndPrivacyPage(),
                                         ),
                                       );
                                     },
@@ -678,7 +722,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 onPressed: isLoading ? null : checkDetails,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _brandGreen,
-                                  disabledBackgroundColor: const Color(0xFFCBD5E1),
+                                  disabledBackgroundColor: const Color(
+                                    0xFFCBD5E1,
+                                  ),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
@@ -702,8 +748,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       const SizedBox(height: 22),
 
                       // Footer Sign In Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 4,
+                        runSpacing: 6,
                         children: [
                           const Text(
                             "Already have an account? ",

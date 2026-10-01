@@ -1,13 +1,9 @@
-import 'dart:async';
-import 'dart:convert';
+import 'package:fin_track/services/retry_safe_writer.dart';
 import 'package:fin_track/get_information/session_manager.dart';
-import 'package:fin_track/providers/friend_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class FeedbackPage extends StatefulWidget {
   const FeedbackPage({super.key});
@@ -30,6 +26,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
   String selectedType = "Suggestion";
   int rating = 0;
   bool isLoading = false;
+  final String _saveIntent = RetrySafeWriter.newIntent();
   DateTime? _lastSubmitTime;
 
   final List<Map<String, dynamic>> _feedbackTypes = const [
@@ -44,28 +41,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
   @override
   void initState() {
     super.initState();
-    _syncPendingFeedback();
-  }
-
-  Future<void> _syncPendingFeedback() async {
-    try {
-      final sp = await SharedPreferences.getInstance();
-      final pending = sp.getStringList('pending_feedback');
-      if (pending != null && pending.isNotEmpty) {
-        final phoneNumber = await SessionManager.getPhoneNumber() ?? "";
-        if (phoneNumber.isNotEmpty) {
-          final ref = FirebaseDatabase.instance.ref("userUpdates/$phoneNumber");
-          for (final item in List<String>.from(pending)) {
-            final data = jsonDecode(item) as Map<String, dynamic>;
-            await ref.push().set({
-              ...data,
-              "synced_at": ServerValue.timestamp,
-            });
-          }
-          await sp.remove('pending_feedback');
-        }
-      }
-    } catch (_) {}
   }
 
   @override
@@ -113,11 +88,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
             const Text(
               "Your feedback helps make FinTrack better for everyone. We appreciate your thoughts!",
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: _textMuted,
-                fontSize: 13.5,
-                height: 1.4,
-              ),
+              style: TextStyle(color: _textMuted, fontSize: 13.5, height: 1.4),
             ),
             const SizedBox(height: 22),
             SizedBox(
@@ -138,10 +109,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 ),
                 child: const Text(
                   "Done",
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -152,6 +120,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
   }
 
   Future<void> submitFeedback() async {
+    if (isLoading) return;
     final message = feedbackController.text.trim();
     if (message.isEmpty) {
       Fluttertoast.showToast(msg: "Please enter your feedback message");
@@ -175,11 +144,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
       return;
     }
 
-    bool isOffline = false;
-    try {
-      isOffline = context.read<FriendProvider>().isOffline;
-    } catch (_) {}
-
     setState(() {
       isLoading = true;
     });
@@ -194,7 +158,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
       }
 
       String phoneNumber = "";
-      if (currentUser.email != null && currentUser.email!.endsWith('@fintrack.app')) {
+      if (currentUser.email != null &&
+          currentUser.email!.endsWith('@fintrack.app')) {
         phoneNumber = currentUser.email!.split('@').first.trim();
       }
       if (phoneNumber.isEmpty) {
@@ -211,10 +176,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
         return;
       }
 
-      final ref = FirebaseDatabase.instance.ref(
-        "userUpdates/$phoneNumber",
-      );
-
       final payload = {
         "rating": rating,
         "type": selectedType,
@@ -223,22 +184,16 @@ class _FeedbackPageState extends State<FeedbackPage> {
         "timestamp": ServerValue.timestamp,
       };
 
-      // 2. Dispatch payload based on connectivity state
-
-      if (isOffline) {
-        // Device is offline: dispatch to Firebase RTDB disk persistence
-        // Firebase RTDB automatically stores this locally and syncs when reconnected
-        ref.push().set(payload);
-        Fluttertoast.showToast(msg: "Feedback saved offline. Will sync when reconnected.");
-      } else {
-        // Device is online: allow generous 15s window for cellular connection/handshake
-        try {
-          await ref.push().set(payload).timeout(const Duration(seconds: 15));
-        } on TimeoutException {
-          // If cellular latency exceeds 15s, Firebase RTDB's disk persistence
-          // has already stored the write locally and will complete sync in background.
-          // Do not treat as an error or show false offline messages.
-        }
+      final success = await RetrySafeWriter.instance.write(
+        phoneNumber,
+        'feedback',
+        [rating, selectedType, message, email],
+        (id) => {'userUpdates/$phoneNumber/$id': payload},
+        intentId: _saveIntent,
+      );
+      if (!success) {
+        Fluttertoast.showToast(msg: RetrySafeWriter.instance.failureMessage);
+        return; // Preserve the form until delivery is acknowledged.
       }
 
       feedbackController.clear();
@@ -252,10 +207,12 @@ class _FeedbackPageState extends State<FeedbackPage> {
         });
         _showThankYouDialog();
       }
-    } on FirebaseException catch (fe) {
-      Fluttertoast.showToast(msg: "Submission failed: ${fe.message ?? fe.code}");
+    } on FirebaseException {
+      Fluttertoast.showToast(msg: "Unable to submit feedback. Please retry.");
     } catch (e) {
-      Fluttertoast.showToast(msg: "Failed to submit feedback. Please try again.");
+      Fluttertoast.showToast(
+        msg: "Failed to submit feedback. Please try again.",
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -281,7 +238,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
           child: Icon(
             isSelected ? Icons.star_rounded : Icons.star_border_rounded,
             size: 38,
-            color: isSelected ? const Color(0xFFFFB300) : const Color(0xFFCBD5E1),
+            color: isSelected
+                ? const Color(0xFFFFB300)
+                : const Color(0xFFCBD5E1),
           ),
         ),
       ),
@@ -361,7 +320,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: const Color(0xFFE8F5E9),
-                        border: Border.all(color: const Color(0xFFC8E6C9), width: 1.5),
+                        border: Border.all(
+                          color: const Color(0xFFC8E6C9),
+                          width: 1.5,
+                        ),
                       ),
                       child: const Center(
                         child: Icon(
@@ -407,7 +369,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
               // 2. Star Rating Card
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(18),
@@ -441,7 +406,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: rating > 0 ? const Color(0xFFD97706) : _textMuted,
+                        color: rating > 0
+                            ? const Color(0xFFD97706)
+                            : _textMuted,
                       ),
                     ),
                   ],
@@ -511,7 +478,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: _primaryGreen, width: 1.8),
+                          borderSide: const BorderSide(
+                            color: _primaryGreen,
+                            width: 1.8,
+                          ),
                         ),
                       ),
                       dropdownColor: Colors.white,
@@ -563,7 +533,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       maxLength: 1000,
                       style: const TextStyle(fontSize: 14.5, color: _textDark),
                       decoration: InputDecoration(
-                        hintText: "Tell us what happened, or share ideas for improvement...",
+                        hintText:
+                            "Tell us what happened, or share ideas for improvement...",
                         hintStyle: const TextStyle(
                           fontSize: 13.5,
                           color: Color(0xFF94A3B8),
@@ -581,7 +552,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: _primaryGreen, width: 1.8),
+                          borderSide: const BorderSide(
+                            color: _primaryGreen,
+                            width: 1.8,
+                          ),
                         ),
                       ),
                     ),
@@ -630,7 +604,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: _primaryGreen, width: 1.8),
+                          borderSide: const BorderSide(
+                            color: _primaryGreen,
+                            width: 1.8,
+                          ),
                         ),
                         counterText: "",
                       ),

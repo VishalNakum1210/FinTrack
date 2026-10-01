@@ -1,3 +1,4 @@
+import 'money.dart';
 import 'package:fin_track/utils/date_helper.dart';
 
 /// Helper to compute running balances across financial transactions.
@@ -14,7 +15,8 @@ class BalanceHelper {
     final List<Map<String, dynamic>> chronological = [];
     for (final r in records) {
       final copy = Map<String, dynamic>.from(r);
-      copy["_parsedDate"] = (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
+      copy["_parsedDate"] =
+          (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
       chronological.add(copy);
     }
 
@@ -34,20 +36,18 @@ class BalanceHelper {
       return tA.compareTo(tB);
     });
 
-    double running = 0.0;
+    int running = 0;
     for (final item in chronological) {
       final method = (item["Payment_Mode"] ?? "").toString();
       final isIncome = ["Add CASH", "Add Online"].contains(method);
       final rawAmt = item["Amount"];
-      final double amt = rawAmt is num
-          ? rawAmt.toDouble()
-          : (double.tryParse(rawAmt?.toString() ?? '0') ?? 0.0);
+      final int amt = Money.paise(rawAmt);
       if (isIncome) {
         running += amt;
       } else {
         running -= amt;
       }
-      item["_runningBalance"] = running;
+      item["_runningBalance"] = running / 100;
     }
 
     return chronological;

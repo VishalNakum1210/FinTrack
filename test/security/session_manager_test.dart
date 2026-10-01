@@ -12,39 +12,87 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('saves and retrieves phone number, username and email', () async {
+    test(
+      'cached metadata never grants an authenticated phone or session',
+      () async {
+        await SessionManager.saveSession(
+          phoneNumber: '9876543210',
+          username: 'Vishal',
+          email: 'vishal@test.com',
+        );
+
+        final phone = await SessionManager.getPhoneNumber();
+        final username = await SessionManager.getUsername();
+        final email = await SessionManager.getEmail();
+
+        expect(phone, isNull);
+        expect(await SessionManager.isSessionValid(), isFalse);
+        expect(username, equals('Vishal'));
+        expect(email, equals('vishal@test.com'));
+      },
+    );
+
+    test(
+      'forged legacy plaintext session cannot authorize cloud access',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'phone_number': '9876543210',
+          'username': 'Forged',
+          'session_signature': 'anything',
+          'session_last_active': DateTime.now().millisecondsSinceEpoch,
+        });
+        expect(await SessionManager.getPhoneNumber(), isNull);
+        expect(await SessionManager.isSessionValid(), isFalse);
+        expect(await SessionManager.getUsername(), isNull);
+      },
+    );
+
+    test('saving metadata removes obsolete plaintext identity', () async {
+      SharedPreferences.setMockInitialValues({
+        'phone_number': '9876543210',
+        'email': 'private@example.com',
+        'session_signature': 'legacy',
+      });
       await SessionManager.saveSession(
         phoneNumber: '9876543210',
-        username: 'Vishal',
-        email: 'vishal@test.com',
+        username: 'Private',
+        email: 'private@example.com',
       );
-
-      final phone = await SessionManager.getPhoneNumber();
-      final username = await SessionManager.getUsername();
-      final email = await SessionManager.getEmail();
-
-      expect(phone, equals('9876543210'));
-      expect(username, equals('Vishal'));
-      expect(email, equals('vishal@test.com'));
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.containsKey('phone_number'), isFalse);
+      expect(preferences.containsKey('email'), isFalse);
+      expect(preferences.containsKey('session_signature'), isFalse);
     });
 
-    test('preserves existing valid username when subsequent save passes "User"', () async {
-      await SessionManager.saveSession(
-        phoneNumber: '9876543210',
-        username: 'Vishal',
-        email: 'vishal@test.com',
-      );
-
-      // Subsequent call where username defaults to "User"
-      await SessionManager.saveSession(
-        phoneNumber: '9876543210',
-        username: 'User',
-        email: 'vishal@test.com',
-      );
-
-      final username = await SessionManager.getUsername();
-      expect(username, equals('Vishal'));
+    test('corrupt secure metadata fails closed', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'session_profile_v2': '{invalid',
+      });
+      expect(await SessionManager.isSessionValid(), isFalse);
+      expect(await SessionManager.getPhoneNumber(), isNull);
+      expect(await SessionManager.getEmail(), isNull);
     });
+
+    test(
+      'preserves existing valid username when subsequent save passes "User"',
+      () async {
+        await SessionManager.saveSession(
+          phoneNumber: '9876543210',
+          username: 'Vishal',
+          email: 'vishal@test.com',
+        );
+
+        // Subsequent call where username defaults to "User"
+        await SessionManager.saveSession(
+          phoneNumber: '9876543210',
+          username: 'User',
+          email: 'vishal@test.com',
+        );
+
+        final username = await SessionManager.getUsername();
+        expect(username, equals('Vishal'));
+      },
+    );
 
     test('clears session on clearSession()', () async {
       await SessionManager.saveSession(

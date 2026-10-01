@@ -1,3 +1,5 @@
+import 'package:fin_track/utils/money.dart';
+import 'package:fin_track/services/retry_safe_writer.dart';
 import 'package:fin_track/friends_pages/split_bill_page.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/expense_provider.dart';
@@ -7,7 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AddSpent extends StatefulWidget {
   const AddSpent({super.key});
@@ -18,6 +22,8 @@ class AddSpent extends StatefulWidget {
 
 class _AddSpentState extends State<AddSpent> {
   bool isLoading = false;
+  String _saveIntent = RetrySafeWriter.newIntent();
+  final String? _draftOwnerUid = SessionManager.authenticatedUid;
 
   final TextEditingController amountController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
@@ -58,47 +64,112 @@ class _AddSpentState extends State<AddSpent> {
   }
 
   void _addToAmount(double delta) {
-    final current = double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
+    final current =
+        (Money.tryPaise(amountController.text.replaceAll(',', '').trim()) ==
+                null
+            ? null
+            : Money.rupees(amountController.text.replaceAll(',', '').trim())) ??
+        0.0;
     final newVal = current + delta;
-    final str = newVal.truncateToDouble() == newVal ? newVal.toInt().toString() : newVal.toStringAsFixed(2);
+    final str = newVal.truncateToDouble() == newVal
+        ? newVal.toInt().toString()
+        : newVal.toStringAsFixed(2);
     amountController.text = str;
-    amountController.selection = TextSelection.fromPosition(TextPosition(offset: str.length));
+    amountController.selection = TextSelection.fromPosition(
+      TextPosition(offset: str.length),
+    );
   }
 
   void _clearAmount() {
     amountController.clear();
   }
 
-  void _saveDraft() async {
-    try {
-      final sp = await SharedPreferences.getInstance();
-      await sp.setString('draft_add_spent_amount', amountController.text);
-      await sp.setString('draft_add_spent_desc', descriptionController.text);
-    } catch (_) {}
+  static const _draftStorage = FlutterSecureStorage();
+  Timer? _draftTimer;
+  Future<void> _draftWrite = Future.value();
+  String get _draftKey => 'expense_draft_${SessionManager.authenticatedPhone}';
+
+  String _draftValue() => jsonEncode({
+    'owner_uid': _draftOwnerUid,
+    'amount': amountController.text,
+    'description': descriptionController.text,
+    'intent': _saveIntent,
+    'mode': selectedMode,
+    'category': selectedCategory,
+    'date': selectedDate.toIso8601String(),
+    'split': isSplitWithFriend,
+    'friend': selectedFriendNumber,
+    'friendName': selectedFriendName,
+  });
+
+  void _saveDraft() {
+    _draftTimer?.cancel();
+    if (SessionManager.authenticatedPhone == null ||
+        SessionManager.authenticatedUid != _draftOwnerUid) {
+      return;
+    }
+    final key = _draftKey;
+    _draftTimer = Timer(const Duration(milliseconds: 300), () {
+      if (SessionManager.authenticatedUid != _draftOwnerUid) return;
+      final value = _draftValue();
+      _draftWrite = _draftWrite
+          .then((_) => _draftStorage.write(key: key, value: value))
+          .catchError((_) {});
+    });
   }
 
   Future<void> _restoreDraft() async {
+    if (SessionManager.authenticatedPhone == null) return;
     try {
-      final sp = await SharedPreferences.getInstance();
-      final draftAmount = sp.getString('draft_add_spent_amount');
-      final draftDesc = sp.getString('draft_add_spent_desc');
-      if (mounted) {
-        if (draftAmount != null && draftAmount.isNotEmpty && amountController.text.isEmpty) {
-          amountController.text = draftAmount;
-        }
-        if (draftDesc != null && draftDesc.isNotEmpty && descriptionController.text.isEmpty) {
-          descriptionController.text = draftDesc;
-        }
+      final encoded = await _draftStorage.read(key: _draftKey);
+      if (encoded == null || !mounted) return;
+      final draft = jsonDecode(encoded) as Map<String, dynamic>;
+      if (draft['owner_uid'] != _draftOwnerUid ||
+          SessionManager.authenticatedUid != _draftOwnerUid) {
+        return;
+      }
+      if (draft['intent'] is String &&
+          await RetrySafeWriter.instance.isAcknowledged(
+            SessionManager.authenticatedPhone!,
+            draft['split'] == true ? 'full-split' : 'expense',
+            draft['intent'] as String,
+          )) {
+        await _clearDraft();
+        return; // Do not restore an acknowledged transaction as a new draft.
+      }
+      if (!mounted) return;
+      _saveIntent = draft['intent']?.toString() ?? _saveIntent;
+      if (paymentModes.contains(draft['mode'])) {
+        selectedMode = draft['mode'] as String;
+      }
+      if (categories.contains(draft['category'])) {
+        selectedCategory = draft['category'] as String;
+      }
+      selectedDate =
+          DateTime.tryParse(draft['date']?.toString() ?? '') ?? selectedDate;
+      isSplitWithFriend = draft['split'] == true;
+      selectedFriendNumber = draft['friend']?.toString();
+      selectedFriendName = draft['friendName']?.toString();
+      if (amountController.text.isEmpty) {
+        amountController.text = draft['amount']?.toString() ?? '';
+      }
+      if (descriptionController.text.isEmpty) {
+        descriptionController.text = draft['description']?.toString() ?? '';
       }
     } catch (_) {}
   }
 
   Future<void> _clearDraft() async {
+    _draftTimer?.cancel();
     try {
-      final sp = await SharedPreferences.getInstance();
-      await sp.remove('draft_add_spent_amount');
-      await sp.remove('draft_add_spent_desc');
-    } catch (_) {}
+      await _draftWrite.timeout(const Duration(seconds: 3));
+      await _draftStorage
+          .delete(key: _draftKey)
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // The server already acknowledged the save. Do not show false failure;
+      // the retained intent makes restoring this stale draft non-duplicating.
+    }
   }
 
   @override
@@ -125,6 +196,7 @@ class _AddSpentState extends State<AddSpent> {
 
   @override
   void dispose() {
+    _draftTimer?.cancel();
     amountController.removeListener(_onAmountChanged);
     descriptionController.removeListener(_saveDraft);
     amountController.dispose();
@@ -149,6 +221,7 @@ class _AddSpentState extends State<AddSpent> {
   }
 
   Future<void> getAllDetails() async {
+    if (isLoading) return;
     String rawAmount = amountController.text.trim();
     String description = descriptionController.text.trim();
 
@@ -157,7 +230,10 @@ class _AddSpentState extends State<AddSpent> {
       return;
     }
 
-    final totalAmount = double.tryParse(rawAmount.replaceAll(',', '').trim());
+    final totalAmount =
+        (Money.tryPaise(rawAmount.replaceAll(',', '').trim()) == null
+        ? null
+        : Money.rupees(rawAmount.replaceAll(',', '').trim()));
     if (totalAmount == null || totalAmount <= 0) {
       Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
@@ -165,7 +241,9 @@ class _AddSpentState extends State<AddSpent> {
 
     final isSpending = selectedMode.startsWith("Spent");
     if (isSplitWithFriend && isSpending && selectedFriendNumber == null) {
-      Fluttertoast.showToast(msg: "Please select a friend to split the bill with");
+      Fluttertoast.showToast(
+        msg: "Please select a friend to split the bill with",
+      );
       return;
     }
 
@@ -174,6 +252,17 @@ class _AddSpentState extends State<AddSpent> {
     });
 
     try {
+      if (SessionManager.authenticatedUid != _draftOwnerUid) {
+        Fluttertoast.showToast(
+          msg: 'Account changed. Reopen this form before saving.',
+        );
+        return;
+      }
+      _draftTimer?.cancel();
+      await _draftWrite.timeout(const Duration(seconds: 3));
+      await _draftStorage
+          .write(key: _draftKey, value: _draftValue())
+          .timeout(const Duration(seconds: 3));
       final phone = await SessionManager.getPhoneNumber() ?? "";
       if (phone.isEmpty) {
         Fluttertoast.showToast(msg: "User session not found");
@@ -187,15 +276,23 @@ class _AddSpentState extends State<AddSpent> {
       final friendProvider = context.read<FriendProvider>();
 
       if (isSplitWithFriend && isSpending && selectedFriendNumber != null) {
-        final friendShare = (totalAmount * 0.5 * 100).round() / 100;
-        final myShare = ((totalAmount - friendShare) * 100).round() / 100;
+        final friendShare = (Money.paise(totalAmount) ~/ 2) / 100;
+        final myShare =
+            (Money.paise(totalAmount) - Money.paise(friendShare)) / 100;
 
-        final myShareStr = myShare.truncateToDouble() == myShare ? myShare.toInt().toString() : myShare.toStringAsFixed(2);
-        final friendShareStr = friendShare.truncateToDouble() == friendShare ? friendShare.toInt().toString() : friendShare.toStringAsFixed(2);
-        final totalAmountStr = totalAmount.truncateToDouble() == totalAmount ? totalAmount.toInt().toString() : totalAmount.toStringAsFixed(2);
+        final myShareStr = myShare.truncateToDouble() == myShare
+            ? myShare.toInt().toString()
+            : myShare.toStringAsFixed(2);
+        final friendShareStr = friendShare.truncateToDouble() == friendShare
+            ? friendShare.toInt().toString()
+            : friendShare.toStringAsFixed(2);
+        final totalAmountStr = totalAmount.truncateToDouble() == totalAmount
+            ? totalAmount.toInt().toString()
+            : totalAmount.toStringAsFixed(2);
 
         // Single atomic multi-path update for Passbook + Friend Ledger
         final splitSuccess = await friendProvider.atomicSplitBill(
+          intentId: _saveIntent,
           userPhone: phone,
           friendNumber: selectedFriendNumber!,
           myShareAmount: myShareStr,
@@ -209,14 +306,18 @@ class _AddSpentState extends State<AddSpent> {
 
         if (splitSuccess) {
           await _clearDraft();
-          await expenseProvider.fetchExpenses(phone);
+          // The existing realtime subscription refreshes the expense ledger.
           Fluttertoast.showToast(
-            msg: "Saved! ₹$myShareStr in Passbook & ₹$friendShareStr added to $selectedFriendName's ledger",
+            msg:
+                "Saved! ₹$myShareStr in Passbook & ₹$friendShareStr added to $selectedFriendName's ledger",
           );
           if (!mounted) return;
           Navigator.pop(context, true);
         } else {
-          Fluttertoast.showToast(msg: "Failed to save split transaction");
+          Fluttertoast.showToast(
+            msg: friendProvider.lastError ??
+                RetrySafeWriter.instance.failureMessage,
+          );
         }
       } else {
         final rawAmountFormatted = totalAmount.truncateToDouble() == totalAmount
@@ -225,6 +326,7 @@ class _AddSpentState extends State<AddSpent> {
 
         // Standard single transaction
         final success = await expenseProvider.addExpense(
+          intentId: _saveIntent,
           phoneNumber: phone,
           amount: rawAmountFormatted,
           description: description,
@@ -239,7 +341,10 @@ class _AddSpentState extends State<AddSpent> {
           if (!mounted) return;
           Navigator.pop(context, true);
         } else {
-          Fluttertoast.showToast(msg: "Failed to save transaction");
+          Fluttertoast.showToast(
+            msg: expenseProvider.lastError ??
+                RetrySafeWriter.instance.failureMessage,
+          );
         }
       }
     } catch (e) {
@@ -259,19 +364,35 @@ class _AddSpentState extends State<AddSpent> {
     final friendProvider = context.watch<FriendProvider>();
     final friends = friendProvider.friends;
     final isSpending = selectedMode.startsWith("Spent");
-    final currentAmount = double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
-    final mySharePreview = ((currentAmount * 0.5) * 100).round() / 100;
-    final friendSharePreview = ((currentAmount - mySharePreview) * 100).round() / 100;
+    final currentAmount =
+        (Money.tryPaise(amountController.text.replaceAll(',', '').trim()) ==
+                null
+            ? null
+            : Money.rupees(amountController.text.replaceAll(',', '').trim())) ??
+        0.0;
+    final friendSharePreview = (Money.paise(currentAmount) ~/ 2) / 100;
+    final mySharePreview =
+        (Money.paise(currentAmount) - Money.paise(friendSharePreview)) / 100;
 
-    final mySharePreviewStr = mySharePreview.truncateToDouble() == mySharePreview ? mySharePreview.toInt().toString() : mySharePreview.toStringAsFixed(2);
-    final friendSharePreviewStr = friendSharePreview.truncateToDouble() == friendSharePreview ? friendSharePreview.toInt().toString() : friendSharePreview.toStringAsFixed(2);
+    final mySharePreviewStr =
+        mySharePreview.truncateToDouble() == mySharePreview
+        ? mySharePreview.toInt().toString()
+        : mySharePreview.toStringAsFixed(2);
+    final friendSharePreviewStr =
+        friendSharePreview.truncateToDouble() == friendSharePreview
+        ? friendSharePreview.toInt().toString()
+        : friendSharePreview.toStringAsFixed(2);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
           "Add Transaction",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: primary,
@@ -287,7 +408,10 @@ class _AddSpentState extends State<AddSpent> {
                 children: [
                   // 1. Hero Amount Card with Quick Add Chips
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 18,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(22),
@@ -344,7 +468,10 @@ class _AddSpentState extends State<AddSpent> {
                             Expanded(
                               child: TextField(
                                 controller: amountController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 maxLength: 10,
                                 style: const TextStyle(
                                   fontSize: 34,
@@ -354,7 +481,9 @@ class _AddSpentState extends State<AddSpent> {
                                 ),
                                 decoration: const InputDecoration(
                                   hintText: "0.00",
-                                  hintStyle: TextStyle(color: Color(0xFFCBD5E1)),
+                                  hintStyle: TextStyle(
+                                    color: Color(0xFFCBD5E1),
+                                  ),
                                   border: InputBorder.none,
                                   counterText: "",
                                   isDense: true,
@@ -412,9 +541,14 @@ class _AddSpentState extends State<AddSpent> {
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: CategoryTheme.getBgColor(selectedCategory),
+                                color: CategoryTheme.getBgColor(
+                                  selectedCategory,
+                                ),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Row(
@@ -423,7 +557,9 @@ class _AddSpentState extends State<AddSpent> {
                                   Icon(
                                     CategoryTheme.getIcon(selectedCategory),
                                     size: 14,
-                                    color: CategoryTheme.getColor(selectedCategory),
+                                    color: CategoryTheme.getColor(
+                                      selectedCategory,
+                                    ),
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
@@ -431,7 +567,9 @@ class _AddSpentState extends State<AddSpent> {
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.bold,
-                                      color: CategoryTheme.getColor(selectedCategory),
+                                      color: CategoryTheme.getColor(
+                                        selectedCategory,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -454,21 +592,30 @@ class _AddSpentState extends State<AddSpent> {
                                 setState(() {
                                   selectedCategory = cat;
                                   // Auto adjust payment mode if category is Add Money
-                                  if (cat == "Add Money" && selectedMode.startsWith("Spent")) {
+                                  if (cat == "Add Money" &&
+                                      selectedMode.startsWith("Spent")) {
                                     selectedMode = "Add CASH";
-                                  } else if (cat != "Add Money" && selectedMode.startsWith("Add")) {
+                                  } else if (cat != "Add Money" &&
+                                      selectedMode.startsWith("Add")) {
                                     selectedMode = "Spent Online";
                                   }
                                 });
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? catBg : const Color(0xFFF8FAFC),
+                                  color: isSelected
+                                      ? catBg
+                                      : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: isSelected ? catColor : const Color(0xFFE2E8F0),
+                                    color: isSelected
+                                        ? catColor
+                                        : const Color(0xFFE2E8F0),
                                     width: isSelected ? 1.8 : 1,
                                   ),
                                 ),
@@ -478,15 +625,21 @@ class _AddSpentState extends State<AddSpent> {
                                     Icon(
                                       CategoryTheme.getIcon(cat),
                                       size: 16,
-                                      color: isSelected ? catColor : const Color(0xFF64748B),
+                                      color: isSelected
+                                          ? catColor
+                                          : const Color(0xFF64748B),
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
                                       cat,
                                       style: TextStyle(
                                         fontSize: 12.5,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                        color: isSelected ? catColor : const Color(0xFF334155),
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        color: isSelected
+                                            ? catColor
+                                            : const Color(0xFF334155),
                                       ),
                                     ),
                                   ],
@@ -529,17 +682,37 @@ class _AddSpentState extends State<AddSpent> {
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            _paymentModePill("Spent Online", "Online Spent", Icons.credit_card_rounded, primary),
+                            _paymentModePill(
+                              "Spent Online",
+                              "Online Spent",
+                              Icons.credit_card_rounded,
+                              primary,
+                            ),
                             const SizedBox(width: 8),
-                            _paymentModePill("Spent Cash", "Cash Spent", Icons.payments_rounded, const Color(0xFFFFA000)),
+                            _paymentModePill(
+                              "Spent Cash",
+                              "Cash Spent",
+                              Icons.payments_rounded,
+                              const Color(0xFFFFA000),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _paymentModePill("Add Online", "Add Online", Icons.account_balance_rounded, const Color(0xFF2196F3)),
+                            _paymentModePill(
+                              "Add Online",
+                              "Add Online",
+                              Icons.account_balance_rounded,
+                              const Color(0xFF2196F3),
+                            ),
                             const SizedBox(width: 8),
-                            _paymentModePill("Add CASH", "Add Cash", Icons.savings_rounded, const Color(0xFF43A047)),
+                            _paymentModePill(
+                              "Add CASH",
+                              "Add Cash",
+                              Icons.savings_rounded,
+                              const Color(0xFF43A047),
+                            ),
                           ],
                         ),
                       ],
@@ -569,18 +742,29 @@ class _AddSpentState extends State<AddSpent> {
                           onTap: pickDate,
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.calendar_month_rounded, color: primary, size: 20),
+                                const Icon(
+                                  Icons.calendar_month_rounded,
+                                  color: primary,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 10),
                                 Text(
-                                  DateFormat('dd MMMM yyyy').format(selectedDate),
+                                  DateFormat(
+                                    'dd MMMM yyyy',
+                                  ).format(selectedDate),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -605,21 +789,40 @@ class _AddSpentState extends State<AddSpent> {
                         TextField(
                           controller: descriptionController,
                           maxLength: 150,
-                          style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF1E293B),
+                          ),
                           decoration: InputDecoration(
-                            hintText: "Add note / description (e.g. Grocery, Lunch)",
-                            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                            prefixIcon: const Icon(Icons.edit_note_rounded, color: primary, size: 22),
+                            hintText:
+                                "Add note / description (e.g. Grocery, Lunch)",
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 13.5,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.edit_note_rounded,
+                              color: primary,
+                              size: 22,
+                            ),
                             filled: true,
                             fillColor: const Color(0xFFF8FAFC),
                             counterText: "",
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
                             enabledBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: primary, width: 1.8),
+                              borderSide: const BorderSide(
+                                color: primary,
+                                width: 1.8,
+                              ),
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
@@ -634,10 +837,14 @@ class _AddSpentState extends State<AddSpent> {
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: isSplitWithFriend ? const Color(0xFFF7FEE7) : Colors.white,
+                        color: isSplitWithFriend
+                            ? const Color(0xFFF7FEE7)
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(22),
                         border: Border.all(
-                          color: isSplitWithFriend ? primary : const Color(0xFFE2E8F0),
+                          color: isSplitWithFriend
+                              ? primary
+                              : const Color(0xFFE2E8F0),
                           width: isSplitWithFriend ? 1.5 : 1,
                         ),
                         boxShadow: [
@@ -660,19 +867,24 @@ class _AddSpentState extends State<AddSpent> {
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: isSplitWithFriend ? primary.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
+                                        color: isSplitWithFriend
+                                            ? primary.withValues(alpha: 0.15)
+                                            : const Color(0xFFF1F5F9),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
                                         Icons.group_rounded,
                                         size: 20,
-                                        color: isSplitWithFriend ? primary : const Color(0xFF64748B),
+                                        color: isSplitWithFriend
+                                            ? primary
+                                            : const Color(0xFF64748B),
                                       ),
                                     ),
                                     const SizedBox(width: 10),
                                     const Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             "Split Bill with Friend",
@@ -688,7 +900,10 @@ class _AddSpentState extends State<AddSpent> {
                                             "Split 50/50 instantly",
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              color: Color(0xFF64748B),
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -704,9 +919,13 @@ class _AddSpentState extends State<AddSpent> {
                                 onChanged: (val) {
                                   setState(() {
                                     isSplitWithFriend = val;
-                                    if (val && friends.isNotEmpty && selectedFriendNumber == null) {
-                                      selectedFriendNumber = friends.first["friend_number"];
-                                      selectedFriendName = friends.first["friend_name"];
+                                    if (val &&
+                                        friends.isNotEmpty &&
+                                        selectedFriendNumber == null) {
+                                      selectedFriendNumber =
+                                          friends.first["friend_number"];
+                                      selectedFriendName =
+                                          friends.first["friend_name"];
                                     }
                                   });
                                 },
@@ -722,34 +941,56 @@ class _AddSpentState extends State<AddSpent> {
                             if (friends.isEmpty)
                               const Text(
                                 "No friends found. Add friends in the Friends tab to split bills.",
-                                style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
+                                style: TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 12.5,
+                                ),
                               )
                             else ...[
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  border: Border.all(
+                                    color: const Color(0xFFCBD5E1),
+                                  ),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     isExpanded: true,
-                                    value: selectedFriendNumber ?? friends.first["friend_number"],
-                                    icon: const Icon(Icons.arrow_drop_down_rounded, color: primary),
+                                    value:
+                                        selectedFriendNumber ??
+                                        friends.first["friend_number"],
+                                    icon: const Icon(
+                                      Icons.arrow_drop_down_rounded,
+                                      color: primary,
+                                    ),
                                     items: friends.map((f) {
-                                      final name = (f["friend_name"] ?? "Friend").toString();
-                                      final number = (f["friend_number"] ?? "").toString();
+                                      final name =
+                                          (f["friend_name"] ?? "Friend")
+                                              .toString();
+                                      final number = (f["friend_number"] ?? "")
+                                          .toString();
                                       return DropdownMenuItem<String>(
                                         value: number,
                                         child: Row(
                                           children: [
                                             CircleAvatar(
                                               radius: 12,
-                                              backgroundColor: primary.withValues(alpha: 0.2),
+                                              backgroundColor: primary
+                                                  .withValues(alpha: 0.2),
                                               child: Text(
-                                                name.isNotEmpty ? name[0].toUpperCase() : 'F',
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primary),
+                                                name.isNotEmpty
+                                                    ? name[0].toUpperCase()
+                                                    : 'F',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: primary,
+                                                ),
                                               ),
                                             ),
                                             const SizedBox(width: 8),
@@ -758,7 +999,10 @@ class _AddSpentState extends State<AddSpent> {
                                                 "$name ($number)",
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                                                style: const TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
                                             ),
                                           ],
@@ -769,11 +1013,14 @@ class _AddSpentState extends State<AddSpent> {
                                       if (val != null) {
                                         final matched = friends.firstWhere(
                                           (f) => f["friend_number"] == val,
-                                          orElse: () => {"friend_name": "Friend"},
+                                          orElse: () => {
+                                            "friend_name": "Friend",
+                                          },
                                         );
                                         setState(() {
                                           selectedFriendNumber = val;
-                                          selectedFriendName = matched["friend_name"];
+                                          selectedFriendName =
+                                              matched["friend_name"];
                                         });
                                       }
                                     },
@@ -784,14 +1031,20 @@ class _AddSpentState extends State<AddSpent> {
                               if (currentAmount > 0) ...[
                                 const SizedBox(height: 12),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: primary.withValues(alpha: 0.3)),
+                                    border: Border.all(
+                                      color: primary.withValues(alpha: 0.3),
+                                    ),
                                   ),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: FittedBox(
@@ -833,13 +1086,20 @@ class _AddSpentState extends State<AddSpent> {
                                   onPressed: () async {
                                     final res = await Navigator.push(
                                       context,
-                                      MaterialPageRoute(builder: (context) => const SplitBillPage()),
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const SplitBillPage(),
+                                      ),
                                     );
                                     if (res == true && context.mounted) {
                                       Navigator.pop(context, true);
                                     }
                                   },
-                                  icon: const Icon(Icons.group_work_rounded, size: 16, color: primary),
+                                  icon: const Icon(
+                                    Icons.group_work_rounded,
+                                    size: 16,
+                                    color: primary,
+                                  ),
                                   label: const Text(
                                     "Split with 2+ friends? Open Group Splitter ➔",
                                     style: TextStyle(
@@ -873,7 +1133,9 @@ class _AddSpentState extends State<AddSpent> {
                         ),
                       ),
                       child: Text(
-                        isSplitWithFriend ? "Save & Split Bill" : "Save Transaction",
+                        isSplitWithFriend
+                            ? "Save & Split Bill"
+                            : "Save Transaction",
                         style: const TextStyle(
                           fontSize: 16.5,
                           fontWeight: FontWeight.bold,
@@ -927,7 +1189,12 @@ class _AddSpentState extends State<AddSpent> {
     );
   }
 
-  Widget _paymentModePill(String modeKey, String label, IconData icon, Color color) {
+  Widget _paymentModePill(
+    String modeKey,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
     final isSelected = selectedMode == modeKey;
     return Expanded(
       child: InkWell(
@@ -945,7 +1212,9 @@ class _AddSpentState extends State<AddSpent> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.12) : const Color(0xFFF8FAFC),
+            color: isSelected
+                ? color.withValues(alpha: 0.12)
+                : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isSelected ? color : const Color(0xFFE2E8F0),
@@ -955,7 +1224,11 @@ class _AddSpentState extends State<AddSpent> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: isSelected ? color : const Color(0xFF64748B)),
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? color : const Color(0xFF64748B),
+              ),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(

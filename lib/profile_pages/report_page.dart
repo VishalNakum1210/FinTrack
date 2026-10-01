@@ -1,3 +1,4 @@
+import 'package:fin_track/utils/money.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
@@ -41,7 +42,8 @@ class _ReportPageState extends State<Reportpage> {
         return date.year == now.year && date.month == now.month;
       case ReportPeriod.lastMonth:
         final lastMonthDate = DateTime(now.year, now.month - 1);
-        return date.year == lastMonthDate.year && date.month == lastMonthDate.month;
+        return date.year == lastMonthDate.year &&
+            date.month == lastMonthDate.month;
       case ReportPeriod.thisYear:
         return date.year == now.year;
       case ReportPeriod.allTime:
@@ -140,10 +142,30 @@ class _ReportPageState extends State<Reportpage> {
                 ),
               ),
               const SizedBox(height: 14),
-              _scoreGuideItem("80% – 100%", "Excellent", "High savings discipline & low burn rate", const Color(0xFF2E7D32)),
-              _scoreGuideItem("60% – 79%", "Good", "Healthy savings buffer maintained", _primaryGreen),
-              _scoreGuideItem("40% – 59%", "Average", "Moderate savings, review major expenses", Colors.orange),
-              _scoreGuideItem("< 40%", "Needs Work", "Expenses close to or exceeding income", const Color(0xFFC62828)),
+              _scoreGuideItem(
+                "80% – 100%",
+                "Excellent",
+                "High savings discipline & low burn rate",
+                const Color(0xFF2E7D32),
+              ),
+              _scoreGuideItem(
+                "60% – 79%",
+                "Good",
+                "Healthy savings buffer maintained",
+                _primaryGreen,
+              ),
+              _scoreGuideItem(
+                "40% – 59%",
+                "Average",
+                "Moderate savings, review major expenses",
+                Colors.orange,
+              ),
+              _scoreGuideItem(
+                "< 40%",
+                "Needs Work",
+                "Expenses close to or exceeding income",
+                const Color(0xFFC62828),
+              ),
               const SizedBox(height: 16),
             ],
           ),
@@ -167,7 +189,11 @@ class _ReportPageState extends State<Reportpage> {
             ),
             child: Text(
               range,
-              style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
               textAlign: TextAlign.center,
             ),
           ),
@@ -186,15 +212,15 @@ class _ReportPageState extends State<Reportpage> {
   Future<void> exportReportToPdf({
     required BuildContext context,
     required List<Map<String, dynamic>> records,
-    required int income,
-    required int expense,
-    required int balance,
-    required int addCash,
-    required int spentCash,
-    required int addOnline,
-    required int spentOnline,
-    required int friendGet,
-    required int friendGive,
+    required double income,
+    required double expense,
+    required double balance,
+    required double addCash,
+    required double spentCash,
+    required double addOnline,
+    required double spentOnline,
+    required double friendGet,
+    required double friendGive,
     required Map<String, double> categoryTotals,
   }) async {
     final userProvider = context.read<UserProvider>();
@@ -243,41 +269,51 @@ class _ReportPageState extends State<Reportpage> {
 
         // 1. Filter Records based on Period
         final filteredRecords = allRecords.where((r) {
-          final d = (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
+          final d =
+              (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
           return _matchesPeriod(d, selectedPeriod);
         }).toList();
 
         // 2. Compute Filtered Metrics
-        double periodIncome = 0;
-        double periodExpense = 0;
-        int periodCashSpent = 0;
-        int periodOnlineSpent = 0;
-        int periodCashAdded = 0;
-        int periodOnlineAdded = 0;
+        double periodIncome = 0.0;
+        double periodExpense = 0.0;
+        double periodCashSpent = 0.0;
+        double periodOnlineSpent = 0.0;
+        double periodCashAdded = 0.0;
+        double periodOnlineAdded = 0.0;
         final Map<String, double> periodCategoryTotals = {};
 
         for (var r in filteredRecords) {
           final mode = (r["Payment_Mode"] ?? "").toString();
           final category = (r["Category"] ?? "Other").toString();
-          final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
+          final amt = Money.rupees(r["Amount"]);
 
           if (mode == "Add CASH") {
-            periodIncome += amt;
-            periodCashAdded += amt.round();
+            periodIncome = Money.sum([periodIncome, amt]);
+            periodCashAdded = Money.sum([periodCashAdded, amt]);
           } else if (mode == "Add Online") {
-            periodIncome += amt;
-            periodOnlineAdded += amt.round();
+            periodIncome = Money.sum([periodIncome, amt]);
+            periodOnlineAdded = Money.sum([periodOnlineAdded, amt]);
           } else if (mode == "Spent Cash") {
-            periodExpense += amt;
-            periodCashSpent += amt.round();
-            periodCategoryTotals[category] = (periodCategoryTotals[category] ?? 0) + amt;
+            periodExpense = Money.sum([periodExpense, amt]);
+            periodCashSpent = Money.sum([periodCashSpent, amt]);
+            periodCategoryTotals[category] = Money.sum([
+              periodCategoryTotals[category] ?? 0,
+              amt,
+            ]);
           } else if (mode == "Spent Online") {
-            periodExpense += amt;
-            periodOnlineSpent += amt.round();
-            periodCategoryTotals[category] = (periodCategoryTotals[category] ?? 0) + amt;
+            periodExpense = Money.sum([periodExpense, amt]);
+            periodOnlineSpent = Money.sum([periodOnlineSpent, amt]);
+            periodCategoryTotals[category] = Money.sum([
+              periodCategoryTotals[category] ?? 0,
+              amt,
+            ]);
           } else {
-            periodExpense += amt;
-            periodCategoryTotals[category] = (periodCategoryTotals[category] ?? 0) + amt;
+            periodExpense = Money.sum([periodExpense, amt]);
+            periodCategoryTotals[category] = Money.sum([
+              periodCategoryTotals[category] ?? 0,
+              amt,
+            ]);
           }
         }
 
@@ -286,13 +322,13 @@ class _ReportPageState extends State<Reportpage> {
         final healthText = getHealthText(healthScore);
         final double savingsRate = periodIncome > 0
             ? (((periodIncome - periodExpense) / periodIncome) * 100)
-                .clamp(0.0, 100.0)
-                .toDouble()
+                  .clamp(0.0, 100.0)
+                  .toDouble()
             : 0.0;
 
         // Friend Ledger Filtered Calculation
-        double periodFriendGiven = 0;
-        double periodFriendTaken = 0;
+        double periodFriendGiven = 0.0;
+        double periodFriendTaken = 0.0;
         bool hasFriendRecords = false;
 
         for (final f in friendProvider.friends) {
@@ -303,12 +339,12 @@ class _ReportPageState extends State<Reportpage> {
               if (rv is Map) {
                 final d = DateHelper.parse(rv["Date"]);
                 if (_matchesPeriod(d, selectedPeriod)) {
-                  final amt = double.tryParse(rv["Amount"]?.toString() ?? '0') ?? 0.0;
+                  final amt = Money.rupees(rv["Amount"]);
                   final type = rv["Type"]?.toString() ?? "";
                   if (type == "Take Money From Friend") {
-                    periodFriendTaken += amt;
+                    periodFriendTaken = Money.sum([periodFriendTaken, amt]);
                   } else {
-                    periodFriendGiven += amt;
+                    periodFriendGiven = Money.sum([periodFriendGiven, amt]);
                   }
                 }
               }
@@ -316,10 +352,12 @@ class _ReportPageState extends State<Reportpage> {
           }
         }
 
-        final friendGiven = (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
+        final friendGiven =
+            (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
             ? periodFriendGiven
             : friendProvider.totalGet.toDouble();
-        final friendTaken = (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
+        final friendTaken =
+            (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
             ? periodFriendTaken
             : friendProvider.totalGive.toDouble();
 
@@ -327,15 +365,15 @@ class _ReportPageState extends State<Reportpage> {
           exportReportToPdf(
             context: context,
             records: filteredRecords,
-            income: periodIncome.toInt(),
-            expense: periodExpense.toInt(),
-            balance: periodBalance.toInt(),
+            income: periodIncome,
+            expense: periodExpense,
+            balance: periodBalance,
             addCash: periodCashAdded,
             spentCash: periodCashSpent,
             addOnline: periodOnlineAdded,
             spentOnline: periodOnlineSpent,
-            friendGet: friendGiven.toInt(),
-            friendGive: friendTaken.toInt(),
+            friendGet: friendGiven,
+            friendGive: friendTaken,
             categoryTotals: periodCategoryTotals,
           );
         }
@@ -407,7 +445,10 @@ class _ReportPageState extends State<Reportpage> {
                 _buildCashFlowCard(periodIncome, periodExpense, savingsRate),
 
                 // 4. Spending by Category Card
-                _buildSpendingByCategoryCard(periodCategoryTotals, periodExpense),
+                _buildSpendingByCategoryCard(
+                  periodCategoryTotals,
+                  periodExpense,
+                ),
 
                 // 5. Payment Mode Split Card
                 _buildPaymentModeSplitCard(periodCashSpent, periodOnlineSpent),
@@ -499,12 +540,18 @@ class _ReportPageState extends State<Reportpage> {
   // ===========================================================================
   // 2. FINANCIAL HEALTH SCORE CARD (56px Circular Gauge)
   // ===========================================================================
-  Widget _buildHealthScoreCard(double healthScore, String healthText, double savingsRate) {
+  Widget _buildHealthScoreCard(
+    double healthScore,
+    String healthText,
+    double savingsRate,
+  ) {
     String insightText;
     if (savingsRate >= 50) {
-      insightText = "Savings rate is ${savingsRate.toStringAsFixed(0)}% above target";
+      insightText =
+          "Savings rate is ${savingsRate.toStringAsFixed(0)}% above target";
     } else if (savingsRate > 0) {
-      insightText = "Savings rate is ${savingsRate.toStringAsFixed(0)}% (target: 50%)";
+      insightText =
+          "Savings rate is ${savingsRate.toStringAsFixed(0)}% (target: 50%)";
     } else {
       insightText = "Expenses exceeded income this period";
     }
@@ -512,8 +559,8 @@ class _ReportPageState extends State<Reportpage> {
     final Color statusColor = healthScore >= 0.6
         ? _darkGreen
         : healthScore >= 0.4
-            ? Colors.orange.shade800
-            : const Color(0xFFC62828);
+        ? Colors.orange.shade800
+        : const Color(0xFFC62828);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -539,7 +586,11 @@ class _ReportPageState extends State<Reportpage> {
                 borderRadius: BorderRadius.circular(12),
                 child: const Padding(
                   padding: EdgeInsets.all(4.0),
-                  child: Icon(Icons.info_outline_rounded, size: 18, color: _textMuted),
+                  child: Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: _textMuted,
+                  ),
                 ),
               ),
             ],
@@ -622,7 +673,10 @@ class _ReportPageState extends State<Reportpage> {
                     ),
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(8),
@@ -807,7 +861,10 @@ class _ReportPageState extends State<Reportpage> {
   // ===========================================================================
   // 4. SPENDING BY CATEGORY CARD (Ranked List with Visual Bars)
   // ===========================================================================
-  Widget _buildSpendingByCategoryCard(Map<String, double> categoryTotals, double totalExpense) {
+  Widget _buildSpendingByCategoryCard(
+    Map<String, double> categoryTotals,
+    double totalExpense,
+  ) {
     final entries = categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
@@ -939,7 +996,7 @@ class _ReportPageState extends State<Reportpage> {
   // ===========================================================================
   // 5. PAYMENT MODE SPLIT CARD
   // ===========================================================================
-  Widget _buildPaymentModeSplitCard(int cashSpent, int onlineSpent) {
+  Widget _buildPaymentModeSplitCard(double cashSpent, double onlineSpent) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -1076,12 +1133,20 @@ class _ReportPageState extends State<Reportpage> {
                     children: [
                       const Text(
                         "To Receive:",
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2E7D32),
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         friendGiven.toINR(),
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF2E7D32)),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2E7D32),
+                        ),
                       ),
                     ],
                   ),
@@ -1101,12 +1166,20 @@ class _ReportPageState extends State<Reportpage> {
                     children: [
                       const Text(
                         "To Give:",
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFC62828)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFC62828),
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         friendTaken.toINR(),
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFFC62828)),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFC62828),
+                        ),
                       ),
                     ],
                   ),
@@ -1120,14 +1193,20 @@ class _ReportPageState extends State<Reportpage> {
             children: [
               const Text(
                 "Net Settlement:",
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _textMuted),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: _textMuted,
+                ),
               ),
               Text(
                 "${net >= 0 ? '+' : '-'}${net.abs().toINR()}",
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: net >= 0 ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                  color: net >= 0
+                      ? const Color(0xFF2E7D32)
+                      : const Color(0xFFC62828),
                 ),
               ),
             ],
@@ -1145,10 +1224,10 @@ class _ReportPageState extends State<Reportpage> {
     double totalExpense,
     double income,
     double expense,
-    int cashIn,
-    int cashOut,
-    int onlineIn,
-    int onlineOut,
+    double cashIn,
+    double cashOut,
+    double onlineIn,
+    double onlineOut,
   ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1157,52 +1236,56 @@ class _ReportPageState extends State<Reportpage> {
         color: Colors.transparent,
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: _showAdvancedCharts,
-          onExpansionChanged: (v) => setState(() => _showAdvancedCharts = v),
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.bar_chart_rounded, color: _primaryGreen, size: 20),
-          ),
-          title: const Text(
-            "Visual Charts & Analysis",
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w800,
-              color: _textDark,
-            ),
-          ),
-          subtitle: const Text(
-            "Interactive cashflow comparison & category donut chart",
-            style: TextStyle(fontSize: 11.5, color: _textMuted),
-          ),
-          children: [
-            const Divider(height: 1, color: _borderGrey),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildCashflowBarChart(
-                income: income,
-                expense: expense,
-                cashIn: cashIn,
-                cashOut: cashOut,
-                onlineIn: onlineIn,
-                onlineOut: onlineOut,
+          child: ExpansionTile(
+            initiallyExpanded: _showAdvancedCharts,
+            onExpansionChanged: (v) => setState(() => _showAdvancedCharts = v),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.bar_chart_rounded,
+                color: _primaryGreen,
+                size: 20,
               ),
             ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildCategoryDonutSection(categoryTotals, totalExpense),
+            title: const Text(
+              "Visual Charts & Analysis",
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+                color: _textDark,
+              ),
             ),
-            const SizedBox(height: 14),
-          ],
+            subtitle: const Text(
+              "Interactive cashflow comparison & category donut chart",
+              style: TextStyle(fontSize: 11.5, color: _textMuted),
+            ),
+            children: [
+              const Divider(height: 1, color: _borderGrey),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildCashflowBarChart(
+                  income: income,
+                  expense: expense,
+                  cashIn: cashIn,
+                  cashOut: cashOut,
+                  onlineIn: onlineIn,
+                  onlineOut: onlineOut,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildCategoryDonutSection(categoryTotals, totalExpense),
+              ),
+              const SizedBox(height: 14),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -1210,13 +1293,19 @@ class _ReportPageState extends State<Reportpage> {
   Widget _buildCashflowBarChart({
     required double income,
     required double expense,
-    required int cashIn,
-    required int cashOut,
-    required int onlineIn,
-    required int onlineOut,
+    required double cashIn,
+    required double cashOut,
+    required double onlineIn,
+    required double onlineOut,
   }) {
-    final maxVal = [income, expense, cashIn.toDouble(), cashOut.toDouble(), onlineIn.toDouble(), onlineOut.toDouble()]
-        .reduce((a, b) => a > b ? a : b);
+    final maxVal = [
+      income,
+      expense,
+      cashIn.toDouble(),
+      cashOut.toDouble(),
+      onlineIn.toDouble(),
+      onlineOut.toDouble(),
+    ].reduce((a, b) => a > b ? a : b);
     final double maxY = maxVal > 0 ? maxVal * 1.25 : 1000;
 
     return Column(
@@ -1228,7 +1317,11 @@ class _ReportPageState extends State<Reportpage> {
             const Expanded(
               child: Text(
                 "Cashflow Comparison",
-                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: _textDark),
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: _textDark,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1258,8 +1351,8 @@ class _ReportPageState extends State<Reportpage> {
                     final title = groupIndex == 0
                         ? "Total"
                         : groupIndex == 1
-                            ? "Cash"
-                            : "Online";
+                        ? "Cash"
+                        : "Online";
                     final isIncome = rodIndex == 0;
                     return BarTooltipItem(
                       "$title ${isIncome ? 'In' : 'Out'}\n",
@@ -1268,7 +1361,9 @@ class _ReportPageState extends State<Reportpage> {
                         TextSpan(
                           text: rod.toY.toINR(),
                           style: TextStyle(
-                            color: isIncome ? Colors.greenAccent : const Color(0xFFFF8A80),
+                            color: isIncome
+                                ? Colors.greenAccent
+                                : const Color(0xFFFF8A80),
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -1280,9 +1375,15 @@ class _ReportPageState extends State<Reportpage> {
               ),
               titlesData: FlTitlesData(
                 show: true,
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -1304,7 +1405,11 @@ class _ReportPageState extends State<Reportpage> {
                         padding: const EdgeInsets.only(top: 6),
                         child: Text(
                           text,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5, color: _textDark),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.5,
+                            color: _textDark,
+                          ),
                         ),
                       );
                     },
@@ -1315,10 +1420,8 @@ class _ReportPageState extends State<Reportpage> {
                 show: true,
                 drawVerticalLine: false,
                 horizontalInterval: maxY / 4,
-                getDrawingHorizontalLine: (value) => FlLine(
-                  color: Colors.grey.shade200,
-                  strokeWidth: 1,
-                ),
+                getDrawingHorizontalLine: (value) =>
+                    FlLine(color: Colors.grey.shade200, strokeWidth: 1),
               ),
               borderData: FlBorderData(show: false),
               barGroups: [
@@ -1355,7 +1458,10 @@ class _ReportPageState extends State<Reportpage> {
     );
   }
 
-  Widget _buildCategoryDonutSection(Map<String, double> categoryTotals, double totalExpense) {
+  Widget _buildCategoryDonutSection(
+    Map<String, double> categoryTotals,
+    double totalExpense,
+  ) {
     if (categoryTotals.isEmpty) {
       return const Center(
         child: Text(
@@ -1372,7 +1478,11 @@ class _ReportPageState extends State<Reportpage> {
       children: [
         const Text(
           "Expense Distribution Donut",
-          style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: _textDark),
+          style: TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.bold,
+            color: _textDark,
+          ),
         ),
         const SizedBox(height: 14),
         SizedBox(
@@ -1392,7 +1502,9 @@ class _ReportPageState extends State<Reportpage> {
                             _touchedPieIndex = -1;
                             return;
                           }
-                          _touchedPieIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                          _touchedPieIndex = pieTouchResponse
+                              .touchedSection!
+                              .touchedSectionIndex;
                         });
                       },
                     ),
@@ -1404,7 +1516,9 @@ class _ReportPageState extends State<Reportpage> {
                       final double fontSize = isTouched ? 12 : 9.5;
                       final double radius = isTouched ? 44 : 38;
                       final entry = entries[i];
-                      final share = totalExpense > 0 ? (entry.value / totalExpense) * 100 : 0.0;
+                      final share = totalExpense > 0
+                          ? (entry.value / totalExpense) * 100
+                          : 0.0;
                       final color = CategoryTheme.getColor(entry.key);
 
                       return PieChartSectionData(
@@ -1430,7 +1544,9 @@ class _ReportPageState extends State<Reportpage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: entries.take(4).map((e) {
-                    final share = totalExpense > 0 ? (e.value / totalExpense) * 100 : 0.0;
+                    final share = totalExpense > 0
+                        ? (e.value / totalExpense) * 100
+                        : 0.0;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Row(
@@ -1447,13 +1563,21 @@ class _ReportPageState extends State<Reportpage> {
                           Expanded(
                             child: Text(
                               e.key,
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _textDark),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: _textDark,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Text(
                             "${share.toStringAsFixed(0)}%",
-                            style: const TextStyle(fontSize: 11, color: _textMuted, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: _textMuted,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -1479,7 +1603,11 @@ class _ReportPageState extends State<Reportpage> {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 11.5, color: _textMuted, fontWeight: FontWeight.w500),
+          style: const TextStyle(
+            fontSize: 11.5,
+            color: _textMuted,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );
@@ -1503,7 +1631,11 @@ class _ReportPageState extends State<Reportpage> {
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          icon: const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+          icon: const Icon(
+            Icons.download_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
           label: const Text(
             "Export PDF Report",
             style: TextStyle(

@@ -1,224 +1,259 @@
 import 'dart:async';
+import 'package:fin_track/services/retry_safe_writer.dart';
+import 'package:fin_track/services/split_integrity.dart';
+import 'package:fin_track/utils/input_validator.dart';
+import 'package:fin_track/utils/ledger_totals.dart';
+import 'package:fin_track/utils/money.dart';
 import 'package:fin_track/utils/split_helper.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
-enum AddFriendResult {
-  added,
-  updated,
-  failed,
-}
+enum AddFriendResult { added, updated, failed }
 
 class FriendProvider extends ChangeNotifier {
   FriendProvider() {
     _initConnectivity();
   }
-
-  bool _isLoading = false;
-  bool _hasError = false;
-  String _errorMessage = "";
-  String _currentPhone = "";
-  StreamSubscription<DatabaseEvent>? _subscription;
-
-  final List<Map<String, dynamic>> _friends = [];
-
-  int _totalGet = 0;
-  int _totalGive = 0;
-  bool _isOffline = false;
+  bool _isLoading = false, _hasError = false, _isOffline = false;
+  String _errorMessage = '', _currentPhone = '';
   String? _lastError;
-  StreamSubscription<DatabaseEvent>? _connectivitySub;
-
+  StreamSubscription<DatabaseEvent>? _subscription, _connectivitySub;
+  final List<Map<String, dynamic>> _friends = [];
+  int _getPaise = 0, _givePaise = 0;
   bool get isLoading => _isLoading;
   bool get hasError => _hasError;
   bool get isOffline => _isOffline;
   String get errorMessage => _errorMessage;
   String? get lastError => _lastError;
   List<Map<String, dynamic>> get friends => List.unmodifiable(_friends);
-  int get totalGet => _totalGet;
-  int get totalGive => _totalGive;
+  double get totalGet => _getPaise / 100;
+  double get totalGive => _givePaise / 100;
 
   void _initConnectivity() {
     if (_connectivitySub != null) return;
     try {
-      _connectivitySub = FirebaseDatabase.instance.ref(".info/connected").onValue.listen((event) {
-        final connected = event.snapshot.value as bool? ?? true;
-        if (_isOffline != !connected) {
-          _isOffline = !connected;
-          notifyListeners();
-        }
-      });
+      _connectivitySub = FirebaseDatabase.instance
+          .ref('.info/connected')
+          .onValue
+          .listen(
+            (event) {
+              final offline = event.snapshot.value != true;
+              if (_isOffline != offline) {
+                _isOffline = offline;
+                notifyListeners();
+              }
+            },
+            onError: (_) {
+              _isOffline = true;
+              notifyListeners();
+            },
+          );
     } catch (_) {
-      // In tests or environments without Firebase initialized, ignore gracefully
+      /* Firebase may be unavailable during isolated unit tests. */
     }
   }
 
-  /// Sets up a real-time stream listener for friends and aggregate ledger totals
   Future<void> fetchFriends(String phoneNumber, {bool force = false}) async {
-    if (phoneNumber.isEmpty) return;
-
-    if (_currentPhone == phoneNumber && _subscription != null && !force && !_hasError) {
+    if (!InputValidator.phone(phoneNumber)) return;
+    if (_currentPhone == phoneNumber &&
+        _subscription != null &&
+        !force &&
+        !_hasError) {
       return;
     }
-
+    await _subscription?.cancel();
+    if (_currentPhone != phoneNumber) {
+      _friends.clear();
+      _getPaise = 0;
+      _givePaise = 0;
+    }
     _currentPhone = phoneNumber;
     _isLoading = true;
     _hasError = false;
-    _errorMessage = "";
+    _errorMessage = '';
     notifyListeners();
-
     _initConnectivity();
-    await _subscription?.cancel();
-
     try {
-      final ref = FirebaseDatabase.instance.ref("Friends/$phoneNumber");
-
-      _subscription = ref.onValue.listen(
-        (event) {
-          _processSnapshot(event.snapshot);
-          _isLoading = false;
-          _hasError = false;
-          _errorMessage = "";
-          notifyListeners();
-        },
-        onError: (error) {
-          _isLoading = false;
-          _hasError = true;
-          _errorMessage = "Unable to sync friends ledger. Check your internet connection.";
-          notifyListeners();
-        },
-      );
-    } catch (e) {
+      _subscription = FirebaseDatabase.instance
+          .ref('Friends/$phoneNumber')
+          .onValue
+          .listen(
+            (event) {
+              final raw = event.snapshot.value;
+              _friends.clear();
+              if (raw is Map) {
+                for (final entry in raw.entries) {
+                  if (entry.value is Map) {
+                    _friends.add(
+                      LedgerTotals.normalize({
+                        ...Map<String, dynamic>.from(entry.value as Map),
+                        'friend_number': entry.key.toString(),
+                      }),
+                    );
+                  }
+                }
+              }
+              _getPaise = _friends.fold(
+                0,
+                (sum, f) => sum + (f['_getPaise'] as int),
+              );
+              _givePaise = _friends.fold(
+                0,
+                (sum, f) => sum + (f['_givePaise'] as int),
+              );
+              _isLoading = false;
+              _hasError = false;
+              _errorMessage = '';
+              notifyListeners();
+            },
+            onError: (_) {
+              _isLoading = false;
+              _hasError = true;
+              _errorMessage =
+                  'Unable to sync friends ledger. Check your connection.';
+              notifyListeners();
+            },
+          );
+    } catch (_) {
       _isLoading = false;
       _hasError = true;
-      _errorMessage = "Connection error. Please try again.";
+      _errorMessage = 'Unable to connect to the ledger.';
       notifyListeners();
     }
   }
 
-  void _processSnapshot(DataSnapshot snapshot) {
-    _friends.clear();
-    _totalGet = 0;
-    _totalGive = 0;
-
-    if (snapshot.value != null && snapshot.value is Map) {
-      final data = snapshot.value as Map;
-      data.forEach((key, value) {
-        if (value is Map) {
-          final map = Map<String, dynamic>.from(value);
-          _friends.add(map);
-
-          final getVal = (double.tryParse(map["total_get"]?.toString() ?? '0') ?? 0.0).round();
-          final giveVal = (double.tryParse(map["total_give"]?.toString() ?? '0') ?? 0.0).round();
-          _totalGet += getVal;
-          _totalGive += giveVal;
-        }
-      });
-    }
-  }
-
-  /// Adds a new friend safely without overwriting existing ledger
   Future<AddFriendResult> addFriend({
     required String userPhone,
     required String friendName,
     required String friendNumber,
-    String note = "",
+    String note = '',
     required String date,
   }) async {
     _lastError = null;
-    final cleanUserPhone = userPhone.trim();
-    final cleanFriendName = friendName.trim();
-    final cleanFriendNumber = friendNumber.trim();
-
-    if (cleanUserPhone.isEmpty || cleanFriendNumber.isEmpty || cleanFriendName.isEmpty) {
-      _lastError = "User phone, friend name, and phone number cannot be empty";
+    final user = userPhone.trim(),
+        number = friendNumber.trim(),
+        name = friendName.trim();
+    if (user.isEmpty || number.isEmpty || name.isEmpty) {
+      _lastError = 'User phone, friend name, and phone number cannot be empty';
       return AddFriendResult.failed;
     }
-
+    if (!InputValidator.phone(user) ||
+        !InputValidator.phone(number) ||
+        user == number ||
+        name.length > 50 ||
+        note.length > 200 ||
+        !InputValidator.date(date)) {
+      _lastError = 'Invalid friend details';
+      return AddFriendResult.failed;
+    }
     try {
-      final ref = FirebaseDatabase.instance.ref("Friends/$cleanUserPhone/$cleanFriendNumber");
-
-      // Check if friend exists: first inspect in-memory list for instant response,
-      // fallback to ref.get() with a safe timeout
-      bool exists = _friends.any(
-        (f) => (f["friend_number"] ?? "").toString().trim() == cleanFriendNumber,
-      );
-
-      if (!exists) {
-        try {
-          final snapshot = await ref.get().timeout(const Duration(seconds: 4));
-          if (snapshot.exists) {
-            exists = true;
-          }
-        } catch (_) {
-          // Timeout or network read glitch: proceed using local knowledge
-        }
-      }
-
-      if (exists) {
-        // Friend already exists: update name/note only, preserve existing ledger
-        await ref.update({
-          "friend_name": cleanFriendName,
-          "note": note.trim(),
-        });
-        return AddFriendResult.updated;
-      }
-
-      await ref.set({
-        "friend_name": cleanFriendName,
-        "friend_number": cleanFriendNumber,
-        "note": note.trim(),
-        "date": date,
-        "timestamp": ServerValue.timestamp,
-        "total_get": 0,
-        "total_give": 0,
+      final ref = FirebaseDatabase.instance.ref('Friends/$user/$number');
+      // Updating metadata cannot overwrite existing records even on timeout,
+      // stale cache, or simultaneous friend creation.
+      await ref.update({
+        'friend_name': name,
+        'friend_number': number,
+        'note': note.trim(),
+        'date': InputValidator.normalizedDate(date),
+        ...InputValidator.dateFields(date),
       });
-
-      return AddFriendResult.added;
-    } catch (e, st) {
-      debugPrint("FriendProvider.addFriend error: $e\n$st");
-      _lastError = e.toString();
+      return _friends.any((f) => f['friend_number'] == number)
+          ? AddFriendResult.updated
+          : AddFriendResult.added;
+    } catch (_) {
+      _lastError = 'Unable to save friend. Check your connection.';
       return AddFriendResult.failed;
     }
   }
 
-  /// Deletes a friend and all ledger history (real-time stream will auto-update)
   Future<bool> deleteFriend({
     required String userPhone,
     required String friendNumber,
   }) async {
+    if (!InputValidator.phone(userPhone) ||
+        !InputValidator.phone(friendNumber)) {
+      return false;
+    }
     try {
-      final ref = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-      await ref.remove();
+      _lastError = null;
+      final snapshot = await FirebaseDatabase.instance
+          .ref('Friends/$userPhone/$friendNumber')
+          .get()
+          .timeout(const Duration(seconds: 15));
+      final data = snapshot.value;
+      final records = data is Map ? data['Records'] : null;
+      if (records is Map) {
+        for (final entry in records.entries) {
+          final record = entry.value;
+          if (record is Map &&
+              (record['split_id'] != null ||
+                  SplitIntegrity.operationId(entry.key.toString()) !=
+                      entry.key)) {
+            _lastError =
+                'Delete linked splits from the ledger before deleting this friend.';
+            return false;
+          }
+        }
+      }
+      await FirebaseDatabase.instance
+          .ref('Friends/$userPhone/$friendNumber')
+          .remove();
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  /// Helper for atomic increment of ledger fields
-  Future<void> _atomicUpdateLedger(
-    DatabaseReference friendRef,
-    String field,
-    int delta,
-  ) async {
-    await friendRef.child(field).runTransaction((Object? currentData) {
-      final currentVal = (double.tryParse(currentData?.toString() ?? '0') ?? 0.0).round();
-      final calculated = currentVal + delta;
-      // Guard against underflow while preserving non-negative aggregate invariant
-      final newVal = calculated < 0 ? 0 : calculated;
-      return Transaction.success(newVal);
-    });
-  }
+  Map<String, Object?> _record(
+    String key,
+    String amount,
+    String description,
+    String paymentMode,
+    String date,
+    String categoryType,
+  ) => {
+    'key': key,
+    'Amount': Money.decimal(Money.paise(amount)),
+    'Description': description,
+    'Payment_Mode': paymentMode,
+    'Date': InputValidator.normalizedDate(date),
+    ...InputValidator.dateFields(date),
+    'Type': categoryType,
+    'timestamp': ServerValue.timestamp,
+  };
+  Map<String, Object?> _expense(
+    String key,
+    String amount,
+    String description,
+    String paymentMode,
+    String date,
+    String category,
+  ) => {
+    'key': key,
+    'Amount': Money.decimal(Money.paise(amount)),
+    'Description': description,
+    'Payment_Mode': paymentMode,
+    'Date': InputValidator.normalizedDate(date),
+    ...InputValidator.dateFields(date),
+    'Category': category,
+    'timestamp': ServerValue.timestamp,
+  };
+  bool _valid(
+    String amount,
+    String description,
+    String mode,
+    String date, {
+    String? type,
+    String? category,
+  }) => InputValidator.transaction(
+    amount: amount,
+    description: description,
+    mode: mode,
+    date: date,
+    type: type,
+    category: category,
+  );
 
-  Future<void> adjustLedger({
-    required DatabaseReference friendRef,
-    required String field,
-    required int delta,
-  }) async {
-    await _atomicUpdateLedger(friendRef, field, delta);
-  }
-
-  /// Adds a transaction to a specific friend's ledger atomically
   Future<bool> addFriendTransaction({
     required String userPhone,
     required String friendNumber,
@@ -227,35 +262,43 @@ class FriendProvider extends ChangeNotifier {
     required String paymentMode,
     required String date,
     required String categoryType,
+    String? intentId,
   }) async {
-    if (userPhone.isEmpty || friendNumber.isEmpty) return false;
-    try {
-      final recordRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber/Records");
-      final key = recordRef.push().key;
-      if (key == null || key.isEmpty) return false;
-      final parsedAmount = (double.tryParse(amount) ?? 0.0).round();
-
-      await recordRef.child(key).set({
-        "key": key,
-        "Amount": amount,
-        "Description": description,
-        "Payment_Mode": paymentMode,
-        "Date": date,
-        "Type": categoryType,
-        "timestamp": ServerValue.timestamp,
-      });
-
-      final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-      if (categoryType == "Take Money From Friend") {
-        await _atomicUpdateLedger(friendRef, "total_give", parsedAmount);
-      } else {
-        await _atomicUpdateLedger(friendRef, "total_get", parsedAmount);
-      }
-
-      return true;
-    } catch (_) {
+    _lastError = null;
+    if (!InputValidator.phone(userPhone) ||
+        !InputValidator.phone(friendNumber) ||
+        userPhone == friendNumber ||
+        !_valid(amount, description, paymentMode, date, type: categoryType)) {
+      _lastError = 'Invalid friend transaction details, amount, or date';
       return false;
     }
+    final success = await RetrySafeWriter.instance.write(
+      userPhone,
+      'friend-record',
+      [
+        friendNumber,
+        Money.decimal(Money.paise(amount)),
+        description,
+        paymentMode,
+        InputValidator.normalizedDate(date),
+        categoryType,
+      ],
+      (id) => {
+        'Friends/$userPhone/$friendNumber/Records/$id': _record(
+          id,
+          amount,
+          description,
+          paymentMode,
+          date,
+          categoryType,
+        ),
+      },
+      intentId: intentId,
+    );
+    if (!success) {
+      _lastError = RetrySafeWriter.instance.failureMessage;
+    }
+    return success;
   }
 
   Future<int> batchAddFriendTransactions({
@@ -267,38 +310,16 @@ class FriendProvider extends ChangeNotifier {
     required String date,
     required String categoryType,
   }) async {
-    if (userPhone.isEmpty) return 0;
-    int successCount = 0;
-    final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
-
-    for (final friendNumber in friendNumbers) {
-      if (friendNumber.isEmpty) continue;
-      try {
-        final recordRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber/Records");
-        final key = recordRef.push().key;
-        if (key == null || key.isEmpty) continue;
-
-        await recordRef.child(key).set({
-          "key": key,
-          "Amount": amountPerFriend,
-          "Description": description,
-          "Payment_Mode": paymentMode,
-          "Date": date,
-          "Type": categoryType,
-          "timestamp": ServerValue.timestamp,
-        });
-
-        final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-        if (categoryType == "Take Money From Friend") {
-          await _atomicUpdateLedger(friendRef, "total_give", parsedAmount);
-        } else {
-          await _atomicUpdateLedger(friendRef, "total_get", parsedAmount);
-        }
-        successCount++;
-      } catch (_) {}
-    }
-
-    return successCount;
+    final success = await atomicMultiFriendSplit(
+      userPhone: userPhone,
+      friendNumbers: friendNumbers,
+      amountPerFriend: amountPerFriend,
+      description: description,
+      paymentMode: paymentMode,
+      date: date,
+      categoryType: categoryType,
+    );
+    return success ? friendNumbers.length : 0;
   }
 
   Future<bool> deleteFriendTransaction({
@@ -306,30 +327,75 @@ class FriendProvider extends ChangeNotifier {
     required String friendNumber,
     required String recordKey,
     required bool isGive,
-    required int amount,
+    required num amount,
   }) async {
-    if (userPhone.isEmpty || friendNumber.isEmpty || recordKey.isEmpty) return false;
+    if (!InputValidator.phone(userPhone) ||
+        !InputValidator.phone(friendNumber) ||
+        !InputValidator.key(recordKey)) {
+      return false;
+    }
     try {
-      final recordRef = FirebaseDatabase.instance.ref(
-        "Friends/$userPhone/$friendNumber/Records/$recordKey",
-      );
-      await recordRef.remove();
-
-      final friendRef = FirebaseDatabase.instance.ref("Friends/$userPhone/$friendNumber");
-      if (isGive) {
-        await _atomicUpdateLedger(friendRef, "total_give", -amount);
-      } else {
-        await _atomicUpdateLedger(friendRef, "total_get", -amount);
+      final splitPaths = await SplitIntegrity.load(userPhone, recordKey);
+      if (splitPaths.isNotEmpty) {
+        await FirebaseDatabase.instance.ref().update({
+          for (final path in splitPaths) path: null,
+        });
+        return true;
       }
-
+      await FirebaseDatabase.instance
+          .ref('Friends/$userPhone/$friendNumber/Records/$recordKey')
+          .remove();
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  /// Executes an atomic multi-path transaction for bill splitting
-  /// Updates both Passbook Expense and Friend Ledger in a single atomic network payload
+  Future<bool> updateFriendTransaction({
+    required String userPhone,
+    required String friendNumber,
+    required String recordKey,
+    required String amount,
+    required String description,
+  }) async {
+    if (!InputValidator.phone(userPhone) ||
+        !InputValidator.phone(friendNumber) ||
+        !InputValidator.key(recordKey) ||
+        !Money.positive(amount) ||
+        !InputValidator.description(description)) {
+      return false;
+    }
+    try {
+      final ref = FirebaseDatabase.instance.ref(
+        'Friends/$userPhone/$friendNumber/Records/$recordKey',
+      );
+      final record = (await ref.get().timeout(
+        const Duration(seconds: 15),
+      )).value;
+      if (record is! Map) return false;
+      final splitPaths = await SplitIntegrity.load(
+        userPhone,
+        recordKey,
+        splitId: record['split_id']?.toString(),
+      );
+      if (splitPaths.isNotEmpty &&
+          Money.paise(record['Amount']) != Money.paise(amount)) {
+        _lastError =
+            'Split amounts cannot be changed independently. Delete the split and record the corrected bill.';
+        return false;
+      }
+      await FirebaseDatabase.instance
+          .ref('Friends/$userPhone/$friendNumber/Records/$recordKey')
+          .update({
+            'Amount': Money.decimal(Money.paise(amount)),
+            'Description': description,
+          });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> atomicSplitBill({
     required String userPhone,
     required String friendNumber,
@@ -340,54 +406,30 @@ class FriendProvider extends ChangeNotifier {
     required String date,
     required String category,
     required String paymentMode,
+    String? intentId,
   }) async {
-    try {
-      final dbRef = FirebaseDatabase.instance.ref();
-      final expRef = dbRef.child("Expenses/$userPhone").push();
-      final expenseKey = expRef.key ?? DateTime.now().millisecondsSinceEpoch.toString();
-
-      final recRef = dbRef.child("Friends/$userPhone/$friendNumber/Records").push();
-      final recordKey = recRef.key ?? (DateTime.now().millisecondsSinceEpoch + 1).toString();
-
-      final Map<String, Object?> multiPathUpdates = {};
-
-      // 1. Personal Passbook Entry
-      multiPathUpdates["Expenses/$userPhone/$expenseKey"] = {
-        "key": expenseKey,
-        "Amount": myShareAmount,
-        "Description": "$description (Your share of ₹$totalAmount)",
-        "Payment_Mode": paymentMode,
-        "Date": date,
-        "Category": category,
-        "timestamp": ServerValue.timestamp,
-      };
-
-      // 2. Friend Ledger Record
-      multiPathUpdates["Friends/$userPhone/$friendNumber/Records/$recordKey"] = {
-        "key": recordKey,
-        "Amount": friendShareAmount,
-        "Description": "Split: $description (Total ₹$totalAmount)",
-        "Payment_Mode": paymentMode,
-        "Date": date,
-        "Type": "Give Money To Friend",
-        "timestamp": ServerValue.timestamp,
-      };
-
-      // 3. Atomically update ledger total in the same payload
-      final parsedFriendAmount = (double.tryParse(friendShareAmount) ?? 0.0).round();
-      multiPathUpdates["Friends/$userPhone/$friendNumber/total_get"] =
-          ServerValue.increment(parsedFriendAmount);
-
-      // Single atomic multi-path update
-      await dbRef.update(multiPathUpdates);
-
-      return true;
-    } catch (_) {
+    _lastError = null;
+    if (Money.paise(myShareAmount) + Money.paise(friendShareAmount) !=
+        Money.paise(totalAmount)) {
+      _lastError = 'Split shares must add up to total amount';
       return false;
     }
+    return atomicFullBillSplit(
+      userPhone: userPhone,
+      myShareAmount: myShareAmount,
+      myDescription: '$description (Your share of ₹$totalAmount)',
+      totalAmount: totalAmount,
+      paymentMode: paymentMode,
+      category: category,
+      date: date,
+      friendNumbers: [friendNumber],
+      amountPerFriend: friendShareAmount,
+      friendDescription: 'Split: $description (Total ₹$totalAmount)',
+      categoryType: 'Give Money To Friend',
+      intentId: intentId,
+    );
   }
 
-  /// Performs an atomic multi-path split across multiple friends in a SINGLE network payload
   Future<bool> atomicMultiFriendSplit({
     required String userPhone,
     required List<String> friendNumbers,
@@ -397,43 +439,55 @@ class FriendProvider extends ChangeNotifier {
     required String date,
     required String categoryType,
   }) async {
-    if (userPhone.isEmpty || friendNumbers.isEmpty) return false;
-    try {
-      final dbRef = FirebaseDatabase.instance.ref();
-      final Map<String, Object?> multiPathUpdates = {};
-      final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
-      final ledgerField = categoryType == "Take Money From Friend" ? "total_give" : "total_get";
-
-      for (int i = 0; i < friendNumbers.length; i++) {
-        final friendNumber = friendNumbers[i];
-        if (friendNumber.isEmpty) continue;
-        final newRef = dbRef.child("Friends/$userPhone/$friendNumber/Records").push();
-        final key = newRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_$i";
-
-        multiPathUpdates["Friends/$userPhone/$friendNumber/Records/$key"] = {
-          "key": key,
-          "Amount": amountPerFriend,
-          "Description": description,
-          "Payment_Mode": paymentMode,
-          "Date": date,
-          "Type": categoryType,
-          "timestamp": ServerValue.timestamp,
-        };
-
-        multiPathUpdates["Friends/$userPhone/$friendNumber/$ledgerField"] =
-            ServerValue.increment(parsedAmount);
-      }
-
-      await dbRef.update(multiPathUpdates);
-
-      return true;
-    } catch (_) {
+    _lastError = null;
+    if (!InputValidator.phone(userPhone) ||
+        !_validFriends(userPhone, friendNumbers) ||
+        !_valid(
+          amountPerFriend,
+          description,
+          paymentMode,
+          date,
+          type: categoryType,
+        )) {
+      _lastError = 'Invalid friend split details';
       return false;
     }
+    final numbers = [...friendNumbers]..sort();
+    final success = await RetrySafeWriter.instance.write(
+      userPhone,
+      'multi-friend',
+      [
+        numbers,
+        Money.decimal(Money.paise(amountPerFriend)),
+        description,
+        paymentMode,
+        InputValidator.normalizedDate(date),
+        categoryType,
+      ],
+      (id) => {
+        for (var i = 0; i < numbers.length; i++)
+          'Friends/$userPhone/${numbers[i]}/Records/${id}_$i': _record(
+            '${id}_$i',
+            amountPerFriend,
+            description,
+            paymentMode,
+            date,
+            categoryType,
+          ),
+      },
+    );
+    if (!success) {
+      _lastError = RetrySafeWriter.instance.failureMessage;
+    }
+    return success;
   }
 
-  /// Executes a single atomic multi-path transaction for bill splitting across user's passbook and all friends.
-  /// If ANY part of the write fails, none of the changes are written to the database (H2 fix).
+  bool _validFriends(String user, List<String> numbers) =>
+      numbers.isNotEmpty &&
+      numbers.length <= 100 &&
+      numbers.toSet().length == numbers.length &&
+      numbers.every((n) => InputValidator.phone(n) && n != user);
+
   Future<bool> atomicFullBillSplit({
     required String userPhone,
     required String myShareAmount,
@@ -446,61 +500,98 @@ class FriendProvider extends ChangeNotifier {
     required String amountPerFriend,
     required String friendDescription,
     required String categoryType,
+    String? intentId,
   }) async {
-    if (userPhone.isEmpty || friendNumbers.isEmpty) return false;
-    try {
-      final dbRef = FirebaseDatabase.instance.ref();
-      final Map<String, Object?> multiPathUpdates = {};
-      final parsedAmount = (double.tryParse(amountPerFriend) ?? 0.0).round();
-      final ledgerField = categoryType == "Take Money From Friend" ? "total_give" : "total_get";
-
-      // 1. Personal Passbook Entry (Atomic part of the multi-path update)
-      final expRef = dbRef.child("Expenses/$userPhone").push();
-      final expenseKey = expRef.key ?? DateTime.now().millisecondsSinceEpoch.toString();
-
-      multiPathUpdates["Expenses/$userPhone/$expenseKey"] = {
-        "key": expenseKey,
-        "Amount": myShareAmount,
-        "Description": myDescription,
-        "Payment_Mode": paymentMode,
-        "Date": date,
-        "Category": category,
-        "timestamp": ServerValue.timestamp,
-      };
-
-      // 2. Each friend's record AND their ledger increment, in the SAME payload
-      for (int i = 0; i < friendNumbers.length; i++) {
-        final friendNumber = friendNumbers[i];
-        if (friendNumber.isEmpty) continue;
-        final newRef = dbRef.child("Friends/$userPhone/$friendNumber/Records").push();
-        final key = newRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_$i";
-
-        multiPathUpdates["Friends/$userPhone/$friendNumber/Records/$key"] = {
-          "key": key,
-          "Amount": amountPerFriend,
-          "Description": friendDescription,
-          "Payment_Mode": paymentMode,
-          "Date": date,
-          "Type": categoryType,
-          "timestamp": ServerValue.timestamp,
-        };
-
-        // No separate transaction needed — this commits atomically with everything else.
-        multiPathUpdates["Friends/$userPhone/$friendNumber/$ledgerField"] =
-            ServerValue.increment(parsedAmount);
-      }
-
-      // One network call. Either the whole split lands, or none of it does — safe to retry.
-      await dbRef.update(multiPathUpdates);
-
-      return true;
-    } catch (_) {
+    _lastError = null;
+    if (!InputValidator.phone(userPhone)) {
+      _lastError = 'Invalid user phone number';
       return false;
     }
+    if (!_validFriends(userPhone, friendNumbers)) {
+      _lastError = 'Invalid friends selected for split';
+      return false;
+    }
+    if (!Money.positive(totalAmount)) {
+      _lastError = 'Please enter a valid total amount';
+      return false;
+    }
+    if (!_valid(
+          myShareAmount,
+          myDescription,
+          paymentMode,
+          date,
+          category: category,
+        ) ||
+        !_valid(
+          amountPerFriend,
+          friendDescription,
+          paymentMode,
+          date,
+          type: categoryType,
+        )) {
+      _lastError = 'Invalid transaction details, date, or category';
+      return false;
+    }
+    final total = Money.paise(totalAmount),
+        mine = Money.paise(myShareAmount),
+        friend = Money.paise(amountPerFriend);
+    // This API intentionally supports equal friend shares with the remainder
+    // assigned to the current user; no value is created or lost.
+    if (categoryType == 'Give Money To Friend'
+        ? mine + friend * friendNumbers.length != total
+        : (friendNumbers.length != 1 || mine != friend || mine > total)) {
+      _lastError = 'Split shares do not balance with total bill';
+      return false;
+    }
+    final numbers = [...friendNumbers]..sort();
+    final success = await RetrySafeWriter.instance.write(
+      userPhone,
+      'full-split',
+      [
+        numbers,
+        Money.decimal(mine),
+        myDescription,
+        Money.decimal(total),
+        paymentMode,
+        category,
+        InputValidator.normalizedDate(date),
+        Money.decimal(friend),
+        friendDescription,
+        categoryType,
+      ],
+      (id) => {
+        'Expenses/$userPhone/$id': {
+          ..._expense(
+            id,
+            myShareAmount,
+            myDescription,
+            categoryType == 'Take Money From Friend' ? 'Owed' : paymentMode,
+            date,
+            category,
+          ),
+          'split_id': id,
+        },
+        for (var i = 0; i < numbers.length; i++)
+          'Friends/$userPhone/${numbers[i]}/Records/${id}_$i': {
+            ..._record(
+              '${id}_$i',
+              amountPerFriend,
+              friendDescription,
+              paymentMode,
+              date,
+              categoryType,
+            ),
+            'split_id': id,
+          },
+      },
+      intentId: intentId,
+    );
+    if (!success) {
+      _lastError = RetrySafeWriter.instance.failureMessage;
+    }
+    return success;
   }
 
-  /// Executes a single atomic multi-path update for multi-payer group trip splits.
-  /// Updates user's passbook for consumed shares, mutual friend ledger balances, and logs detailed trip records.
   Future<bool> batchSaveMultiSplit({
     required String userPhone,
     required String tripTitle,
@@ -508,137 +599,133 @@ class FriendProvider extends ChangeNotifier {
     required String paymentMode,
     required List<GroupExpense> expenses,
     required List<PersonSettlement> settlements,
+    String? intentId,
   }) async {
-    final cleanUserPhone = userPhone.trim();
-    if (cleanUserPhone.isEmpty || expenses.isEmpty || settlements.isEmpty) {
-      _lastError = "User phone, expenses, or settlements cannot be empty";
+    _lastError = null;
+    if (!InputValidator.phone(userPhone) ||
+        expenses.isEmpty ||
+        expenses.length > 100 ||
+        !InputValidator.description(tripTitle) ||
+        !InputValidator.date(formattedDate) ||
+        !InputValidator.modes.contains(paymentMode)) {
+      _lastError = 'Invalid trip details';
       return false;
     }
-
     try {
-      final dbRef = FirebaseDatabase.instance.ref();
-      final Map<String, Object?> multiPathUpdates = {};
-
-      // 1. Log each expense share the current user consumed into Passbook
-      for (int i = 0; i < expenses.length; i++) {
-        final exp = expenses[i];
-        final myParticipant = settlements.firstWhere(
-          (s) => s.person.isMe,
-          orElse: () => PersonSettlement(
-            person: SplitParticipant(phone: cleanUserPhone, name: "You", isMe: true),
-            totalPaid: 0,
-            totalConsumed: 0,
-            netBalance: 0,
-            giveLines: [],
-            getLines: [],
-          ),
-        );
-        final myShare = exp.shareFor(myParticipant.person);
-
-        if (myShare > 0.01) {
-          final expRef = dbRef.child("Expenses/$cleanUserPhone").push();
-          final expKey = expRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_exp_$i";
-          final payerName = exp.payer.isMe ? "You" : exp.payer.name;
-          final cat = exp.category.trim().isNotEmpty ? exp.category.trim() : "Other";
-
-          multiPathUpdates["Expenses/$cleanUserPhone/$expKey"] = {
-            "key": expKey,
-            "Amount": myShare.toStringAsFixed(myShare.truncateToDouble() == myShare ? 0 : 2),
-            "Description": "$tripTitle: ${exp.title} (Paid by $payerName)",
-            "Payment_Mode": exp.payer.isMe ? paymentMode : "Owed to ${exp.payer.name}",
-            "Date": formattedDate,
-            "Category": cat,
-            "timestamp": ServerValue.timestamp,
-          };
+      final people = <String, SplitParticipant>{};
+      for (final expense in expenses) {
+        expense.validate();
+        if (!InputValidator.date(expense.date.toIso8601String()) ||
+            !InputValidator.categories.contains(expense.category)) {
+          throw ArgumentError('Invalid expense');
+        }
+        people[expense.payer.phone] = expense.payer;
+        for (final participant in expense.participants) {
+          people[participant.phone] = participant;
         }
       }
-
-      // 2. Update Friend Ledgers for debts involving the current user
-      final mySettlement = settlements.firstWhere(
-        (s) => s.person.isMe,
-        orElse: () => PersonSettlement(
-          person: SplitParticipant(phone: cleanUserPhone, name: "You", isMe: true),
-          totalPaid: 0,
-          totalConsumed: 0,
-          netBalance: 0,
-          giveLines: [],
-          getLines: [],
-        ),
+      final me = people.values.where((p) => p.isMe).toList();
+      if (me.length != 1 ||
+          (me.single.phone != 'me' && me.single.phone != userPhone) ||
+          people.values.any(
+            (p) =>
+                !p.isMe &&
+                (!InputValidator.phone(p.phone) || p.phone == userPhone),
+          )) {
+        throw ArgumentError('Invalid participants');
+      }
+      // Never trust caller-supplied settlement amounts.
+      final calculated = SplitHelper.calculatePersonSettlements(
+        expenses: expenses,
+        allParticipants: people.values.toList(),
       );
-
-      // Debts current user owes to friends (You Give)
-      for (int i = 0; i < mySettlement.giveLines.length; i++) {
-        final line = mySettlement.giveLines[i];
-        final friendPhone = line.otherPerson.phone.trim();
-        if (friendPhone.isEmpty) continue;
-
-        final recRef = dbRef.child("Friends/$cleanUserPhone/$friendPhone/Records").push();
-        final recKey = recRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_give_$i";
-
-        multiPathUpdates["Friends/$cleanUserPhone/$friendPhone/Records/$recKey"] = {
-          "key": recKey,
-          "Amount": line.amount.toStringAsFixed(line.amount.truncateToDouble() == line.amount ? 0 : 2),
-          "Description": tripTitle.trim().isNotEmpty ? tripTitle.trim() : "Group Trip",
-          "Payment_Mode": paymentMode,
-          "Date": formattedDate,
-          "Type": "Take Money From Friend",
-          "timestamp": ServerValue.timestamp,
-        };
-
-        multiPathUpdates["Friends/$cleanUserPhone/$friendPhone/total_give"] =
-            ServerValue.increment(line.amount.round());
-      }
-
-      // Debts friends owe to current user (You Get)
-      for (int i = 0; i < mySettlement.getLines.length; i++) {
-        final line = mySettlement.getLines[i];
-        final friendPhone = line.otherPerson.phone.trim();
-        if (friendPhone.isEmpty) continue;
-
-        final recRef = dbRef.child("Friends/$cleanUserPhone/$friendPhone/Records").push();
-        final recKey = recRef.key ?? "${DateTime.now().millisecondsSinceEpoch}_get_$i";
-
-        multiPathUpdates["Friends/$cleanUserPhone/$friendPhone/Records/$recKey"] = {
-          "key": recKey,
-          "Amount": line.amount.toStringAsFixed(line.amount.truncateToDouble() == line.amount ? 0 : 2),
-          "Description": tripTitle.trim().isNotEmpty ? tripTitle.trim() : "Group Trip",
-          "Payment_Mode": paymentMode,
-          "Date": formattedDate,
-          "Type": "Give Money To Friend",
-          "timestamp": ServerValue.timestamp,
-        };
-
-        multiPathUpdates["Friends/$cleanUserPhone/$friendPhone/total_get"] =
-            ServerValue.increment(line.amount.round());
-      }
-
-      // Commit all passbook and ledger updates atomically
-      if (multiPathUpdates.isNotEmpty) {
-        await dbRef.update(multiPathUpdates);
-      }
-
-      return true;
-    } catch (e, st) {
-      debugPrint("FriendProvider.batchSaveMultiSplit error: $e\n$st");
-      _lastError = e.toString();
+      final mine = calculated.singleWhere((s) => s.person.isMe);
+      final payload = [
+        tripTitle,
+        paymentMode,
+        InputValidator.normalizedDate(formattedDate),
+        for (final e in expenses)
+          [
+            e.title,
+            e.amount,
+            e.category,
+            InputValidator.normalizedDate(e.date.toIso8601String()),
+            e.payer.phone,
+            e.participants.map((p) => p.phone).toList(),
+            e.customShares,
+          ],
+      ];
+      final success = await RetrySafeWriter.instance.write(
+        userPhone,
+        'group-trip',
+        payload,
+        (id) {
+          final updates = <String, Object?>{};
+          for (var i = 0; i < expenses.length; i++) {
+            final e = expenses[i], share = e.shareFor(me.single);
+            if (Money.paise(share) > 0) {
+              final key = '${id}_expense_$i';
+              final description =
+                  '$tripTitle: ${e.title} (Paid by ${e.payer.isMe ? 'You' : e.payer.name})';
+              if (!InputValidator.description(description)) {
+                throw ArgumentError('Description too long');
+              }
+              updates['Expenses/$userPhone/$key'] = {
+                ..._expense(
+                  key,
+                  Money.decimal(Money.paise(share)),
+                  description,
+                  e.payer.isMe ? paymentMode : 'Owed',
+                  '${e.date.day}/${e.date.month}/${e.date.year}',
+                  e.category,
+                ),
+                'split_id': id,
+              };
+            }
+          }
+          final lines = [...mine.giveLines, ...mine.getLines];
+          for (var i = 0; i < lines.length; i++) {
+            final line = lines[i], key = '${id}_debt_$i';
+            updates['Friends/$userPhone/${line.otherPerson.phone}/Records/$key'] =
+                {
+                  ..._record(
+                    key,
+                    Money.decimal(Money.paise(line.amount)),
+                    tripTitle,
+                    paymentMode,
+                    formattedDate,
+                    line.isGive
+                        ? 'Take Money From Friend'
+                        : 'Give Money To Friend',
+                  ),
+                  'split_id': id,
+                };
+          }
+          return updates;
+        },
+        intentId: intentId,
+      );
+      if (!success) _lastError = RetrySafeWriter.instance.failureMessage;
+      return success;
+    } catch (_) {
+      _lastError = 'Invalid split or trip details';
       return false;
     }
   }
 
-  /// Clears friends state on logout
   void clearFriends() {
     _subscription?.cancel();
     _subscription = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
-    _currentPhone = "";
+    _currentPhone = '';
     _friends.clear();
-    _totalGet = 0;
-    _totalGive = 0;
+    _getPaise = 0;
+    _givePaise = 0;
     _isOffline = false;
     _isLoading = false;
     _hasError = false;
-    _errorMessage = "";
+    _errorMessage = '';
     _lastError = null;
     notifyListeners();
   }
@@ -646,21 +733,21 @@ class FriendProvider extends ChangeNotifier {
   @visibleForTesting
   void setFriendsForTesting(
     List<Map<String, dynamic>> friends, {
-    int totalGet = 0,
-    int totalGive = 0,
+    num totalGet = 0,
+    num totalGive = 0,
   }) {
     _friends.clear();
     _friends.addAll(friends);
-    _totalGet = totalGet;
-    _totalGive = totalGive;
+    _getPaise = Money.paise(totalGet);
+    _givePaise = Money.paise(totalGive);
     _isLoading = false;
     _hasError = false;
     notifyListeners();
   }
 
   @visibleForTesting
-  void setIsOfflineForTesting(bool isOffline) {
-    _isOffline = isOffline;
+  void setIsOfflineForTesting(bool value) {
+    _isOffline = value;
     notifyListeners();
   }
 

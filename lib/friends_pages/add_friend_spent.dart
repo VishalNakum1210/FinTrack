@@ -1,3 +1,5 @@
+import 'package:fin_track/utils/money.dart';
+import 'package:fin_track/services/retry_safe_writer.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
@@ -7,10 +9,7 @@ import 'package:provider/provider.dart';
 
 class AddFriendExpenses extends StatefulWidget {
   final String friendNumber;
-  const AddFriendExpenses({
-    super.key,
-    required this.friendNumber,
-  });
+  const AddFriendExpenses({super.key, required this.friendNumber});
 
   @override
   State<AddFriendExpenses> createState() => _AddFriendExpensesState();
@@ -18,16 +17,14 @@ class AddFriendExpenses extends StatefulWidget {
 
 class _AddFriendExpensesState extends State<AddFriendExpenses> {
   bool isLoading = false;
+  final String _saveIntent = RetrySafeWriter.newIntent();
 
   final TextEditingController amountController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
 
   DateTime selectedDate = DateTime.now();
 
-  final List<String> paymentModes = const [
-    "Spent Online",
-    "Spent Cash",
-  ];
+  final List<String> paymentModes = const ["Spent Online", "Spent Cash"];
 
   final List<String> categoryTypes = const [
     "Give Money To Friend",
@@ -42,11 +39,20 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
   }
 
   void _addToAmount(double delta) {
-    final current = double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
+    final current =
+        (Money.tryPaise(amountController.text.replaceAll(',', '').trim()) ==
+                null
+            ? null
+            : Money.rupees(amountController.text.replaceAll(',', '').trim())) ??
+        0.0;
     final newVal = current + delta;
-    final str = newVal.truncateToDouble() == newVal ? newVal.toInt().toString() : newVal.toStringAsFixed(2);
+    final str = newVal.truncateToDouble() == newVal
+        ? newVal.toInt().toString()
+        : newVal.toStringAsFixed(2);
     amountController.text = str;
-    amountController.selection = TextSelection.fromPosition(TextPosition(offset: str.length));
+    amountController.selection = TextSelection.fromPosition(
+      TextPosition(offset: str.length),
+    );
   }
 
   void _clearAmount() {
@@ -64,9 +70,13 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final friends = context.read<FriendProvider>().friends;
-      final exists = friends.any((f) => (f["friend_number"] ?? "").toString() == widget.friendNumber);
+      final exists = friends.any(
+        (f) => (f["friend_number"] ?? "").toString() == widget.friendNumber,
+      );
       if (!exists && friends.isNotEmpty) {
-        Fluttertoast.showToast(msg: "Notice: Friend not found in recent friend list");
+        Fluttertoast.showToast(
+          msg: "Notice: Friend not found in recent friend list",
+        );
       }
     });
   }
@@ -95,6 +105,7 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
   }
 
   Future<void> getAllDetails() async {
+    if (isLoading) return;
     String amount = amountController.text.trim();
     String description = descriptionController.text.trim();
 
@@ -103,12 +114,16 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
       return;
     }
 
-    final parsed = double.tryParse(amount.replaceAll(',', '').trim());
+    final parsed = (Money.tryPaise(amount.replaceAll(',', '').trim()) == null
+        ? null
+        : Money.rupees(amount.replaceAll(',', '').trim()));
     if (parsed == null || parsed <= 0) {
       Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
     }
-    final formattedAmount = parsed.truncateToDouble() == parsed ? parsed.toInt().toString() : parsed.toStringAsFixed(2);
+    final formattedAmount = parsed.truncateToDouble() == parsed
+        ? parsed.toInt().toString()
+        : parsed.toStringAsFixed(2);
 
     setState(() {
       isLoading = true;
@@ -123,7 +138,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
 
       String formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
       if (!mounted) return;
-      final success = await context.read<FriendProvider>().addFriendTransaction(
+      final friendProvider = context.read<FriendProvider>();
+      final success = await friendProvider.addFriendTransaction(
+        intentId: _saveIntent,
         userPhone: userPhoneNumber,
         friendNumber: widget.friendNumber,
         amount: formattedAmount,
@@ -138,10 +155,13 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
         if (!mounted) return;
         Navigator.pop(context, true);
       } else {
-        Fluttertoast.showToast(msg: "Failed to save expense");
+        Fluttertoast.showToast(
+          msg: friendProvider.lastError ??
+              RetrySafeWriter.instance.failureMessage,
+        );
       }
     } catch (e) {
-      Fluttertoast.showToast(msg: "Failed to save expense: $e");
+      Fluttertoast.showToast(msg: "Unable to save expense. Please try again.");
     } finally {
       if (mounted) {
         setState(() {
@@ -157,7 +177,10 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
     final friends = context.watch<FriendProvider>().friends;
     final friendData = friends.firstWhere(
       (f) => (f["friend_number"] ?? "").toString() == widget.friendNumber,
-      orElse: () => {"friend_name": "Friend", "friend_number": widget.friendNumber},
+      orElse: () => {
+        "friend_name": "Friend",
+        "friend_number": widget.friendNumber,
+      },
     );
     final friendName = (friendData["friend_name"] ?? "Friend").toString();
 
@@ -166,7 +189,11 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
       appBar: AppBar(
         title: const Text(
           "Record Friend Expense",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: primary,
@@ -200,7 +227,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                           radius: 24,
                           backgroundColor: primary.withValues(alpha: 0.15),
                           child: Text(
-                            friendName.isNotEmpty ? friendName[0].toUpperCase() : 'F',
+                            friendName.isNotEmpty
+                                ? friendName[0].toUpperCase()
+                                : 'F',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -233,7 +262,10 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF1F8E9),
                             borderRadius: BorderRadius.circular(12),
@@ -255,7 +287,10 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
 
                   // 2. Hero Amount Card with Quick Add Chips
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 18,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(22),
@@ -312,7 +347,10 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                             Expanded(
                               child: TextField(
                                 controller: amountController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 maxLength: 10,
                                 style: const TextStyle(
                                   fontSize: 34,
@@ -322,7 +360,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                                 ),
                                 decoration: const InputDecoration(
                                   hintText: "0.00",
-                                  hintStyle: TextStyle(color: Color(0xFFCBD5E1)),
+                                  hintStyle: TextStyle(
+                                    color: Color(0xFFCBD5E1),
+                                  ),
                                   border: InputBorder.none,
                                   counterText: "",
                                   isDense: true,
@@ -381,20 +421,27 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                             // You Gave Money
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() => selectedType = "Give Money To Friend"),
+                                onTap: () => setState(
+                                  () => selectedType = "Give Money To Friend",
+                                ),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 180),
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: selectedType == "Give Money To Friend"
+                                    color:
+                                        selectedType == "Give Money To Friend"
                                         ? const Color(0xFFE8F5E9)
                                         : const Color(0xFFF8FAFC),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: selectedType == "Give Money To Friend"
+                                      color:
+                                          selectedType == "Give Money To Friend"
                                           ? const Color(0xFF2E7D32)
                                           : const Color(0xFFE2E8F0),
-                                      width: selectedType == "Give Money To Friend" ? 2 : 1,
+                                      width:
+                                          selectedType == "Give Money To Friend"
+                                          ? 2
+                                          : 1,
                                     ),
                                   ),
                                   child: Column(
@@ -402,15 +449,21 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                                       Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: selectedType == "Give Money To Friend"
-                                              ? const Color(0xFF2E7D32).withValues(alpha: 0.2)
+                                          color:
+                                              selectedType ==
+                                                  "Give Money To Friend"
+                                              ? const Color(
+                                                  0xFF2E7D32,
+                                                ).withValues(alpha: 0.2)
                                               : Colors.grey.shade200,
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
                                           Icons.arrow_upward_rounded,
                                           size: 20,
-                                          color: selectedType == "Give Money To Friend"
+                                          color:
+                                              selectedType ==
+                                                  "Give Money To Friend"
                                               ? const Color(0xFF2E7D32)
                                               : Colors.grey.shade600,
                                         ),
@@ -421,7 +474,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13.5,
-                                          color: selectedType == "Give Money To Friend"
+                                          color:
+                                              selectedType ==
+                                                  "Give Money To Friend"
                                               ? const Color(0xFF2E7D32)
                                               : const Color(0xFF334155),
                                         ),
@@ -431,7 +486,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                                         "Friend owes you",
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: selectedType == "Give Money To Friend"
+                                          color:
+                                              selectedType ==
+                                                  "Give Money To Friend"
                                               ? const Color(0xFF2E7D32)
                                               : const Color(0xFF64748B),
                                         ),
@@ -445,20 +502,29 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                             // You Took Money
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() => selectedType = "Take Money From Friend"),
+                                onTap: () => setState(
+                                  () => selectedType = "Take Money From Friend",
+                                ),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 180),
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: selectedType == "Take Money From Friend"
+                                    color:
+                                        selectedType == "Take Money From Friend"
                                         ? const Color(0xFFFFEBEE)
                                         : const Color(0xFFF8FAFC),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: selectedType == "Take Money From Friend"
+                                      color:
+                                          selectedType ==
+                                              "Take Money From Friend"
                                           ? const Color(0xFFC62828)
                                           : const Color(0xFFE2E8F0),
-                                      width: selectedType == "Take Money From Friend" ? 2 : 1,
+                                      width:
+                                          selectedType ==
+                                              "Take Money From Friend"
+                                          ? 2
+                                          : 1,
                                     ),
                                   ),
                                   child: Column(
@@ -466,15 +532,21 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                                       Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: selectedType == "Take Money From Friend"
-                                              ? const Color(0xFFC62828).withValues(alpha: 0.2)
+                                          color:
+                                              selectedType ==
+                                                  "Take Money From Friend"
+                                              ? const Color(
+                                                  0xFFC62828,
+                                                ).withValues(alpha: 0.2)
                                               : Colors.grey.shade200,
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
                                           Icons.arrow_downward_rounded,
                                           size: 20,
-                                          color: selectedType == "Take Money From Friend"
+                                          color:
+                                              selectedType ==
+                                                  "Take Money From Friend"
                                               ? const Color(0xFFC62828)
                                               : Colors.grey.shade600,
                                         ),
@@ -485,7 +557,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13.5,
-                                          color: selectedType == "Take Money From Friend"
+                                          color:
+                                              selectedType ==
+                                                  "Take Money From Friend"
                                               ? const Color(0xFFC62828)
                                               : const Color(0xFF334155),
                                         ),
@@ -495,7 +569,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                                         "You owe friend",
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: selectedType == "Take Money From Friend"
+                                          color:
+                                              selectedType ==
+                                                  "Take Money From Friend"
                                               ? const Color(0xFFC62828)
                                               : const Color(0xFF64748B),
                                         ),
@@ -541,9 +617,19 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            _paymentModePill("Spent Online", "Online / UPI", Icons.credit_card_rounded, primary),
+                            _paymentModePill(
+                              "Spent Online",
+                              "Online / UPI",
+                              Icons.credit_card_rounded,
+                              primary,
+                            ),
                             const SizedBox(width: 10),
-                            _paymentModePill("Spent Cash", "Cash", Icons.payments_rounded, const Color(0xFFFFA000)),
+                            _paymentModePill(
+                              "Spent Cash",
+                              "Cash",
+                              Icons.payments_rounded,
+                              const Color(0xFFFFA000),
+                            ),
                           ],
                         ),
                       ],
@@ -572,18 +658,29 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                           onTap: pickDate,
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.calendar_month_rounded, color: primary, size: 20),
+                                const Icon(
+                                  Icons.calendar_month_rounded,
+                                  color: primary,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 10),
                                 Text(
-                                  DateFormat('dd MMMM yyyy').format(selectedDate),
+                                  DateFormat(
+                                    'dd MMMM yyyy',
+                                  ).format(selectedDate),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -607,21 +704,40 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                         TextField(
                           controller: descriptionController,
                           maxLength: 150,
-                          style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF1E293B),
+                          ),
                           decoration: InputDecoration(
-                            hintText: "Add note / reason (e.g. Dinner share, Cab fare)",
-                            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                            prefixIcon: const Icon(Icons.edit_note_rounded, color: primary, size: 22),
+                            hintText:
+                                "Add note / reason (e.g. Dinner share, Cab fare)",
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 13.5,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.edit_note_rounded,
+                              color: primary,
+                              size: 22,
+                            ),
                             filled: true,
                             fillColor: const Color(0xFFF8FAFC),
                             counterText: "",
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
                             enabledBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: primary, width: 1.8),
+                              borderSide: const BorderSide(
+                                color: primary,
+                                width: 1.8,
+                              ),
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
@@ -700,7 +816,12 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
     );
   }
 
-  Widget _paymentModePill(String modeKey, String label, IconData icon, Color color) {
+  Widget _paymentModePill(
+    String modeKey,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
     final isSelected = selectedMode == modeKey;
     return Expanded(
       child: InkWell(
@@ -710,7 +831,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.12) : const Color(0xFFF8FAFC),
+            color: isSelected
+                ? color.withValues(alpha: 0.12)
+                : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isSelected ? color : const Color(0xFFE2E8F0),
@@ -720,7 +843,11 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: isSelected ? color : const Color(0xFF64748B)),
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? color : const Color(0xFF64748B),
+              ),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(

@@ -1,3 +1,5 @@
+import 'package:fin_track/utils/ledger_totals.dart';
+import 'package:fin_track/utils/money.dart';
 import 'dart:async';
 import 'package:fin_track/friends_pages/add_friend_spent.dart';
 import 'package:fin_track/get_information/session_manager.dart';
@@ -16,7 +18,11 @@ import 'package:provider/provider.dart';
 class Specificfriendpage extends StatefulWidget {
   final String friendNumber;
   final String friendName;
-  const Specificfriendpage({super.key, required this.friendNumber, required this.friendName});
+  const Specificfriendpage({
+    super.key,
+    required this.friendNumber,
+    required this.friendName,
+  });
 
   @override
   State<Specificfriendpage> createState() => _SpecificfriendpageState();
@@ -30,6 +36,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
   Map<String, dynamic> _friendData = {};
   List<Map<String, dynamic>> _records = [];
   bool _isLoading = true;
+  String? _syncError;
 
   @override
   void initState() {
@@ -40,14 +47,27 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
   Future<void> _startStream() async {
     await _sub?.cancel();
     _sub = null;
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _syncError = null;
+      });
+    }
 
     _userPhone = await SessionManager.getPhoneNumber() ?? '';
     if (_userPhone.isEmpty) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _syncError = 'Session expired. Please sign in again.';
+        });
+      }
       return;
     }
 
-    final ref = FirebaseDatabase.instance.ref('Friends/$_userPhone/${widget.friendNumber}');
+    final ref = FirebaseDatabase.instance.ref(
+      'Friends/$_userPhone/${widget.friendNumber}',
+    );
     _sub = ref.onValue.listen(
       (event) {
         if (!mounted) return;
@@ -92,10 +112,17 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
           _friendData = data;
           _records = records;
           _isLoading = false;
+          _syncError = null;
         });
       },
       onError: (_) {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _syncError =
+                'Unable to sync this ledger. Cached records may be out of date.';
+          });
+        }
       },
     );
   }
@@ -106,33 +133,40 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
     super.dispose();
   }
 
-  int get _totalGet => (double.tryParse(_friendData['total_get']?.toString() ?? '0') ?? 0.0).round();
-  int get _totalGive => (double.tryParse(_friendData['total_give']?.toString() ?? '0') ?? 0.0).round();
+  double get _totalGet => LedgerTotals.fromRecords(_records).totalGet;
+  double get _totalGive => LedgerTotals.fromRecords(_records).totalGive;
 
   String _getInitials(String name) {
     final clean = name.trim();
     if (clean.isEmpty) return "F";
-    final parts = clean.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = clean
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.length == 1) {
       return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
     }
     return "${parts[0][0]}${parts[1][0]}".toUpperCase();
   }
 
-  Future<void> _deleteRecord(String key, bool isGive, int amount) async {
+  Future<void> _deleteRecord(String key, bool isGive, double amount) async {
     if (mounted) setState(() => _isLoading = true);
     try {
       if (!mounted) return;
-      await context.read<FriendProvider>().deleteFriendTransaction(
+      final success = await context
+          .read<FriendProvider>()
+          .deleteFriendTransaction(
             userPhone: _userPhone,
             friendNumber: widget.friendNumber,
             recordKey: key,
             isGive: isGive,
             amount: amount,
           );
-      Fluttertoast.showToast(msg: 'Record deleted');
+      Fluttertoast.showToast(
+        msg: success ? 'Record deleted' : 'Unable to delete record',
+      );
     } catch (e) {
-      Fluttertoast.showToast(msg: '$e');
+      Fluttertoast.showToast(msg: 'Unable to delete record');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -155,38 +189,32 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
     final newDesc = result['desc'] ?? '';
     if (newAmount.isEmpty) return;
 
-    final parsedNew = double.tryParse(newAmount.replaceAll(',', '').trim());
-    if (parsedNew == null || parsedNew <= 0) {
+    final parsedPaise = Money.tryPaise(newAmount.replaceAll(',', '').trim());
+    if (parsedPaise == null || parsedPaise <= 0) {
       Fluttertoast.showToast(msg: 'Please enter a valid amount');
       return;
     }
-    final cleanNewAmount = parsedNew.truncateToDouble() == parsedNew
-        ? parsedNew.toInt().toString()
-        : parsedNew.toStringAsFixed(2);
+    final cleanNewAmount = Money.decimal(parsedPaise);
 
     try {
-      final oldAmt = (double.tryParse(record['Amount']?.toString() ?? '0') ?? 0.0).round();
-      final newAmt = parsedNew.round();
-      final diff = newAmt - oldAmt;
-
-      final ref = FirebaseDatabase.instance
-          .ref('Friends/$_userPhone/${widget.friendNumber}/Records/${record['key']}');
-      await ref.update({'Amount': cleanNewAmount, 'Description': newDesc});
-
-      if (diff != 0 && mounted) {
-        final isGive = record['Type'] == 'Take Money From Friend';
-        final friendRef = FirebaseDatabase.instance.ref('Friends/$_userPhone/${widget.friendNumber}');
-        await context.read<FriendProvider>().adjustLedger(
-              friendRef: friendRef,
-              field: isGive ? 'total_give' : 'total_get',
-              delta: diff,
-            );
+      final success = await context
+          .read<FriendProvider>()
+          .updateFriendTransaction(
+            userPhone: _userPhone,
+            friendNumber: widget.friendNumber,
+            recordKey: record['key'].toString(),
+            amount: cleanNewAmount,
+            description: newDesc,
+          );
+      if (!success) {
+        Fluttertoast.showToast(msg: 'Unable to update transaction');
+        return;
       }
       record['Amount'] = cleanNewAmount;
       record['Description'] = newDesc;
       Fluttertoast.showToast(msg: 'Transaction updated');
     } catch (e) {
-      Fluttertoast.showToast(msg: 'Failed to update: $e');
+      Fluttertoast.showToast(msg: 'Unable to update transaction');
     }
   }
 
@@ -207,7 +235,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
     );
   }
 
-  void _showSettleUpModal(String friendName, int net) {
+  void _showSettleUpModal(String friendName, double net) {
     if (net == 0) {
       Fluttertoast.showToast(msg: "All settled up with $friendName!");
       return;
@@ -249,18 +277,24 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isOwed ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                    color: isOwed
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        isOwed ? "Outstanding to Collect:" : "Outstanding to Pay:",
+                        isOwed
+                            ? "Outstanding to Collect:"
+                            : "Outstanding to Pay:",
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: isOwed ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                          color: isOwed
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFC62828),
                         ),
                       ),
                       Text(
@@ -268,7 +302,9 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: isOwed ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                          color: isOwed
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFC62828),
                         ),
                       ),
                     ],
@@ -283,18 +319,31 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AddFriendExpenses(friendNumber: widget.friendNumber),
+                          builder: (_) => AddFriendExpenses(
+                            friendNumber: widget.friendNumber,
+                          ),
                         ),
                       );
                     },
-                    icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
+                    icon: const Icon(
+                      Icons.receipt_long_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                     label: Text(
-                      isOwed ? "Record Settlement Received" : "Record Settlement Paid",
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      isOwed
+                          ? "Record Settlement Received"
+                          : "Record Settlement Paid",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryGreen,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -308,8 +357,10 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
 
   @override
   Widget build(BuildContext context) {
-    final friendName = (_friendData['friend_name'] ?? widget.friendName).toString();
-    final friendNumber = (_friendData['friend_number'] ?? widget.friendNumber).toString();
+    final friendName = (_friendData['friend_name'] ?? widget.friendName)
+        .toString();
+    final friendNumber = (_friendData['friend_number'] ?? widget.friendNumber)
+        .toString();
     final net = _totalGet - _totalGive;
     final initials = _getInitials(friendName);
 
@@ -388,7 +439,11 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               onPressed: _exportPdf,
             ),
@@ -398,72 +453,90 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: primaryGreen))
+          : _syncError != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_syncError!, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: _startStream,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
           : _friendData.isEmpty
-              ? const Center(child: Text('Friend Not Found'))
-              : SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 30),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ? const Center(child: Text('Friend Not Found'))
+          : SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 30),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. BALANCED METRICS (You Get vs You Give)
+                  _buildBalancedMetrics(),
+                  const SizedBox(height: 16),
+
+                  // 2. ACTION BAR (+ Add Transaction & Settle Up)
+                  _buildActionBar(friendName, net),
+                  const SizedBox(height: 20),
+
+                  // 3. TRANSACTIONS LIST HEADER
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // 1. BALANCED METRICS (You Get vs You Give)
-                      _buildBalancedMetrics(),
-                      const SizedBox(height: 16),
-
-                      // 2. ACTION BAR (+ Add Transaction & Settle Up)
-                      _buildActionBar(friendName, net),
-                      const SizedBox(height: 20),
-
-                      // 3. TRANSACTIONS LIST HEADER
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Transactions',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                          Text(
-                            "${_records.length} ${_records.length == 1 ? 'record' : 'records'}",
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // 4. TRANSACTIONS LEDGER LIST
-                      if (_records.isEmpty)
-                        _buildEmptyHistory()
-                      else
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _records.length,
-                          itemBuilder: (context, index) {
-                            final record = _records[index];
-                            final isGive = record['Type'] == 'Take Money From Friend';
-                            final amount =
-                                (double.tryParse(record['Amount']?.toString() ?? '0') ?? 0.0).round();
-                            final key = (record['key'] ?? '').toString();
-
-                            return _buildTransactionCard(
-                              record: record,
-                              isGive: isGive,
-                              amount: amount,
-                              keyStr: key,
-                            );
-                          },
+                      const Text(
+                        'Transactions',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
                         ),
+                      ),
+                      Text(
+                        "${_records.length} ${_records.length == 1 ? 'record' : 'records'}",
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+
+                  // 4. TRANSACTIONS LEDGER LIST
+                  if (_records.isEmpty)
+                    _buildEmptyHistory()
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _records.length,
+                      itemBuilder: (context, index) {
+                        final record = _records[index];
+                        final isGive =
+                            record['Type'] == 'Take Money From Friend';
+                        final amount = Money.rupees(record['Amount']);
+                        final key = (record['key'] ?? '').toString();
+
+                        return _buildTransactionCard(
+                          record: record,
+                          isGive: isGive,
+                          amount: amount,
+                          keyStr: key,
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -548,7 +621,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
     );
   }
 
-  Widget _buildActionBar(String friendName, int net) {
+  Widget _buildActionBar(String friendName, double net) {
     return Row(
       children: [
         // + Add Transaction (Outlined Button)
@@ -560,7 +633,8 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => AddFriendExpenses(friendNumber: widget.friendNumber),
+                    builder: (context) =>
+                        AddFriendExpenses(friendNumber: widget.friendNumber),
                   ),
                 );
               },
@@ -580,7 +654,9 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
               style: OutlinedButton.styleFrom(
                 backgroundColor: Colors.white,
                 side: const BorderSide(color: primaryGreen, width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 elevation: 0,
               ),
             ),
@@ -597,7 +673,9 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryGreen,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 elevation: 0,
               ),
               child: const FittedBox(
@@ -605,10 +683,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                 child: Text(
                   'Settle Up',
                   maxLines: 1,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ),
             ),
@@ -621,7 +696,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
   Widget _buildTransactionCard({
     required Map<String, dynamic> record,
     required bool isGive,
-    required int amount,
+    required double amount,
     required String keyStr,
   }) {
     final title = (record['Type'] ?? '').toString();
@@ -654,7 +729,9 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isGive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              isGive
+                  ? Icons.arrow_upward_rounded
+                  : Icons.arrow_downward_rounded,
               color: isGive ? const Color(0xFFC62828) : const Color(0xFF2E7D32),
               size: 20,
             ),
@@ -679,7 +756,10 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                 const SizedBox(height: 3),
                 Text(
                   DateHelper.formatDisplay(date),
-                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -699,7 +779,9 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: isGive ? const Color(0xFFC62828) : const Color(0xFF2E7D32),
+                      color: isGive
+                          ? const Color(0xFFC62828)
+                          : const Color(0xFF2E7D32),
                     ),
                   ),
                 ),
@@ -707,7 +789,11 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
               const SizedBox(width: 6),
               // Pencil Icon (Edit)
               IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(),
                 onPressed: () => _editRecord(record),
@@ -716,14 +802,19 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
               const SizedBox(width: 6),
               // Trash Icon (Delete)
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  size: 18,
+                  color: Color(0xFFEF4444),
+                ),
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(),
                 onPressed: () async {
                   final confirmed = await showDeleteConfirmDialog(
                     context,
                     title: 'Delete Record',
-                    message: 'Are you sure you want to delete this record?',
+                    message:
+                        'Delete this record? If it belongs to a split, all linked bill and friend records will be deleted together.',
                   );
                   if (confirmed == true && keyStr.isNotEmpty) {
                     await _deleteRecord(keyStr, isGive, amount);
@@ -753,7 +844,11 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
           SizedBox(height: 12),
           Text(
             'No Transactions Yet',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
           ),
           SizedBox(height: 4),
           Text(
@@ -782,8 +877,12 @@ class _EditRecordBottomSheetState extends State<_EditRecordBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _amountCtrl = TextEditingController(text: widget.record['Amount']?.toString() ?? '');
-    _descCtrl = TextEditingController(text: widget.record['Description']?.toString() ?? '');
+    _amountCtrl = TextEditingController(
+      text: widget.record['Amount']?.toString() ?? '',
+    );
+    _descCtrl = TextEditingController(
+      text: widget.record['Description']?.toString() ?? '',
+    );
   }
 
   @override
@@ -821,17 +920,25 @@ class _EditRecordBottomSheetState extends State<_EditRecordBottomSheet> {
             ),
             const Text(
               'Edit Ledger Record',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
             ),
             const SizedBox(height: 18),
             TextField(
               controller: _amountCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               maxLength: 10,
               decoration: InputDecoration(
                 labelText: 'Amount (₹)',
                 counterText: '',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -841,7 +948,9 @@ class _EditRecordBottomSheetState extends State<_EditRecordBottomSheet> {
               decoration: InputDecoration(
                 labelText: 'Note / Description',
                 counterText: '',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -860,9 +969,14 @@ class _EditRecordBottomSheetState extends State<_EditRecordBottomSheet> {
                 backgroundColor: primaryGreen,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              child: const Text(
+                'Save Changes',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
             ),
           ],
         ),

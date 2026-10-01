@@ -22,8 +22,17 @@ class DateHelper {
       if (str.length >= 10 && str[4] == '-' && str[7] == '-') {
         final expectedMonth = int.tryParse(str.substring(5, 7));
         final expectedDay = int.tryParse(str.substring(8, 10));
-        if (expectedMonth != null && expectedMonth != iso.month) return null;
-        if (expectedDay != null && expectedDay != iso.day) return null;
+        final expectedYear = int.tryParse(str.substring(0, 4));
+        if (expectedYear != null &&
+            expectedMonth != null &&
+            expectedDay != null) {
+          final calendar = DateTime(expectedYear, expectedMonth, expectedDay);
+          if (calendar.year != expectedYear ||
+              calendar.month != expectedMonth ||
+              calendar.day != expectedDay) {
+            return null;
+          }
+        }
       }
       return iso;
     }
@@ -35,7 +44,14 @@ class DateHelper {
         final d = int.tryParse(parts[0]);
         final m = int.tryParse(parts[1]);
         final y = int.tryParse(parts[2]);
-        if (d != null && m != null && y != null && y > 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        if (d != null &&
+            m != null &&
+            y != null &&
+            y > 1900 &&
+            m >= 1 &&
+            m <= 12 &&
+            d >= 1 &&
+            d <= 31) {
           final dt = DateTime(y, m, d);
           if (dt.year == y && dt.month == m && dt.day == d) {
             return dt;

@@ -40,7 +40,8 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialPhoneNumber != null && widget.initialPhoneNumber!.isNotEmpty) {
+    if (widget.initialPhoneNumber != null &&
+        widget.initialPhoneNumber!.isNotEmpty) {
       username.text = widget.initialPhoneNumber!;
     }
   }
@@ -76,6 +77,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> checkUserDetails() async {
+    if (isLoading) return;
     if (lockoutSeconds > 0) {
       Fluttertoast.showToast(
         msg: "Too many failed attempts. Please wait $lockoutSeconds seconds.",
@@ -84,10 +86,12 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     String phoneNumber = username.text.trim();
-    String passwordUser = password.text.trim();
+    String passwordUser = password.text;
 
     if (phoneNumber.isEmpty || passwordUser.isEmpty) {
-      Fluttertoast.showToast(msg: "Please enter your phone number and password");
+      Fluttertoast.showToast(
+        msg: "Please enter your phone number and password",
+      );
       return;
     }
     if (phoneNumber.length != 10 || int.tryParse(phoneNumber) == null) {
@@ -100,15 +104,42 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: "$phoneNumber@fintrack.app",
-        password: passwordUser,
-      );
+      final userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: "$phoneNumber@fintrack.app",
+            password: passwordUser,
+          );
 
       if (userCredential.user != null) {
         failedAttempts = 0;
-        final myRef = FirebaseDatabase.instance.ref("user_details/$phoneNumber");
-        final event = await myRef.once().timeout(const Duration(seconds: 8));
+        final myRef = FirebaseDatabase.instance.ref(
+          "user_details/$phoneNumber",
+        );
+        var event = await myRef.once().timeout(const Duration(seconds: 8));
+
+        if (!event.snapshot.exists ||
+            (event.snapshot.value is Map &&
+                (event.snapshot.value as Map)['deletion_pending'] == true &&
+                (event.snapshot.value as Map)['owner_uid'] !=
+                    userCredential.user!.uid)) {
+          // Resume provisioning using the SAME Auth UID after an interrupted
+          // registration. Rules prohibit adopting orphaned financial roots.
+          await myRef.set({
+            'owner_uid': userCredential.user!.uid,
+            'phone_number': phoneNumber,
+            'name': userCredential.user?.displayName?.trim().isNotEmpty == true
+                ? userCredential.user!.displayName!.trim()
+                : 'User',
+            'email': '',
+            'created_at': ServerValue.timestamp,
+          });
+          event = await myRef.once().timeout(const Duration(seconds: 8));
+        } else if (event.snapshot.value is Map &&
+            (event.snapshot.value as Map)['owner_uid'] == null) {
+          try {
+            await myRef.update({'owner_uid': userCredential.user!.uid});
+          } catch (_) {}
+        }
 
         String name = "User";
         String email = "";
@@ -122,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
             'fullName',
             'FullName',
             'displayName',
-            'DisplayName'
+            'DisplayName',
           ]) {
             final val = values[key]?.toString().trim();
             if (val != null && val.isNotEmpty && val != 'User') {
@@ -143,8 +174,13 @@ class _LoginPageState extends State<LoginPage> {
 
         // Fallback to SessionManager cached username
         if (name == "User" || name.isEmpty) {
-          final sessionName = await SessionManager.getUsername();
-          if (sessionName != null && sessionName.trim().isNotEmpty && sessionName.trim() != "User") {
+          final sessionName =
+              await SessionManager.getPhoneNumber() == phoneNumber
+              ? await SessionManager.getUsername()
+              : null;
+          if (sessionName != null &&
+              sessionName.trim().isNotEmpty &&
+              sessionName.trim() != "User") {
             name = sessionName.trim();
           }
         }
@@ -165,11 +201,15 @@ class _LoginPageState extends State<LoginPage> {
           } catch (_) {}
         }
 
-        await SessionManager.saveSession(
-          phoneNumber: phoneNumber,
-          username: name,
-          email: email,
-        );
+        try {
+          await SessionManager.saveSession(
+            phoneNumber: phoneNumber,
+            username: name,
+            email: email,
+          );
+        } catch (_) {
+          // Local profile caching cannot invalidate remote provisioning.
+        }
 
         if (mounted) {
           context.read<UserProvider>().loadUserSession();
@@ -193,13 +233,11 @@ class _LoginPageState extends State<LoginPage> {
           msg: "Too many failed attempts. Locked for 30 seconds.",
         );
       } else {
-        if (e.code == 'user-not-found') {
+        if (e.code == 'user-not-found' ||
+            e.code == 'wrong-password' ||
+            e.code == 'invalid-credential') {
           Fluttertoast.showToast(
-            msg: "No account found. If you registered previously, tap Register to link your data.",
-          );
-        } else if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-          Fluttertoast.showToast(
-            msg: "Incorrect password (${5 - failedAttempts} attempts remaining)",
+            msg: "Unable to sign in. Check your credentials and try again.",
           );
         } else if (e.code == 'user-disabled') {
           Fluttertoast.showToast(
@@ -216,7 +254,8 @@ class _LoginPageState extends State<LoginPage> {
           );
         } else if (e.code == 'operation-not-allowed') {
           Fluttertoast.showToast(
-            msg: "Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication > Sign-in method.",
+            msg:
+                "Email/Password sign-in is disabled in Firebase Console. Please enable it under Authentication > Sign-in method.",
           );
         } else if (e.code == 'invalid-email') {
           Fluttertoast.showToast(
@@ -227,7 +266,7 @@ class _LoginPageState extends State<LoginPage> {
             msg: "Please enter your phone number and password.",
           );
         } else {
-          Fluttertoast.showToast(msg: e.message ?? "Authentication failed");
+          Fluttertoast.showToast(msg: "Unable to sign in. Please try again.");
         }
       }
     } catch (e) {
@@ -235,7 +274,9 @@ class _LoginPageState extends State<LoginPage> {
       try {
         await FirebaseAuth.instance.signOut();
       } catch (_) {}
-      Fluttertoast.showToast(msg: "Connection error: Unable to load user profile. Please retry.");
+      Fluttertoast.showToast(
+        msg: "Connection error: Unable to load user profile. Please retry.",
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -265,31 +306,19 @@ class _LoginPageState extends State<LoginPage> {
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          width: 1.2,
-          color: _borderColor,
-        ),
+        borderSide: const BorderSide(width: 1.2, color: _borderColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          width: 1.8,
-          color: _brandGreen,
-        ),
+        borderSide: const BorderSide(width: 1.8, color: _brandGreen),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          width: 1.2,
-          color: Color(0xFFEF4444),
-        ),
+        borderSide: const BorderSide(width: 1.2, color: Color(0xFFEF4444)),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          width: 1.8,
-          color: Color(0xFFEF4444),
-        ),
+        borderSide: const BorderSide(width: 1.8, color: Color(0xFFEF4444)),
       ),
     );
   }
@@ -307,14 +336,20 @@ class _LoginPageState extends State<LoginPage> {
               child: Center(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // FinTrack Brand Header with App Logo
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
                         children: [
                           Container(
                             height: 44,
@@ -337,7 +372,6 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
                           const Text(
                             "FinTrack",
                             style: TextStyle(
@@ -406,7 +440,9 @@ class _LoginPageState extends State<LoginPage> {
                               controller: username,
                               keyboardType: TextInputType.phone,
                               maxLength: 10,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
                               textInputAction: TextInputAction.next,
                               style: const TextStyle(
                                 fontSize: 15,
@@ -416,7 +452,10 @@ class _LoginPageState extends State<LoginPage> {
                               decoration: _inputDecoration(
                                 hint: "Enter 10 digit number",
                                 prefixIcon: Padding(
-                                  padding: const EdgeInsets.only(left: 14, right: 10),
+                                  padding: const EdgeInsets.only(
+                                    left: 14,
+                                    right: 10,
+                                  ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -460,9 +499,10 @@ class _LoginPageState extends State<LoginPage> {
                             TextField(
                               controller: password,
                               obscureText: !isPasswordVisible,
-                              maxLength: 64,
+                              maxLength: 128,
                               textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => (isLoading || lockoutSeconds > 0)
+                              onSubmitted: (_) =>
+                                  (isLoading || lockoutSeconds > 0)
                                   ? null
                                   : checkUserDetails(),
                               style: const TextStyle(
@@ -497,7 +537,8 @@ class _LoginPageState extends State<LoginPage> {
                               child: GestureDetector(
                                 onTap: () {
                                   Fluttertoast.showToast(
-                                    msg: "Please contact support or admin to reset your credentials.",
+                                    msg:
+                                        "Please contact support or admin to reset your credentials.",
                                   );
                                 },
                                 child: const Text(
@@ -523,7 +564,9 @@ class _LoginPageState extends State<LoginPage> {
                                     : checkUserDetails,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _brandGreen,
-                                  disabledBackgroundColor: const Color(0xFFCBD5E1),
+                                  disabledBackgroundColor: const Color(
+                                    0xFFCBD5E1,
+                                  ),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
@@ -549,8 +592,11 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 24),
 
                       // Sign Up Footer Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 4,
+                        runSpacing: 6,
                         children: [
                           const Text(
                             "Don't have an account? ",
@@ -568,7 +614,8 @@ class _LoginPageState extends State<LoginPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const RegistrationPage(),
+                                    builder: (context) =>
+                                        const RegistrationPage(),
                                   ),
                                 );
                               }

@@ -35,13 +35,19 @@ void main() {
         ChangeNotifierProvider<FriendProvider>.value(value: friendProvider),
         ChangeNotifierProvider<UserProvider>.value(value: userProvider),
       ],
-      child: const MaterialApp(
-        home: NavPageSelector(),
-      ),
+      child: const MaterialApp(home: NavPageSelector()),
     );
   }
 
   group('NavPageSelector Widget Tests', () {
+    testWidgets('existing pages fit a narrow 274px screen', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(274, 640);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pumpAndSettle();
+    });
     testWidgets('renders all 4 navigation tabs properly', (tester) async {
       await tester.pumpWidget(createWidgetUnderTest());
       await tester.pumpAndSettle();
@@ -76,7 +82,9 @@ void main() {
       expect(tester.widget<IndexedStack>(indexedStackFinder).index, equals(3));
     });
 
-    testWidgets('displays offline banner when network is disconnected', (tester) async {
+    testWidgets('displays offline banner when network is disconnected', (
+      tester,
+    ) async {
       await tester.pumpWidget(createWidgetUnderTest());
       await tester.pumpAndSettle();
 
@@ -88,7 +96,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
-      expect(find.text('No Internet Connection • Offline Mode'), findsOneWidget);
+      expect(
+        find.text('No Internet Connection • Offline Mode'),
+        findsOneWidget,
+      );
 
       // Restore connectivity
       friendProvider.setIsOfflineForTesting(false);
@@ -98,7 +109,9 @@ void main() {
       expect(find.text('No Internet Connection • Offline Mode'), findsNothing);
     });
 
-    testWidgets('PopScope navigates back to Home tab when not on Home', (tester) async {
+    testWidgets('PopScope navigates back to Home tab when not on Home', (
+      tester,
+    ) async {
       await tester.pumpWidget(createWidgetUnderTest());
       await tester.pumpAndSettle();
 
@@ -106,7 +119,9 @@ void main() {
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
 
-      var indexedStack = tester.widget<IndexedStack>(find.byType(IndexedStack).first);
+      var indexedStack = tester.widget<IndexedStack>(
+        find.byType(IndexedStack).first,
+      );
       expect(indexedStack.index, equals(3));
 
       // Trigger pop navigation (simulate Android back button)
@@ -116,7 +131,9 @@ void main() {
       });
       await tester.pumpAndSettle();
 
-      indexedStack = tester.widget<IndexedStack>(find.byType(IndexedStack).first);
+      indexedStack = tester.widget<IndexedStack>(
+        find.byType(IndexedStack).first,
+      );
       expect(indexedStack.index, equals(0));
     });
   });

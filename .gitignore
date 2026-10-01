@@ -4,6 +4,10 @@
 *.pyc
 *.swp
 *.mp4
+/node_modules/
+firebase-debug.log
+database-debug.log
+ui-debug.log
 .DS_Store
 .atom/
 .build/
@@ -33,6 +37,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/.release-backups/
 
 # Symbolication related
 app.*.symbols

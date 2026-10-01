@@ -81,55 +81,36 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
 
-      final phone = await SessionManager.getPhoneNumber() ??
-          (user.email?.split('@').first ?? "");
-
-      // ── FIX C1: Clean RTDB FIRST while user is still authenticated ──────────
-      // Deleting data before removing the Auth account ensures the RTDB security
-      // rules allow the write. If RTDB cleanup fails, we abort – the Auth account
-      // stays intact and the user can retry. This prevents orphaned data.
-      if (phone.isNotEmpty && phone.length == 10) {
-        try {
-          await FirebaseDatabase.instance.ref("Friends/$phone").remove();
-          await FirebaseDatabase.instance.ref("Expenses/$phone").remove();
-          await FirebaseDatabase.instance.ref("user_details/$phone").remove();
-        } catch (dbErr) {
-          Fluttertoast.showToast(msg: "Failed to clear your data. Account not deleted.");
-          if (mounted) setState(() => isActionLoading = false);
-          return;
-        }
+      final phone = await SessionManager.getPhoneNumber();
+      if (phone == null) throw StateError('No active session');
+      final password = await _promptPasswordForReauth();
+      if (password == null || password.isEmpty) {
+        if (mounted) setState(() => isActionLoading = false);
+        return;
       }
-
-      // ── Step 2: Now safely delete the Firebase Auth account ─────────────────
-      try {
-        await user.delete();
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'requires-recent-login') {
-          if (mounted) {
-            // ── FIX C2: Reset loading flag BEFORE showing the re-auth dialog ──
-            setState(() => isActionLoading = false);
-            final password = await _promptPasswordForReauth();
-            if (password != null && password.isNotEmpty) {
-              // ── FIX C2: Re-enable loading only if user provided credentials ──
-              if (mounted) setState(() => isActionLoading = true);
-              final credential = EmailAuthProvider.credential(
-                email: user.email!,
-                password: password,
-              );
-              await user.reauthenticateWithCredential(credential);
-              await user.delete();
-            } else {
-              // ── FIX C2: User cancelled – isActionLoading already false ──────
-              Fluttertoast.showToast(msg: "Authentication cancelled");
-              return;
-            }
-          }
-        } else {
-          Fluttertoast.showToast(msg: e.message ?? "Failed to delete account");
-          if (mounted) setState(() => isActionLoading = false);
-          return;
-        }
-      }
+      // Confirm credentials before deleting any data, including when an old
+      // Auth session would otherwise reject account deletion.
+      await user.reauthenticateWithCredential(
+        EmailAuthProvider.credential(email: user.email!, password: password),
+      );
+      await FirebaseDatabase.instance.ref().update({
+        'Friends/$phone': null,
+        'Expenses/$phone': null,
+        'Trips/$phone': null,
+        'userUpdates/$phone': null,
+        // Retain a scrubbed ownership tombstone until Auth deletion completes.
+        // Cleanup can be retried by the same UID; a future UID can replace it
+        // only after all financial roots have been removed (enforced by rules).
+        'WriteOperations/$phone': null,
+        'user_details/$phone': {
+          'owner_uid': user.uid,
+          'phone_number': phone,
+          'name': 'Deleted account',
+          'email': '',
+          'deletion_pending': true,
+        },
+      });
+      await user.delete();
 
       Fluttertoast.showToast(msg: "Account deleted successfully");
       if (mounted) {
@@ -137,7 +118,11 @@ class _ProfilePageState extends State<ProfilePage> {
         context.read<ExpenseProvider>().clearExpenses();
         context.read<FriendProvider>().clearFriends();
       }
-      await SessionManager.clearSession();
+      try {
+        await SessionManager.clearSession();
+      } catch (_) {
+        // Remote deletion succeeded. Local cleanup must not claim failure.
+      }
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
@@ -145,7 +130,9 @@ class _ProfilePageState extends State<ProfilePage> {
         (route) => false,
       );
     } catch (e) {
-      Fluttertoast.showToast(msg: "Failed to delete account: $e");
+      Fluttertoast.showToast(
+        msg: "Unable to delete account. Please sign in again and retry.",
+      );
       if (mounted) {
         setState(() {
           isActionLoading = false;
@@ -156,7 +143,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<String?> _promptPasswordForReauth() async {
     final passCtrl = TextEditingController();
-    return showDialog<String>(
+    final result = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
@@ -176,7 +163,9 @@ class _ProfilePageState extends State<ProfilePage> {
               obscureText: true,
               decoration: InputDecoration(
                 labelText: "Password",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -191,21 +180,21 @@ class _ProfilePageState extends State<ProfilePage> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            onPressed: () => Navigator.pop(ctx, passCtrl.text.trim()),
+            onPressed: () => Navigator.pop(ctx, passCtrl.text),
             child: const Text("Confirm"),
           ),
         ],
       ),
     );
+    passCtrl.dispose();
+    return result;
   }
 
   void _showLogoutDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Log Out"),
         content: const Text("Are you sure you want to log out of FinTrack?"),
         actions: [
@@ -286,15 +275,22 @@ class _ProfilePageState extends State<ProfilePage> {
                           dialogTimer?.cancel();
                           setState(() => _deleteCooldown = true);
                           _cooldownTimer?.cancel();
-                          _cooldownTimer = Timer(const Duration(seconds: 5), () {
-                            if (mounted) setState(() => _deleteCooldown = false);
-                          });
+                          _cooldownTimer = Timer(
+                            const Duration(seconds: 5),
+                            () {
+                              if (mounted) {
+                                setState(() => _deleteCooldown = false);
+                              }
+                            },
+                          );
                           Navigator.pop(dialogCtx);
                           await deleteUser();
                         }
                       : null,
                   child: Text(
-                    countdown > 0 ? "Delete (${countdown}s)" : "Delete Permanently",
+                    countdown > 0
+                        ? "Delete (${countdown}s)"
+                        : "Delete Permanently",
                   ),
                 ),
               ],
@@ -311,11 +307,14 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Consumer2<UserProvider, ExpenseProvider>(
       builder: (context, userProvider, expenseProvider, _) {
-        final userName = userProvider.name.isNotEmpty && userProvider.name != "User"
+        final userName =
+            userProvider.name.isNotEmpty && userProvider.name != "User"
             ? userProvider.name
             : "User"; // FIX M2: removed hardcoded "Vishal" personal name
         final phone = userProvider.phoneNumber;
-        final email = userProvider.email.isNotEmpty ? userProvider.email : "user@fintrack.app";
+        final email = userProvider.email.isNotEmpty
+            ? userProvider.email
+            : "user@fintrack.app";
         final userSubtitle = phone.isNotEmpty
             ? (phone.startsWith("+") ? phone : "+91 $phone")
             : email;
@@ -506,7 +505,10 @@ class _ProfilePageState extends State<ProfilePage> {
             },
             borderRadius: BorderRadius.circular(20),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6.5),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 6.5,
+              ),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(20),
@@ -531,7 +533,7 @@ class _ProfilePageState extends State<ProfilePage> {
   // 3. BALANCED SUMMARY CARDS (Card 1: Total Spent, Card 2: Records)
   // ===========================================================================
   Widget _buildBalancedSummaryCards({
-    required int totalExpense,
+    required double totalExpense,
     required int recordCount,
   }) {
     return Row(
@@ -646,7 +648,9 @@ class _ProfilePageState extends State<ProfilePage> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const PersonalInformationPage()),
+              MaterialPageRoute(
+                builder: (_) => const PersonalInformationPage(),
+              ),
             );
           },
         ),
@@ -820,7 +824,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     color: const Color(0xFFFFE4E6),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFE11D48), size: 20),
+                  child: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFE11D48),
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

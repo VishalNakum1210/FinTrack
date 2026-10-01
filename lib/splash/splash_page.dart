@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:fin_track/services/minimum_version_policy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -38,50 +40,41 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   bool _isVersionLower(String current, String minimum) {
-    try {
-      final cParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-      final mParts = minimum.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-      while (cParts.length < 3) {
-        cParts.add(0);
-      }
-      while (mParts.length < 3) {
-        mParts.add(0);
-      }
-      for (int i = 0; i < 3; i++) {
-        if (cParts[i] < mParts[i]) return true;
-        if (cParts[i] > mParts[i]) return false;
-      }
-    } catch (_) {}
-    return false;
+    return MinimumVersionPolicy.isLower(current, minimum);
   }
 
   void _showUpdateDialog(String minVersion) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.system_update_rounded, color: _darkGreen),
-            SizedBox(width: 10),
-            Text(
-              "Update Required",
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-                color: _primaryText,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.system_update_rounded, color: _darkGreen),
+              SizedBox(width: 10),
+              Text(
+                "Update Required",
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: _primaryText,
+                ),
               ),
+            ],
+          ),
+          content: Text(
+            "A newer version of FinTrack (v$minVersion) is required. Please update the app from the store to continue.",
+            style: const TextStyle(
+              fontSize: 14,
+              color: _mutedText,
+              height: 1.4,
             ),
-          ],
-        ),
-        content: Text(
-          "A newer version of FinTrack (v$minVersion) is required. Please update the app from the store to continue.",
-          style: const TextStyle(
-            fontSize: 14,
-            color: _mutedText,
-            height: 1.4,
           ),
         ),
       ),
@@ -91,31 +84,54 @@ class _SplashPageState extends State<SplashPage> {
   Future<void> getDecision() async {
     try {
       final results = await Future.wait([
-        SessionManager.isSessionValid()
-            .timeout(const Duration(seconds: 3), onTimeout: () => false),
-        SessionManager.getPhoneNumber()
-            .timeout(const Duration(seconds: 3), onTimeout: () => null),
+        SessionManager.isSessionValid().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => false,
+        ),
+        SessionManager.getPhoneNumber().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => null,
+        ),
         Future.delayed(const Duration(milliseconds: 900)),
       ]);
 
       if (!mounted) return;
 
-      // Check minVersion from Firebase Realtime Database
       try {
-        final versionSnap = await FirebaseDatabase.instance
-            .ref('app_config/min_version')
-            .get()
-            .timeout(const Duration(seconds: 2));
-        if (versionSnap.exists && versionSnap.value != null) {
-          final minVer = versionSnap.value.toString().trim();
-          if (_isVersionLower(appVersion, minVer)) {
-            if (mounted) {
-              _showUpdateDialog(minVer);
-              return;
-            }
-          }
+        final minimum = await MinimumVersionPolicy.resolve(
+          remote: () async {
+            final snapshot = await FirebaseDatabase.instance
+                .ref('app_config/min_version')
+                .get()
+                .timeout(const Duration(seconds: 8));
+            return snapshot.exists ? snapshot.value.toString().trim() : '0.0.0';
+          },
+          cached: () async => (await SharedPreferences.getInstance()).getString(
+            'verified_min_version',
+          ),
+          cache: (value) async {
+            await (await SharedPreferences.getInstance()).setString(
+              'verified_min_version',
+              value,
+            );
+          },
+        );
+        if (_isVersionLower(appVersion, minimum)) {
+          if (mounted) _showUpdateDialog(minimum);
+          return;
         }
-      } catch (_) {}
+      } catch (error) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => VersionCheckFailureDialog(
+            failure: VersionPolicyException.from(error),
+          ),
+        );
+        if (mounted) await getDecision();
+        return;
+      }
 
       if (!mounted) return;
 
@@ -142,6 +158,7 @@ class _SplashPageState extends State<SplashPage> {
       } else if (hasValidSession) {
         // Clear stale local session on auth mismatch
         await SessionManager.clearSession();
+        await FirebaseAuth.instance.signOut();
       }
     } catch (_) {
       await SessionManager.clearSession();
@@ -157,8 +174,9 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
-    getVersion();
-    getDecision();
+    getVersion().then((_) {
+      if (mounted) getDecision();
+    });
   }
 
   @override
@@ -224,7 +242,10 @@ class _SplashPageState extends State<SplashPage> {
 
               // Trust & Security Pill
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(20),
@@ -236,11 +257,7 @@ class _SplashPageState extends State<SplashPage> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.lock_rounded,
-                      color: _darkGreen,
-                      size: 13,
-                    ),
+                    Icon(Icons.lock_rounded, color: _darkGreen, size: 13),
                     SizedBox(width: 5),
                     Text(
                       "256-Bit Encrypted • Realtime Sync",
@@ -270,7 +287,10 @@ class _SplashPageState extends State<SplashPage> {
 
               // Version Pill
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(10),
@@ -304,4 +324,27 @@ class _SplashPageState extends State<SplashPage> {
       ),
     );
   }
+}
+
+/// Keep startup blocked until a verified policy is available, without calling
+/// a server configuration failure an internet outage.
+class VersionCheckFailureDialog extends StatelessWidget {
+  final VersionPolicyException failure;
+
+  const VersionCheckFailureDialog({super.key, required this.failure});
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    child: AlertDialog(
+      title: Text(failure.title),
+      content: Text(failure.description),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Retry'),
+        ),
+      ],
+    ),
+  );
 }

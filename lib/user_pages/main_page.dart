@@ -1,3 +1,4 @@
+import 'package:fin_track/utils/money.dart';
 import 'package:fin_track/friends_pages/split_bill_page.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/profile_pages/report_page.dart';
@@ -70,11 +71,14 @@ class _UserMainPageState extends State<UserMainPage> {
     }
   }
 
-  void _showTransactionDetails(BuildContext context, Map<String, dynamic> item) {
+  void _showTransactionDetails(
+    BuildContext context,
+    Map<String, dynamic> item,
+  ) {
     final category = (item["Category"] ?? "Other").toString();
     final desc = (item["Description"] ?? "No description").toString();
     final method = (item["Payment_Mode"] ?? "").toString();
-    final amount = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
+    final amount = Money.rupees(item["Amount"]);
     final date = (item["Date"] ?? "").toString();
     final isIncome = ["Add CASH", "Add Online"].contains(method);
     final key = (item["key"] ?? "").toString();
@@ -152,7 +156,9 @@ class _UserMainPageState extends State<UserMainPage> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: isIncome ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                    color: isIncome
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFC62828),
                   ),
                 ),
               ],
@@ -161,23 +167,39 @@ class _UserMainPageState extends State<UserMainPage> {
             if (desc.isNotEmpty) ...[
               const Text(
                 "Description / Merchant",
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 desc,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                ),
               ),
               const SizedBox(height: 14),
             ],
             const Text(
               "Payment Mode",
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               method,
-              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E293B),
+              ),
             ),
             const SizedBox(height: 24),
             Row(
@@ -189,22 +211,34 @@ class _UserMainPageState extends State<UserMainPage> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red.shade700,
                         side: BorderSide(color: Colors.red.shade200),
-                        backgroundColor: Colors.red.shade50.withValues(alpha: 0.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        backgroundColor: Colors.red.shade50.withValues(
+                          alpha: 0.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       icon: const Icon(Icons.delete_outline, size: 18),
-                      label: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        "Delete",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       onPressed: () async {
                         Navigator.pop(ctx);
                         final confirmed = await showDeleteConfirmDialog(
                           context,
                           title: "Delete Record",
-                          message: "Are you sure you want to delete this record?",
+                          message:
+                              "Delete this record? If it belongs to a split, all linked bill and friend records will be deleted together.",
                         );
                         if (confirmed == true && key.isNotEmpty) {
-                          final phone = await SessionManager.getPhoneNumber() ?? "";
+                          final phone =
+                              await SessionManager.getPhoneNumber() ?? "";
                           if (context.mounted && phone.isNotEmpty) {
-                            await context.read<ExpenseProvider>().deleteExpense(phoneNumber: phone, key: key);
+                            await context.read<ExpenseProvider>().deleteExpense(
+                              phoneNumber: phone,
+                              key: key,
+                            );
                           }
                         }
                       },
@@ -220,13 +254,21 @@ class _UserMainPageState extends State<UserMainPage> {
                         backgroundColor: const Color(0xFF8BC24A),
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text("Edit", style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        "Edit",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       onPressed: () async {
                         Navigator.pop(ctx);
-                        final result = await showEditExpenseModal(context: context, record: item);
+                        final result = await showEditExpenseModal(
+                          context: context,
+                          record: item,
+                        );
                         if (result == true && mounted) {
                           setState(() {});
                         }
@@ -260,19 +302,20 @@ class _UserMainPageState extends State<UserMainPage> {
         final now = DateTime.now();
         final sevenDaysAgo = now.subtract(const Duration(days: 7));
         final fourteenDaysAgo = now.subtract(const Duration(days: 14));
-        double last7Expense = 0;
-        double prev7Expense = 0;
+        double last7Expense = 0.0;
+        double prev7Expense = 0.0;
         for (final r in records) {
           final mode = (r["Payment_Mode"] ?? "").toString();
           final isExpense = mode != "Add CASH" && mode != "Add Online";
           if (isExpense) {
-            final date = (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
+            final date =
+                (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
             if (date != null) {
-              final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
+              final amt = Money.rupees(r["Amount"]);
               if (date.isAfter(sevenDaysAgo)) {
-                last7Expense += amt;
+                last7Expense = Money.sum([last7Expense, amt]);
               } else if (date.isAfter(fourteenDaysAgo)) {
-                prev7Expense += amt;
+                prev7Expense = Money.sum([prev7Expense, amt]);
               }
             }
           }
@@ -284,8 +327,10 @@ class _UserMainPageState extends State<UserMainPage> {
         // Recent 5 transactions (newest first)
         final recentRecords = List<Map<String, dynamic>>.from(records);
         recentRecords.sort((a, b) {
-          final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
-          final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
+          final DateTime? dateA =
+              (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
+          final DateTime? dateB =
+              (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
           int cmp = 0;
           if (dateA != null && dateB != null) {
             cmp = dateB.compareTo(dateA);
@@ -336,7 +381,9 @@ class _UserMainPageState extends State<UserMainPage> {
                         ),
                       ),
                       Text(
-                        userProvider.name.isNotEmpty ? "${userProvider.name} 👋" : "User 👋",
+                        userProvider.name.isNotEmpty
+                            ? "${userProvider.name} 👋"
+                            : "User 👋",
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF1E293B),
@@ -359,7 +406,11 @@ class _UserMainPageState extends State<UserMainPage> {
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.refresh_rounded, color: themeColor, size: 20),
+                  child: Icon(
+                    Icons.refresh_rounded,
+                    color: themeColor,
+                    size: 20,
+                  ),
                 ),
                 onPressed: () => _loadData(force: true),
               ),
@@ -427,13 +478,15 @@ class _UserMainPageState extends State<UserMainPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  "Recent Transactions",
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF1E293B),
-                                    letterSpacing: -0.2,
+                                const Expanded(
+                                  child: Text(
+                                    "Recent Transactions",
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF1E293B),
+                                      letterSpacing: -0.2,
+                                    ),
                                   ),
                                 ),
                                 if (records.isNotEmpty)
@@ -458,14 +511,24 @@ class _UserMainPageState extends State<UserMainPage> {
                                 itemCount: displayRecent.length,
                                 itemBuilder: (context, index) {
                                   final record = displayRecent[index];
-                                  final category = (record["Category"] ?? "Other").toString();
-                                  final desc = (record["Description"] ?? "").toString();
-                                  final paymentMode = (record["Payment_Mode"] ?? "").toString();
-                                  final isIncome = ["Add CASH", "Add Online"].contains(paymentMode);
-                                  final amount = double.tryParse(record["Amount"]?.toString() ?? '0') ?? 0.0;
-                                  final date = (record["Date"] ?? "").toString();
-                                  final runningBal = record["_runningBalance"] as double?;
-                                  final splitFriend = record["splitFriend"]?.toString();
+                                  final category =
+                                      (record["Category"] ?? "Other")
+                                          .toString();
+                                  final desc = (record["Description"] ?? "")
+                                      .toString();
+                                  final paymentMode =
+                                      (record["Payment_Mode"] ?? "").toString();
+                                  final isIncome = [
+                                    "Add CASH",
+                                    "Add Online",
+                                  ].contains(paymentMode);
+                                  final amount = Money.rupees(record["Amount"]);
+                                  final date = (record["Date"] ?? "")
+                                      .toString();
+                                  final runningBal =
+                                      record["_runningBalance"] as double?;
+                                  final splitFriend = record["splitFriend"]
+                                      ?.toString();
 
                                   return PassbookTransactionTile(
                                     category: category,
@@ -476,9 +539,15 @@ class _UserMainPageState extends State<UserMainPage> {
                                     isIncome: isIncome,
                                     runningBalance: runningBal,
                                     splitFriendName: splitFriend,
-                                    onTap: () => _showTransactionDetails(context, record),
+                                    onTap: () => _showTransactionDetails(
+                                      context,
+                                      record,
+                                    ),
                                     onEdit: () async {
-                                      final result = await showEditExpenseModal(context: context, record: record);
+                                      final result = await showEditExpenseModal(
+                                        context: context,
+                                        record: record,
+                                      );
                                       if (result == true && mounted) {
                                         setState(() {});
                                       }
@@ -520,7 +589,11 @@ class _UserMainPageState extends State<UserMainPage> {
             icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
             label: const Text(
               "Add Spent",
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
             ),
           ),
         );
@@ -529,11 +602,11 @@ class _UserMainPageState extends State<UserMainPage> {
   }
 
   Widget _buildHeroBalanceCard({
-    required int currentBalance,
-    required int totalIncome,
-    required int totalExpense,
-    required int bankBalance,
-    required int cashBalance,
+    required double currentBalance,
+    required double totalIncome,
+    required double totalExpense,
+    required double bankBalance,
+    required double cashBalance,
     required double last7Expense,
     required double prev7Expense,
   }) {
@@ -563,7 +636,7 @@ class _UserMainPageState extends State<UserMainPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                "Total Balance",
+                "Ledger Net",
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 13,
@@ -572,11 +645,14 @@ class _UserMainPageState extends State<UserMainPage> {
               ),
               if (last7Expense > 0 || prev7Expense > 0) ...[
                 () {
-                  final diff = (last7Expense - prev7Expense).round();
+                  final diff = Money.sum([last7Expense, -prev7Expense]);
                   final bool isDecrease = diff < 0;
                   final bool isSame = diff == 0;
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.22),
                       borderRadius: BorderRadius.circular(12),
@@ -588,8 +664,8 @@ class _UserMainPageState extends State<UserMainPage> {
                           isSame
                               ? Icons.trending_flat_rounded
                               : (isDecrease
-                                  ? Icons.trending_down_rounded
-                                  : Icons.trending_up_rounded),
+                                    ? Icons.trending_down_rounded
+                                    : Icons.trending_up_rounded),
                           color: Colors.white,
                           size: 14,
                         ),
@@ -598,8 +674,8 @@ class _UserMainPageState extends State<UserMainPage> {
                           isSame
                               ? "Same as last wk"
                               : (isDecrease
-                                  ? "-${diff.abs().toINR()} vs last wk"
-                                  : "+${diff.toINR()} vs last wk"),
+                                    ? "-${diff.abs().toINR()} vs last wk"
+                                    : "+${diff.toINR()} vs last wk"),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 11,
@@ -637,7 +713,10 @@ class _UserMainPageState extends State<UserMainPage> {
               // Bank Account Pill
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(14),
@@ -666,7 +745,7 @@ class _UserMainPageState extends State<UserMainPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              "Bank / Online",
+                              "Online Ledger Net",
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 10.5,
@@ -698,7 +777,10 @@ class _UserMainPageState extends State<UserMainPage> {
               // Cash in Hand Pill
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(14),
@@ -727,7 +809,7 @@ class _UserMainPageState extends State<UserMainPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              "Cash in Hand",
+                              "Cash Ledger Net",
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 10.5,
@@ -764,14 +846,21 @@ class _UserMainPageState extends State<UserMainPage> {
               // Inflow Capsule
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.arrow_downward_rounded, color: Colors.white, size: 16),
+                      const Icon(
+                        Icons.arrow_downward_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Column(
@@ -779,7 +868,11 @@ class _UserMainPageState extends State<UserMainPage> {
                           children: [
                             const Text(
                               "Income",
-                              style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -804,14 +897,21 @@ class _UserMainPageState extends State<UserMainPage> {
               // Outflow Capsule
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 16),
+                      const Icon(
+                        Icons.arrow_upward_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Column(
@@ -819,7 +919,11 @@ class _UserMainPageState extends State<UserMainPage> {
                           children: [
                             const Text(
                               "Expense",
-                              style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -942,50 +1046,55 @@ class _UserMainPageState extends State<UserMainPage> {
 
   Widget _buildQuickInsightsGrid({
     required String biggestCategory,
-    required int highestTransaction,
+    required double highestTransaction,
     required int totalTransactions,
-    required int cashBalance,
-    required int onlineBalance,
+    required double cashBalance,
+    required double onlineBalance,
   }) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      childAspectRatio: 1.32,
-      children: [
-        _buildInsightCard(
-          icon: Icons.shopping_bag_outlined,
-          title: "Top Category",
-          value: biggestCategory.isNotEmpty ? biggestCategory : "None",
-          iconColor: const Color(0xFFE65100),
-          bgColor: const Color(0xFFFFF3E0),
-        ),
-        _buildInsightCard(
-          icon: Icons.arrow_upward_rounded,
-          title: "Highest Spend",
-          value: highestTransaction > 0 ? highestTransaction.toINR() : "₹0",
-          iconColor: const Color(0xFFC62828),
-          bgColor: const Color(0xFFFFEBEE),
-        ),
-        _buildInsightCard(
-          icon: Icons.receipt_long_outlined,
-          title: "Total Entries",
-          value: "$totalTransactions recorded",
-          iconColor: themeColor,
-          bgColor: const Color(0xFFE8F5E9),
-        ),
-        _buildInsightCard(
-          icon: Icons.account_balance_wallet_outlined,
-          title: "Wallet Split",
-          value: "Cash: ${cashBalance.toINR()}",
-          subtitle: "Online: ${onlineBalance.toINR()}",
-          iconColor: const Color(0xFF0288D1),
-          bgColor: const Color(0xFFE1F5FE),
-        ),
-      ],
+    final cards = [
+      _buildInsightCard(
+        icon: Icons.shopping_bag_outlined,
+        title: "Top Category",
+        value: biggestCategory.isNotEmpty ? biggestCategory : "None",
+        iconColor: const Color(0xFFE65100),
+        bgColor: const Color(0xFFFFF3E0),
+      ),
+      _buildInsightCard(
+        icon: Icons.arrow_upward_rounded,
+        title: "Highest Spend",
+        value: highestTransaction > 0 ? highestTransaction.toINR() : "₹0",
+        iconColor: const Color(0xFFC62828),
+        bgColor: const Color(0xFFFFEBEE),
+      ),
+      _buildInsightCard(
+        icon: Icons.receipt_long_outlined,
+        title: "Total Entries",
+        value: "$totalTransactions recorded",
+        iconColor: themeColor,
+        bgColor: const Color(0xFFE8F5E9),
+      ),
+      _buildInsightCard(
+        icon: Icons.account_balance_wallet_outlined,
+        title: "Wallet Split",
+        value: "Cash net: ${cashBalance.toINR()}",
+        subtitle: "Online net: ${onlineBalance.toINR()}",
+        iconColor: const Color(0xFF0288D1),
+        bgColor: const Color(0xFFE1F5FE),
+      ),
+    ];
+    // Four bounded cards can size to their text instead of clipping the wallet
+    // subtitle inside a fixed-aspect tile on narrow screens or larger fonts.
+    Widget row(int start) => IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: cards[start]),
+          const SizedBox(width: 10),
+          Expanded(child: cards[start + 1]),
+        ],
+      ),
     );
+    return Column(children: [row(0), const SizedBox(height: 10), row(2)]);
   }
 
   Widget _buildInsightCard({
@@ -1088,7 +1197,11 @@ class _UserMainPageState extends State<UserMainPage> {
               color: Color(0xFFF1F5F9),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.receipt_long_outlined, size: 36, color: Color(0xFF94A3B8)),
+            child: const Icon(
+              Icons.receipt_long_outlined,
+              size: 36,
+              color: Color(0xFF94A3B8),
+            ),
           ),
           const SizedBox(height: 12),
           const Text(

@@ -16,13 +16,13 @@
     <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" /></a>
     <a href="https://firebase.google.com"><img src="https://img.shields.io/badge/Firebase-Realtime%20Database-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase" /></a>
     <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
-    <img src="https://img.shields.io/badge/Tests-76%20Passing-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" />
+    <img src="https://img.shields.io/badge/Tests-Automated%20QA-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Automated QA" />
     <img src="https://img.shields.io/badge/Design-Material%203-6750A4?style=for-the-badge&logo=materialdesign&logoColor=white" alt="Material 3" />
-    <img src="https://img.shields.io/badge/Security-HMAC--SHA256%20%2B%20Keystore-red?style=for-the-badge&logo=securityscorecard&logoColor=white" alt="Security" />
+    <img src="https://img.shields.io/badge/Security-Firebase%20Auth%20%2B%20UID%20Rules-red?style=for-the-badge&logo=securityscorecard&logoColor=white" alt="Security" />
   </p>
 
   <p>
-    <img src="https://readme-typing-svg.herokuapp.com?font=Inter&weight=600&size=20&duration=3200&pause=1000&color=2E7D32&center=true&vCenter=true&width=750&lines=Track+Every+Rupee+Seamlessly+💸;Atomic+Multi-Friend+Bill+Splitting+👥;Real-Time+Firebase+Streaming+%26+Offline+Cache+⚡;Interactive+FL+Chart+Financial+Health+Analytics+📊;One-Click+PDF%2C+CSV%2C+and+JSON+Export+📄;Hardware-Encrypted+Keystore+Sessions+🔒" alt="FinTrack Dynamic Subtitle" />
+    <img src="https://readme-typing-svg.herokuapp.com?font=Inter&weight=600&size=20&duration=3200&pause=1000&color=2E7D32&center=true&vCenter=true&width=750&lines=Track+Every+Rupee+Seamlessly+💸;Atomic+Multi-Friend+Bill+Splitting+👥;Real-Time+Firebase+Streaming+%26+Offline+Cache+⚡;Interactive+FL+Chart+Financial+Health+Analytics+📊;One-Click+PDF%2C+CSV%2C+and+JSON+Export+📄;Firebase+Authentication+%26+UID+Ownership+🔒" alt="FinTrack Dynamic Subtitle" />
   </p>
 
 </div>
@@ -41,7 +41,7 @@
   - [4. Multi-Friend Atomic Bill Splitter](#4-multi-friend-atomic-bill-splitter)
   - [5. Visual Analytics & Financial Health Reports](#5-visual-analytics--financial-health-reports)
   - [6. Multi-Format Data Export & Backup Engine](#6-multi-format-data-export--backup-engine)
-  - [7. Hardware-Backed Security & Offline Architecture](#7-hardware-backed-security--offline-architecture)
+  - [7. Authentication, Privacy & Offline Architecture](#7-authentication-privacy--offline-architecture)
   - [8. User Profile & Feedback System](#8-user-profile--feedback-system)
 - [🏗 Architecture & Flow Diagrams](#-architecture--flow-diagrams)
   - [System Architecture](#system-architecture)
@@ -65,10 +65,10 @@
 
 **FinTrack** is an enterprise-grade, high-performance personal finance and shared expense ledger mobile application built with **Flutter** and **Firebase Realtime Database**. Engineered following modern clean architecture and Google's Material Design 3 guidelines, FinTrack bridges the gap between individual budgeting and social expense splitting.
 
-Unlike standard expense apps that only count what you spend, FinTrack incorporates a **double-entry ledger engine** for friends and group outings, **atomic bill-splitting transactions**, **interactive data visualization**, and **hardware-backed session encryption** ensuring zero data loss even in low or absent network conditions.
+FinTrack combines friend and group ledgers, atomic bill-splitting writes, financial charts, Firebase Authentication, and secure local profile storage. Financial calculations use integer paise and friend balances are derived from their records.
 
 > [!TIP]
-> FinTrack runs completely offline with automatic sync! All transactions made while offline are saved to disk (up to 10 MB) and synchronized instantaneously with Firebase Realtime Database once connectivity is restored.
+> Supported native platforms enable Firebase disk persistence with a 10 MB cache. Reconnection and server authorization determine when pending writes are confirmed. Web caching and process-restart behavior differ; offline operation is not a substitute for backups or device testing.
 
 ---
 
@@ -153,7 +153,7 @@ Unlike standard expense apps that only count what you spend, FinTrack incorporat
 ## 🌟 Key Features
 
 ### 1. Dual-Wallet Personal Expense & Income Tracker
-- **Smart Wallet Separation**: Differentiates between liquid **Cash in Hand** and **Bank / Online** balances for accurate cashflow reconciliation.
+- **Cash / Online Ledger Nets**: Separates recorded cash and online income/spending. These are personal ledger nets, not verified cash-in-hand or bank balances; split entries represent personal consumption and debt.
 - **Categorization Engine**: Comprehensive pre-configured categories with distinct thematic colors and icon mappings (Food, Groceries, Shopping, Transport, Fuel, Entertainment, Healthcare, Bills, Education, Salary, Business, Investment, etc.).
 - **Smart Insights**: Computes Top Spending Category, Highest Single Outflow, and Total Entry counts in real-time.
 - **Dual Flow Quick Cards**: Real-time monthly Inflow (+Income) and Outflow (-Expense) summaries with delta comparisons against previous periods.
@@ -173,7 +173,7 @@ Unlike standard expense apps that only count what you spend, FinTrack incorporat
 ### 4. Multi-Friend Atomic Bill Splitter
 - **Group Outings & Dinners**: Split any bill equally across multiple friends in a single transaction.
 - **Atomic Double-Entry Dispatch**: Automatically calculates individual shares, logs your personal portion in your Passbook, and credits or debits each friend's ledger simultaneously.
-- **Zero Inconsistencies**: Guarantees that personal spending and friend obligations remain strictly in sync.
+- **Linked Split Integrity**: Bill creation writes linked entries atomically. Financial corrections use whole-bill deletion and re-entry; historical records with missing links need reconciliation before release.
 
 ### 5. Visual Analytics & Financial Health Reports
 - **Financial Health Score (0–100%)**: Algorithmic scoring that evaluates your monthly savings-to-income ratio, providing immediate feedback on financial discipline.
@@ -186,13 +186,13 @@ Unlike standard expense apps that only count what you spend, FinTrack incorporat
 - **📊 CSV Spreadsheet Export**: Standard tabular export compatible with Microsoft Excel, Apple Numbers, and Google Sheets for audit and tax purposes.
 - **💾 JSON Cloud Snapshot**: Full hierarchical backup of all user accounts, transactions, and friend ledgers for safe archiving and migration.
 
-### 7. Hardware-Backed Security & Offline Architecture
-- **Salted Password Hashing**: Passwords protected by **1,000-Round HMAC-SHA256** key stretching with unique telephone number salts and static secret peppers.
-- **Isolate-Offloaded Crypto**: Heavy cryptographic hashing runs on dedicated Dart `compute()` background threads to guarantee a silky 60/120 FPS UI.
-- **Android Keystore Encryption**: Persistent sessions stored in hardware-backed storage (`flutter_secure_storage`).
-- **Anti-Brute Force Protection**: 5-attempt rate limiters on login and registration to mitigate credential stuffing attacks.
-- **Offline Disk Persistence**: 10 MB local cache with automatic conflict-free synchronization upon reconnection.
-- **Real-Time Network Status Banner**: Floating animated indicator automatically alerts users when working in offline cache mode.
+### 7. Authentication, Privacy & Offline Architecture
+- **Firebase Authentication**: Password verification is handled by Firebase; the app caches profile metadata in secure storage.
+- **Account Ownership**: Database rules bind each phone identifier to a Firebase UID.
+- **Money Integrity**: Integer-paisa calculations and record-derived friend balances preserve decimal precision.
+- **Retry-Safe Saves**: Pending operation IDs remain stable across uncertain writes and app restarts.
+- **Abuse Controls**: Client cooldowns reduce accidental retries. Server quotas and enumeration protection must be enabled in Firebase.
+- **Offline Disk Persistence**: Supported native platforms use a 10 MB Firebase cache. Export private backups before destructive actions.
 
 ### 8. User Profile & Feedback System
 - **Profile Customization**: Manage personal details (Full Name, Email, Phone, Currency preferences).
@@ -221,7 +221,7 @@ flowchart TD
     subgraph Services ["Services & Domain Utilities"]
         F["ExportService<br>(PDF, CSV, JSON)"]
         G["SessionManager<br>(Keystore Secure Storage)"]
-        H["HashPassword<br>(Isolate HMAC-SHA256)"]
+        H["Money / RetrySafeWriter<br>(Integer Paise / Stable Operation IDs)"]
         I["Helpers<br>(BalanceHelper, CurrencyHelper, DateHelper)"]
     end
 
@@ -303,24 +303,13 @@ sequenceDiagram
 
 ### Security & Authentication Lifecycle
 
-```mermaid
+\`\`\`mermaid
 flowchart TD
-    User(["User submits Phone & Password"]) --> Lockout{"Attempts < 5?"}
-    Lockout -- "Exceeded" --> Block["Lockout for 60 seconds<br>Show warning banner"]
-    Lockout -- "Allowed" --> Isolate["Spawn Background Isolate<br>(compute())"]
-    
-    subgraph Crypto ["Off-Thread Cryptography"]
-        Isolate --> Salt["Generate / Fetch Phone Salt + Secret Pepper"]
-        Salt --> Stretching["1,000 Rounds HMAC-SHA256<br>(PBKDF2 style stretching)"]
-        Stretching --> HashResult["Computed Hash (v3_...)"]
-    end
-
-    HashResult --> Verify{"Compare with stored hash"}
-    Verify -- "Mismatch" --> IncFail["Increment Failure Counter<br>Show error"]
-    Verify -- "Match" --> GenToken["Generate Session Token & HMAC Signature"]
-    GenToken --> Keystore["Store in Android Keystore / iOS Keychain<br>(FlutterSecureStorage)"]
-    Keystore --> Ready(["Authenticated Session Ready"])
-```
+    User["Phone and password"] --> Auth["Firebase Authentication"]
+    Auth --> Cache["Secure profile metadata cache"]
+    Auth --> Rules["UID-bound Firebase database rules"]
+    Rules --> Ledger["Validated financial records"]
+\`\`\`
 
 ---
 
@@ -345,8 +334,8 @@ account/
 │   │
 │   ├── get_information/               # Cryptography, secure storage & session management
 │   │   ├── get_user_detail.dart       # User details retrieval & session binding
-│   │   ├── hash_password.dart         # 1,000-round HMAC-SHA256 off-thread password hashing
-│   │   └── session_manager.dart       # Hardware-backed Keystore session persistence
+│   │   ├── password_policy.dart       # New-password validation; Firebase manages verification
+│   │   └── session_manager.dart       # Secure profile cache; Firebase owns authentication
 │   │
 │   ├── profile_pages/                 # Profile, settings, analytics & export screens
 │   │   ├── change_password_page.dart  # Secure password reset with old password verification
@@ -409,9 +398,9 @@ account/
 │   ├── 09_cloud_backup_and_export.jpeg
 │   └── 10_feedback_and_support.jpeg
 │
-├── test/                              # Automated test suite (76 Passing Tests)
+├── test/                              # Automated unit, widget, stress, and rules tests
 │   ├── security/                      # Cryptography and session unit tests
-│   │   ├── hash_password_test.dart
+│   │   ├── password_policy_test.dart
 │   │   └── session_manager_test.dart
 │   ├── services/                      # Data export and generation tests
 │   │   └── export_service_test.dart
@@ -442,18 +431,18 @@ account/
 
 | Technology / Package | Version | Purpose in FinTrack |
 |---|---|---|
-| **[Flutter SDK](https://flutter.dev)** | `^3.24.0` | Cross-platform UI development framework |
-| **[Dart SDK](https://dart.dev)** | `^3.5.0` | Modern, null-safe client-optimized programming language |
-| **[Firebase Database](https://pub.dev/packages/firebase_database)** | `^11.0.0` | Real-time cloud synchronization & 10MB offline disk persistence |
-| **[Firebase Core](https://pub.dev/packages/firebase_core)** | `^3.0.0` | Core Firebase app initialization and configuration |
-| **[Firebase Auth](https://pub.dev/packages/firebase_auth)** | `^5.0.0` | Anonymous session credentials for secure database rule enforcement |
-| **[Provider](https://pub.dev/packages/provider)** | `^6.1.2` | Clean, reactive state management across all app domains |
-| **[Flutter Secure Storage](https://pub.dev/packages/flutter_secure_storage)** | `^9.2.2` | Hardware-backed session tokens via Android Keystore / iOS Keychain |
-| **[FL Chart](https://pub.dev/packages/fl_chart)** | `^0.68.0` | Beautiful, performant bar charts and donut charts |
-| **[PDF](https://pub.dev/packages/pdf)** | `^3.10.8` | Vector PDF document generation for passbooks and statements |
+| **[Flutter SDK](https://flutter.dev)** | `3.44.6` in CI | Cross-platform UI development framework |
+| **[Dart SDK](https://dart.dev)** | `^3.11.4` | Modern, null-safe client-optimized programming language |
+| **[Firebase Database](https://pub.dev/packages/firebase_database)** | `^12.0.0` | Real-time cloud synchronization & supported native disk persistence |
+| **[Firebase Core](https://pub.dev/packages/firebase_core)** | `^4.0.0` | Core Firebase app initialization and configuration |
+| **[Firebase Auth](https://pub.dev/packages/firebase_auth)** | `^6.6.1` | Password authentication and UID-bound database access |
+| **[Provider](https://pub.dev/packages/provider)** | `^6.1.5+1` | Reactive state management across app domains |
+| **[Flutter Secure Storage](https://pub.dev/packages/flutter_secure_storage)** | `^10.3.1` | Platform secure storage for profile caches, drafts, and retry identifiers |
+| **[FL Chart](https://pub.dev/packages/fl_chart)** | `^0.70.2` | Bar charts and donut charts |
+| **[PDF](https://pub.dev/packages/pdf)** | `^3.11.1` | Vector PDF document generation for passbooks and statements |
 | **[Printing](https://pub.dev/packages/printing)** | `^5.13.2` | Cross-platform print dialog, document sharing, and preview sheet |
-| **[Crypto](https://pub.dev/packages/crypto)** | `^3.0.3` | Cryptographic primitives for HMAC-SHA256 password stretching |
-| **[Intl](https://pub.dev/packages/intl)** | `^0.19.0` | Currency localization and date parsing |
+| **[Crypto](https://pub.dev/packages/crypto)** | `^3.0.7` | SHA-256 fingerprints for retry-safe operation identifiers |
+| **[Intl](https://pub.dev/packages/intl)** | `^0.20.2` | Currency localization and date parsing |
 
 ---
 
@@ -490,43 +479,63 @@ Before running FinTrack, ensure you have:
 
 ### Firebase Setup
 
-1. Enable **Realtime Database** in test/production mode in your Firebase Console.
-2. Enable **Anonymous Authentication** under *Firebase Console > Build > Authentication > Sign-in method*.
+1. Create **Realtime Database** with access denied by default. Do not use open test-mode rules for deployment.
+2. Enable **Email/Password Authentication** under *Firebase Console > Build > Authentication > Sign-in method*. The app uses password-authenticated, UID-owned profiles; anonymous sign-in is not supported by its rules. Configure the matching server password policy and abuse controls before release.
 3. Add your `google-services.json` file inside `android/app/` or generate `lib/firebase_options.dart` using the FlutterFire CLI:
    ```bash
    flutterfire configure
    ```
-4. Set up Realtime Database security rules:
-   ```json
-   {
-     "rules": {
-       "users": {
-         "$uid": {
-           ".read": "auth != null",
-           ".write": "auth != null"
-         }
-       },
-       "feedback": {
-         ".read": "auth != null",
-         ".write": true
-       }
-     }
-   }
-   ```
+4. Use the repository's `database.rules.json`, not generic sample rules. Before deploying it to existing data, complete the verified ownership/schema migration and coordinated client rollout described in [changes.md](changes.md). Deploy only after staging verification; never replace these rules with publicly writable feedback or cross-user access rules.
+
+Startup reads the non-sensitive `app_config/min_version` setting before login.
+That exact path must allow public reads and deny client writes; private records
+retain their separate access rules. An unset setting means no minimum version is
+enforced, while a denied or failed read is not treated as a verified policy.
+Permission/configuration errors now have a distinct alert instead of blaming
+the user's internet connection. The startup-only production permission repair
+is recorded in section 13 of [changes.md](changes.md); it is not the full data
+migration or release sign-off.
 
 ---
 
 ## 🧪 Testing & Quality Assurance
 
-FinTrack includes a comprehensive test suite of **76 automated unit, security, and widget tests** covering all critical business logic and UI interactions.
+FinTrack includes automated unit, security, stress, and widget tests, plus isolated Firebase emulator rules tests. Real-device smoke testing remains a release prerequisite; see the [change log and deployment requirements](changes.md).
 
 ### Run All Tests:
 ```bash
 flutter test
 ```
 
+Android QA uses the separate `com.vishalnakum.fintrack.qa` package and fake
+`demo-fintrack-audit` backend. Start the local Auth/Database emulators with
+`firebase.device-qa.json`, then use `tool/test_device.ps1` with an explicit
+emulator serial and integration-test target. The runner checks package, backend,
+test target and protected-app identity before installing or attaching. On a
+low-memory laptop, build the QA APK before starting Android, then use
+`-SkipBuild`; it still verifies the inspected APK. A second run of the acceptance
+target tests process-restart recovery using only its synthetic QA account.
+`-SkipInstall` is permitted only when the installed QA APK has the same SHA-256.
+
+**Do not run `flutter test -d` for Android here:** Flutter's generated listener
+can rebuild a different package and replace an existing installation. The
+project rejects that unsafe bootstrap. See [changes.md](changes.md) for the
+incident history, current test evidence, and the production migration plan.
+
+The read-only production startup check is skipped by ordinary tests and CI.
+To explicitly run it in an isolated Chrome profile, use:
+
+```bash
+flutter test --platform chrome --dart-define=FINTRACK_LIVE_STARTUP_CHECK=true test/startup_policy_browser_test.dart
+```
+
+It only reads and validates the public version policy from Chrome; it does not
+register an account, sign in, or write financial records. This installed Windows
+Flutter version also has test-server asset/path issues; see section 13 of the
+change log for the temporary local test workaround and verification limits.
+
 ### Test Suite Breakdown:
-- 🔒 **Security Tests** (`test/security/`): Validates password complexity, off-thread isolate hashing, session token integrity, and user persistence across app restarts.
+- 🔒 **Security Tests** (`test/security/`): Validates password complexity, password policy, untrusted-session rejection, and user persistence across app restarts.
 - 📐 **Math & Utilities** (`test/utils/`): Verifies running balance math, zero-exception date parsing, and Indian Rupee currency formatting.
 - 📄 **Export Service** (`test/services/`): Tests PDF vector statement building, CSV spreadsheet data generation, and complete JSON cloud serialization.
 - 📱 **Widget & UI Integration** (`test/widgets/`): Covers Navigation bar switching, PopScope back-button logic, Edit Expense modals, Financial Report charts, and Feedback form validation.
@@ -556,12 +565,14 @@ flutter build apk --release
 
 ## 🛡 Security Best Practices
 
-FinTrack follows strict mobile security guidelines:
-- 🔑 **No Plaintext Passwords**: Passwords are never transmitted or stored in plaintext. They undergo 1,000 rounds of HMAC-SHA256 hashing with individual user salts.
-- ⚡ **No UI Thread Freezing**: All intensive hashing computations are offloaded to background threads using Flutter's `compute()`.
-- 🔐 **Keystore Backed Sessions**: Auth tokens and usernames are stored inside Android Keystore / iOS Keychain.
-- ⏱️ **Brute-Force Throttling**: 5-attempt rate limiter locks the login form for 60 seconds after repeated failed credentials.
-- 🛡️ **Zero-Credential Git Policy**: Production signing keystores and private credentials (`key.properties`, private configs) are strictly excluded via `.gitignore`.
+See [changes.md](changes.md) for the complete audit/remediation history, original
+problems and fixes, final verification results, required ownership migration,
+Firebase Auth settings, signing configuration, device checks, and release gates.
+Existing APKs listed above
+must not be assumed to contain these fixes; rebuild from the final source.
+Local metadata is never an authorization credential. Passwords are sent to
+Firebase over TLS and are not stored by the application. Exported backups contain
+private financial data and should be protected by their owner.
 
 ---
 

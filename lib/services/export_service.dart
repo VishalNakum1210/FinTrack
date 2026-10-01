@@ -1,11 +1,11 @@
+import 'package:fin_track/utils/money.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:fin_track/utils/date_helper.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:ui' show Rect;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -18,7 +18,9 @@ class ExportService {
     decimalDigits: 2,
   );
 
-  static final DateFormat _exportDateFormatter = DateFormat('dd MMM yyyy, hh:mm a');
+  static final DateFormat _exportDateFormatter = DateFormat(
+    'dd MMM yyyy, hh:mm a',
+  );
 
   // Theme Colors for PDF
   static final PdfColor _primaryGreen = PdfColor.fromHex('8BC24A');
@@ -32,10 +34,14 @@ class ExportService {
   /// Safely loads the FinTrack application logo for PDF rendering
   static Future<pw.ImageProvider?> _loadAppLogo() async {
     try {
-      return await imageFromAssetBundle('assets/image/AccountApplicationLogo.jpg');
+      return await imageFromAssetBundle(
+        'assets/image/AccountApplicationLogo.jpg',
+      );
     } catch (_) {
       try {
-        final bytes = await rootBundle.load('assets/image/AccountApplicationLogo.jpg');
+        final bytes = await rootBundle.load(
+          'assets/image/AccountApplicationLogo.jpg',
+        );
         return pw.MemoryImage(bytes.buffer.asUint8List());
       } catch (_) {
         return null;
@@ -51,13 +57,13 @@ class ExportService {
     required String userName,
     required String phoneNumber,
     required List<Map<String, dynamic>> records,
-    required int totalIncome,
-    required int totalExpense,
-    required int currentBalance,
-    required int addCash,
-    required int spentCash,
-    required int addOnline,
-    required int spentOnline,
+    required double totalIncome,
+    required double totalExpense,
+    required double currentBalance,
+    required double addCash,
+    required double spentCash,
+    required double addOnline,
+    required double spentOnline,
     String filterCategory = "All",
     DateTime? startDate,
     DateTime? endDate,
@@ -69,7 +75,8 @@ class ExportService {
     final pdf = pw.Document();
     final cashBalance = addCash - spentCash;
     final onlineBalance = addOnline - spentOnline;
-    final effectiveStatementId = statementId ??
+    final effectiveStatementId =
+        statementId ??
         "FT-${DateFormat('yyyyMMdd').format(DateTime.now())}-${(records.length * 79 + 101).toString().padLeft(4, '0')}";
     final periodStr = (startDate != null && endDate != null)
         ? "${DateFormat('dd MMM yyyy').format(startDate)} - ${DateFormat('dd MMM yyyy').format(endDate)}"
@@ -79,8 +86,10 @@ class ExportService {
     if (includeRunningBalance && records.isNotEmpty) {
       final chronoList = List<Map<String, dynamic>>.from(records);
       chronoList.sort((a, b) {
-        final dA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
-        final dB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
+        final dA =
+            (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
+        final dB =
+            (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
         if (dA != null && dB != null) {
           final c = dA.compareTo(dB);
           if (c != 0) return c;
@@ -97,11 +106,11 @@ class ExportService {
       double bal = 0.0;
       for (final r in chronoList) {
         final mode = (r["Payment_Mode"] ?? "").toString();
-        final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
+        final amt = Money.rupees(r["Amount"]);
         if (mode == "Add CASH" || mode == "Add Online") {
-          bal += amt;
+          bal = Money.sum([bal, amt]);
         } else {
-          bal -= amt;
+          bal = Money.sum([bal, -amt]);
         }
         r["_pdfRunningBalance"] = bal;
       }
@@ -115,8 +124,8 @@ class ExportService {
         final isIncome = mode == "Add CASH" || mode == "Add Online";
         if (!isIncome) {
           final cat = (r["Category"] ?? "General").toString();
-          final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
-          catTotals[cat] = (catTotals[cat] ?? 0.0) + amt;
+          final amt = Money.rupees(r["Amount"]);
+          catTotals[cat] = Money.sum([catTotals[cat] ?? 0, amt]);
         }
       }
     }
@@ -127,7 +136,10 @@ class ExportService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (pw.Context context) => _buildPdfHeader("Official Financial Statement", logoImage: logoImage),
+        header: (pw.Context context) => _buildPdfHeader(
+          "Official Financial Statement",
+          logoImage: logoImage,
+        ),
         footer: (pw.Context context) => _buildPdfFooter(context),
         build: (pw.Context context) {
           return [
@@ -145,14 +157,26 @@ class ExportService {
             // Section 1: Executive Financial Summary (3-Stat Grid)
             pw.Text(
               "Executive Financial Summary",
-              style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold, color: _darkGreen),
+              style: pw.TextStyle(
+                fontSize: 10.5,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGreen,
+              ),
             ),
             pw.SizedBox(height: 5),
             pw.Row(
               children: [
-                _buildStatBox("Total Credits (Inflow)", "+${_currencyFormatter.format(totalIncome)}", _incomeColor),
+                _buildStatBox(
+                  "Total Credits (Inflow)",
+                  "+${_currencyFormatter.format(totalIncome)}",
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Total Debits (Outflow)", "-${_currencyFormatter.format(totalExpense)}", _expenseColor),
+                _buildStatBox(
+                  "Total Debits (Outflow)",
+                  "-${_currencyFormatter.format(totalExpense)}",
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
                 _buildStatBox(
                   "Closing Balance",
@@ -166,26 +190,54 @@ class ExportService {
             // Section 2: Cash vs Online Breakdown
             pw.Text(
               "Cash & Online Account Breakdown",
-              style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold, color: _darkGreen),
+              style: pw.TextStyle(
+                fontSize: 10.5,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGreen,
+              ),
             ),
             pw.SizedBox(height: 5),
             pw.Row(
               children: [
-                _buildStatBox("Cash Added", _currencyFormatter.format(addCash), _incomeColor),
+                _buildStatBox(
+                  "Cash Added",
+                  _currencyFormatter.format(addCash),
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Cash Expense", _currencyFormatter.format(spentCash), _expenseColor),
+                _buildStatBox(
+                  "Cash Expense",
+                  _currencyFormatter.format(spentCash),
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Cash Balance", _currencyFormatter.format(cashBalance), cashBalance >= 0 ? PdfColors.orange900 : _expenseColor),
+                _buildStatBox(
+                  "Cash Ledger Net",
+                  _currencyFormatter.format(cashBalance),
+                  cashBalance >= 0 ? PdfColors.orange900 : _expenseColor,
+                ),
               ],
             ),
             pw.SizedBox(height: 6),
             pw.Row(
               children: [
-                _buildStatBox("Online Added", _currencyFormatter.format(addOnline), _incomeColor),
+                _buildStatBox(
+                  "Online Added",
+                  _currencyFormatter.format(addOnline),
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Online Expense", _currencyFormatter.format(spentOnline), _expenseColor),
+                _buildStatBox(
+                  "Online Expense",
+                  _currencyFormatter.format(spentOnline),
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Online Balance", _currencyFormatter.format(onlineBalance), onlineBalance >= 0 ? PdfColors.blue900 : _expenseColor),
+                _buildStatBox(
+                  "Online Ledger Net",
+                  _currencyFormatter.format(onlineBalance),
+                  onlineBalance >= 0 ? PdfColors.blue900 : _expenseColor,
+                ),
               ],
             ),
             pw.SizedBox(height: 14),
@@ -194,49 +246,69 @@ class ExportService {
             if (includeCategoryBreakdown && catTotals.isNotEmpty) ...[
               pw.Text(
                 "Category Spending Distribution",
-                style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold, color: _darkGreen),
+                style: pw.TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: pw.FontWeight.bold,
+                  color: _darkGreen,
+                ),
               ),
               pw.SizedBox(height: 5),
               pw.TableHelper.fromTextArray(
                 headers: ['Category', 'Total Outflow', 'Share (%)'],
-                headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 8.5),
+                headerStyle: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                  fontSize: 8.5,
+                ),
                 headerDecoration: pw.BoxDecoration(color: _headerBg),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellStyle: const pw.TextStyle(fontSize: 8),
-                cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                cellPadding: const pw.EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 4,
+                ),
                 rowDecoration: const pw.BoxDecoration(
-                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5)),
+                  border: pw.Border(
+                    bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5),
+                  ),
                 ),
                 oddRowDecoration: pw.BoxDecoration(color: _lightGrey),
-                data: (catTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
-                    .take(8)
-                    .map((e) {
-                  final pct = totalExpense > 0 ? ((e.value / totalExpense) * 100).toStringAsFixed(1) : "0.0";
-                  return [
-                    _cleanPdfText(e.key, defaultVal: "General"),
-                    _currencyFormatter.format(e.value),
-                    "$pct %",
-                  ];
-                }).toList(),
+                data:
+                    (catTotals.entries.toList()
+                          ..sort((a, b) => b.value.compareTo(a.value)))
+                        .take(8)
+                        .map((e) {
+                          final pct = totalExpense > 0
+                              ? ((e.value / totalExpense) * 100)
+                                    .toStringAsFixed(1)
+                              : "0.0";
+                          return [
+                            _cleanPdfText(e.key, defaultVal: "General"),
+                            _currencyFormatter.format(e.value),
+                            "$pct %",
+                          ];
+                        })
+                        .toList(),
               ),
               pw.SizedBox(height: 14),
             ],
 
             // Monthly Grouped Transaction Tables with Month Totals
-            ..._buildMonthlyTransactionTables(records, includeRunningBalance: includeRunningBalance),
+            ..._buildMonthlyTransactionTables(
+              records,
+              includeRunningBalance: includeRunningBalance,
+            ),
           ];
         },
       ),
     );
 
     final pdfBytes = await pdf.save();
-    final fileName = 'FinTrack_Statement_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
+    final fileName =
+        'FinTrack_Statement_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
 
     if (isShare) {
-      await Printing.sharePdf(
-        bytes: pdfBytes,
-        filename: fileName,
-      );
+      await Printing.sharePdf(bytes: pdfBytes, filename: fileName);
     } else {
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdfBytes,
@@ -252,8 +324,8 @@ class ExportService {
     required String userName,
     required String friendName,
     required String friendNumber,
-    required int totalGet,
-    required int totalGive,
+    required double totalGet,
+    required double totalGive,
     required List<Map<String, dynamic>> records,
   }) async {
     final pdf = pw.Document();
@@ -265,7 +337,8 @@ class ExportService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (pw.Context context) => _buildPdfHeader("Friend Ledger Statement", logoImage: logoImage),
+        header: (pw.Context context) =>
+            _buildPdfHeader("Friend Ledger Statement", logoImage: logoImage),
         footer: (pw.Context context) => _buildPdfFooter(context),
         build: (pw.Context context) {
           return [
@@ -283,9 +356,18 @@ class ExportService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text("Account: ${_cleanPdfText(userName, defaultVal: 'User')}", style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                      pw.Text(
+                        "Account: ${_cleanPdfText(userName, defaultVal: 'User')}",
+                        style: const pw.TextStyle(
+                          fontWeight: pw.FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
                       pw.SizedBox(height: 2),
-                      pw.Text("Friend: ${_cleanPdfText(friendName, defaultVal: 'Friend')} (${_cleanPdfText(friendNumber, defaultVal: '')})", style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text(
+                        "Friend: ${_cleanPdfText(friendName, defaultVal: 'Friend')} (${_cleanPdfText(friendNumber, defaultVal: '')})",
+                        style: const pw.TextStyle(fontSize: 10),
+                      ),
                     ],
                   ),
                   pw.Column(
@@ -318,18 +400,34 @@ class ExportService {
             // Summary row
             pw.Row(
               children: [
-                _buildStatBox("Money You Get", _currencyFormatter.format(totalGet), _incomeColor),
+                _buildStatBox(
+                  "Money You Get",
+                  _currencyFormatter.format(totalGet),
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Money You Give", _currencyFormatter.format(totalGive), _expenseColor),
+                _buildStatBox(
+                  "Money You Give",
+                  _currencyFormatter.format(totalGive),
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Net Balance", _currencyFormatter.format(netDue), netDue >= 0 ? _darkGreen : _expenseColor),
+                _buildStatBox(
+                  "Net Balance",
+                  _currencyFormatter.format(netDue),
+                  netDue >= 0 ? _darkGreen : _expenseColor,
+                ),
               ],
             ),
             pw.SizedBox(height: 20),
 
             pw.Text(
               "Transaction History (${records.length})",
-              style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: _darkGreen),
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGreen,
+              ),
             ),
             pw.SizedBox(height: 8),
 
@@ -337,23 +435,35 @@ class ExportService {
               pw.Container(
                 padding: const pw.EdgeInsets.all(20),
                 alignment: pw.Alignment.center,
-                child: pw.Text("No ledger transactions found with ${_cleanPdfText(friendName, defaultVal: 'Friend')}.", style: const pw.TextStyle(color: PdfColors.grey600)),
+                child: pw.Text(
+                  "No ledger transactions found with ${_cleanPdfText(friendName, defaultVal: 'Friend')}.",
+                  style: const pw.TextStyle(color: PdfColors.grey600),
+                ),
               )
             else
               pw.TableHelper.fromTextArray(
                 headers: ['#', 'Date', 'Type', 'Description', 'Mode', 'Amount'],
-                headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
+                headerStyle: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                  fontSize: 9.5,
+                ),
                 headerDecoration: pw.BoxDecoration(color: _headerBg),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellStyle: const pw.TextStyle(fontSize: 8.5),
-                cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                cellPadding: const pw.EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 5,
+                ),
                 rowDecoration: const pw.BoxDecoration(
-                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5)),
+                  border: pw.Border(
+                    bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5),
+                  ),
                 ),
                 oddRowDecoration: pw.BoxDecoration(color: _lightGrey),
                 data: List<List<dynamic>>.generate(records.length, (index) {
                   final r = records[index];
-                  final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
+                  final amt = Money.rupees(r["Amount"]);
                   final type = r["Type"]?.toString() ?? "-";
 
                   return [
@@ -371,7 +481,10 @@ class ExportService {
       ),
     );
 
-    final cleanFileName = _cleanPdfText(friendName, defaultVal: 'Friend').replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    final cleanFileName = _cleanPdfText(
+      friendName,
+      defaultVal: 'Friend',
+    ).replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
     final pdfBytes = await pdf.save();
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdfBytes,
@@ -385,8 +498,8 @@ class ExportService {
   static Future<void> exportAllFriendsPdf({
     required String userName,
     required List<Map<String, dynamic>> friends,
-    required int totalGet,
-    required int totalGive,
+    required double totalGet,
+    required double totalGive,
   }) async {
     final pdf = pw.Document();
     final netDue = totalGet - totalGive;
@@ -397,7 +510,8 @@ class ExportService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (pw.Context context) => _buildPdfHeader("Friends Ledger Summary", logoImage: logoImage),
+        header: (pw.Context context) =>
+            _buildPdfHeader("Friends Ledger Summary", logoImage: logoImage),
         footer: (pw.Context context) => _buildPdfFooter(context),
         build: (pw.Context context) {
           return [
@@ -415,8 +529,20 @@ class ExportService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text("Account: ${_cleanPdfText(userName, defaultVal: 'User')}", style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                      pw.Text("Total Friends: ${friends.length}", style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text(
+                        "Account: ${_cleanPdfText(userName, defaultVal: 'User')}",
+                        style: const pw.TextStyle(
+                          fontWeight: pw.FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                      pw.Text(
+                        "Total Friends: ${friends.length}",
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey700,
+                        ),
+                      ),
                     ],
                   ),
                   pw.Column(
@@ -440,18 +566,34 @@ class ExportService {
             // Summary row
             pw.Row(
               children: [
-                _buildStatBox("Total To Receive", _currencyFormatter.format(totalGet), _incomeColor),
+                _buildStatBox(
+                  "Total To Receive",
+                  _currencyFormatter.format(totalGet),
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Total To Pay", _currencyFormatter.format(totalGive), _expenseColor),
+                _buildStatBox(
+                  "Total To Pay",
+                  _currencyFormatter.format(totalGive),
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Net Settlement", _currencyFormatter.format(netDue), netDue >= 0 ? _darkGreen : _expenseColor),
+                _buildStatBox(
+                  "Net Settlement",
+                  _currencyFormatter.format(netDue),
+                  netDue >= 0 ? _darkGreen : _expenseColor,
+                ),
               ],
             ),
             pw.SizedBox(height: 20),
 
             pw.Text(
               "Friends Breakdown (${friends.length})",
-              style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: _darkGreen),
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGreen,
+              ),
             ),
             pw.SizedBox(height: 8),
 
@@ -459,24 +601,43 @@ class ExportService {
               pw.Container(
                 padding: const pw.EdgeInsets.all(20),
                 alignment: pw.Alignment.center,
-                child: pw.Text("No friends currently added to your ledger.", style: const pw.TextStyle(color: PdfColors.grey600)),
+                child: pw.Text(
+                  "No friends currently added to your ledger.",
+                  style: const pw.TextStyle(color: PdfColors.grey600),
+                ),
               )
             else
               pw.TableHelper.fromTextArray(
-                headers: ['#', 'Friend Name', 'Phone Number', 'To Receive', 'To Pay', 'Net Due'],
-                headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
+                headers: [
+                  '#',
+                  'Friend Name',
+                  'Phone Number',
+                  'To Receive',
+                  'To Pay',
+                  'Net Due',
+                ],
+                headerStyle: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                  fontSize: 9.5,
+                ),
                 headerDecoration: pw.BoxDecoration(color: _headerBg),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellStyle: const pw.TextStyle(fontSize: 8.5),
-                cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                cellPadding: const pw.EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 5,
+                ),
                 rowDecoration: const pw.BoxDecoration(
-                  border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5)),
+                  border: pw.Border(
+                    bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5),
+                  ),
                 ),
                 oddRowDecoration: pw.BoxDecoration(color: _lightGrey),
                 data: List<List<dynamic>>.generate(friends.length, (index) {
                   final f = friends[index];
-                  final fGet = (double.tryParse(f["total_get"]?.toString() ?? '0') ?? 0.0).round();
-                  final fGive = (double.tryParse(f["total_give"]?.toString() ?? '0') ?? 0.0).round();
+                  final fGet = Money.rupees(f["total_get"]);
+                  final fGive = Money.rupees(f["total_give"]);
                   final diff = fGet - fGive;
 
                   return [
@@ -507,15 +668,15 @@ class ExportService {
   static Future<void> exportReportPdf({
     required String userName,
     required String phoneNumber,
-    required int totalIncome,
-    required int totalExpense,
-    required int currentBalance,
-    required int addCash,
-    required int spentCash,
-    required int addOnline,
-    required int spentOnline,
-    required int friendGet,
-    required int friendGive,
+    required double totalIncome,
+    required double totalExpense,
+    required double currentBalance,
+    required double addCash,
+    required double spentCash,
+    required double addOnline,
+    required double spentOnline,
+    required double friendGet,
+    required double friendGive,
     required Map<String, double> categoryTotals,
     required List<Map<String, dynamic>> records,
   }) async {
@@ -529,10 +690,17 @@ class ExportService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (pw.Context context) => _buildPdfHeader("Comprehensive Financial Report", logoImage: logoImage),
+        header: (pw.Context context) => _buildPdfHeader(
+          "Comprehensive Financial Report",
+          logoImage: logoImage,
+        ),
         footer: (pw.Context context) => _buildPdfFooter(context),
         build: (pw.Context context) {
-          final savingsRate = totalIncome > 0 ? (((totalIncome - totalExpense) / totalIncome) * 100).clamp(0, 100).toStringAsFixed(1) : "0.0";
+          final savingsRate = totalIncome > 0
+              ? (((totalIncome - totalExpense) / totalIncome) * 100)
+                    .clamp(0, 100)
+                    .toStringAsFixed(1)
+              : "0.0";
 
           return [
             // User info
@@ -545,74 +713,169 @@ class ExportService {
             pw.SizedBox(height: 12),
 
             // Section 1: Key KPI Stats
-            pw.Text("Overall Finances", style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold, color: _darkGreen)),
+            pw.Text(
+              "Overall Finances",
+              style: pw.TextStyle(
+                fontSize: 10.5,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGreen,
+              ),
+            ),
             pw.SizedBox(height: 5),
             pw.Row(
               children: [
-                _buildStatBox("Total Income", _currencyFormatter.format(totalIncome), _incomeColor),
+                _buildStatBox(
+                  "Total Income",
+                  _currencyFormatter.format(totalIncome),
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Total Expense", _currencyFormatter.format(totalExpense), _expenseColor),
+                _buildStatBox(
+                  "Total Expense",
+                  _currencyFormatter.format(totalExpense),
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Net Savings ($savingsRate%)", _currencyFormatter.format(currentBalance), currentBalance >= 0 ? _darkGreen : _expenseColor),
+                _buildStatBox(
+                  "Net Savings ($savingsRate%)",
+                  _currencyFormatter.format(currentBalance),
+                  currentBalance >= 0 ? _darkGreen : _expenseColor,
+                ),
               ],
             ),
             pw.SizedBox(height: 10),
 
             // Section 2: Cash Account
-            pw.Text("Cash Account Overview", style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold, color: _darkGreen)),
+            pw.Text(
+              "Cash Account Overview",
+              style: pw.TextStyle(
+                fontSize: 10.5,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGreen,
+              ),
+            ),
             pw.SizedBox(height: 5),
             pw.Row(
               children: [
-                _buildStatBox("Cash Added", _currencyFormatter.format(addCash), _incomeColor),
+                _buildStatBox(
+                  "Cash Added",
+                  _currencyFormatter.format(addCash),
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Cash Expense", _currencyFormatter.format(spentCash), _expenseColor),
+                _buildStatBox(
+                  "Cash Expense",
+                  _currencyFormatter.format(spentCash),
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Cash Balance", _currencyFormatter.format(cashBalance), cashBalance >= 0 ? PdfColors.orange900 : _expenseColor),
+                _buildStatBox(
+                  "Cash Ledger Net",
+                  _currencyFormatter.format(cashBalance),
+                  cashBalance >= 0 ? PdfColors.orange900 : _expenseColor,
+                ),
               ],
             ),
             pw.SizedBox(height: 10),
 
             // Section 3: Online Account & Friends
-            pw.Text("Online Account & Friend Dues", style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold, color: _darkGreen)),
+            pw.Text(
+              "Online Account & Friend Dues",
+              style: pw.TextStyle(
+                fontSize: 10.5,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGreen,
+              ),
+            ),
             pw.SizedBox(height: 5),
             pw.Row(
               children: [
-                _buildStatBox("Online Added", _currencyFormatter.format(addOnline), _incomeColor),
+                _buildStatBox(
+                  "Online Added",
+                  _currencyFormatter.format(addOnline),
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Online Expense", _currencyFormatter.format(spentOnline), _expenseColor),
+                _buildStatBox(
+                  "Online Expense",
+                  _currencyFormatter.format(spentOnline),
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Online Balance", _currencyFormatter.format(onlineBalance), onlineBalance >= 0 ? PdfColors.blue900 : _expenseColor),
+                _buildStatBox(
+                  "Online Ledger Net",
+                  _currencyFormatter.format(onlineBalance),
+                  onlineBalance >= 0 ? PdfColors.blue900 : _expenseColor,
+                ),
               ],
             ),
             pw.SizedBox(height: 6),
             pw.Row(
               children: [
-                _buildStatBox("Friend Money To Get", _currencyFormatter.format(friendGet), _incomeColor),
+                _buildStatBox(
+                  "Friend Money To Get",
+                  _currencyFormatter.format(friendGet),
+                  _incomeColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Friend Money To Give", _currencyFormatter.format(friendGive), _expenseColor),
+                _buildStatBox(
+                  "Friend Money To Give",
+                  _currencyFormatter.format(friendGive),
+                  _expenseColor,
+                ),
                 pw.SizedBox(width: 8),
-                _buildStatBox("Friend Net Balance", _currencyFormatter.format(friendGet - friendGive), (friendGet - friendGive) >= 0 ? _incomeColor : _expenseColor),
+                _buildStatBox(
+                  "Friend Net Balance",
+                  _currencyFormatter.format(friendGet - friendGive),
+                  (friendGet - friendGive) >= 0 ? _incomeColor : _expenseColor,
+                ),
               ],
             ),
             pw.SizedBox(height: 18),
 
             // Category Spending Breakdown
-            pw.Text("Top Expense Categories", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: _darkGreen)),
+            pw.Text(
+              "Top Expense Categories",
+              style: pw.TextStyle(
+                fontSize: 12,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGreen,
+              ),
+            ),
             pw.SizedBox(height: 6),
             if (categoryTotals.isEmpty)
-              pw.Text("No category expense data available.", style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 9))
+              pw.Text(
+                "No category expense data available.",
+                style: const pw.TextStyle(
+                  color: PdfColors.grey600,
+                  fontSize: 9,
+                ),
+              )
             else
               pw.TableHelper.fromTextArray(
                 headers: ['Category', 'Amount (INR)', 'Share of Total Expense'],
-                headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
+                headerStyle: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                  fontSize: 9.5,
+                ),
                 headerDecoration: pw.BoxDecoration(color: _headerBg),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellStyle: const pw.TextStyle(fontSize: 8.5),
-                cellPadding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                rowDecoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5))),
+                cellPadding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 5,
+                ),
+                rowDecoration: const pw.BoxDecoration(
+                  border: pw.Border(
+                    bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5),
+                  ),
+                ),
                 oddRowDecoration: pw.BoxDecoration(color: _lightGrey),
                 data: categoryTotals.entries.map((e) {
-                  final pct = totalExpense > 0 ? ((e.value / totalExpense) * 100).toStringAsFixed(1) : "0.0";
+                  final pct = totalExpense > 0
+                      ? ((e.value / totalExpense) * 100).toStringAsFixed(1)
+                      : "0.0";
                   return [
                     _cleanPdfText(e.key, defaultVal: "General"),
                     _currencyFormatter.format(e.value),
@@ -633,14 +896,17 @@ class ExportService {
     final pdfBytes = await pdf.save();
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdfBytes,
-      name: 'FinTrack_Financial_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+      name:
+          'FinTrack_Financial_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
     );
   }
 
   // ===========================================================================
   // MONTHLY GROUPING & MONTH TOTAL BUILDERS
   // ===========================================================================
-  static Map<String, List<Map<String, dynamic>>> _groupByMonth(List<Map<String, dynamic>> records) {
+  static Map<String, List<Map<String, dynamic>>> _groupByMonth(
+    List<Map<String, dynamic>> records,
+  ) {
     final Map<int, Map<String, dynamic>> sortedMonthMap = {};
     final List<Map<String, dynamic>> unparsedRecords = [];
 
@@ -656,13 +922,16 @@ class ExportService {
             "records": <Map<String, dynamic>>[],
           };
         }
-        (sortedMonthMap[sortKey]!["records"] as List<Map<String, dynamic>>).add(r);
+        (sortedMonthMap[sortKey]!["records"] as List<Map<String, dynamic>>).add(
+          r,
+        );
       } else {
         unparsedRecords.add(r);
       }
     }
 
-    final sortedKeys = sortedMonthMap.keys.toList()..sort((a, b) => b.compareTo(a));
+    final sortedKeys = sortedMonthMap.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
     final Map<String, List<Map<String, dynamic>>> result = {};
 
     for (var k in sortedKeys) {
@@ -687,7 +956,10 @@ class ExportService {
         pw.Container(
           padding: const pw.EdgeInsets.all(20),
           alignment: pw.Alignment.center,
-          child: pw.Text("No transactions found for this period.", style: const pw.TextStyle(color: PdfColors.grey600)),
+          child: pw.Text(
+            "No transactions found for this period.",
+            style: const pw.TextStyle(color: PdfColors.grey600),
+          ),
         ),
       ];
     }
@@ -700,30 +972,30 @@ class ExportService {
       final monthName = entry.key;
       final mRecords = entry.value;
 
-      int mIncome = 0;
-      int mExpense = 0;
-      int mCashSpent = 0;
-      int mOnlineSpent = 0;
-      int mCashAdded = 0;
-      int mOnlineAdded = 0;
+      double mIncome = 0.0;
+      double mExpense = 0.0;
+      double mCashSpent = 0.0;
+      double mOnlineSpent = 0.0;
+      double mCashAdded = 0.0;
+      double mOnlineAdded = 0.0;
 
       for (var r in mRecords) {
         final mode = (r["Payment_Mode"] ?? "").toString();
-        final amt = (double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0).round();
+        final amt = Money.rupees(r["Amount"]);
         if (mode == "Add CASH") {
-          mIncome += amt;
-          mCashAdded += amt;
+          mIncome = Money.sum([mIncome, amt]);
+          mCashAdded = Money.sum([mCashAdded, amt]);
         } else if (mode == "Add Online") {
-          mIncome += amt;
-          mOnlineAdded += amt;
+          mIncome = Money.sum([mIncome, amt]);
+          mOnlineAdded = Money.sum([mOnlineAdded, amt]);
         } else if (mode == "Spent Cash") {
-          mExpense += amt;
-          mCashSpent += amt;
+          mExpense = Money.sum([mExpense, amt]);
+          mCashSpent = Money.sum([mCashSpent, amt]);
         } else if (mode == "Spent Online") {
-          mExpense += amt;
-          mOnlineSpent += amt;
+          mExpense = Money.sum([mExpense, amt]);
+          mOnlineSpent = Money.sum([mOnlineSpent, amt]);
         } else {
-          mExpense += amt;
+          mExpense = Money.sum([mExpense, amt]);
         }
       }
 
@@ -751,7 +1023,10 @@ class ExportService {
               ),
               pw.Text(
                 "${mRecords.length} Transactions",
-                style: const pw.TextStyle(color: PdfColors.white, fontSize: 8.5),
+                style: const pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 8.5,
+                ),
               ),
             ],
           ),
@@ -762,9 +1037,29 @@ class ExportService {
       widgets.add(
         pw.TableHelper.fromTextArray(
           headers: includeRunningBalance
-              ? ['#', 'Date', 'Category', 'Description', 'Mode', 'Debit (-)', 'Credit (+)', 'Balance']
-              : ['#', 'Date', 'Category', 'Description', 'Payment Mode', 'Amount'],
-          headerStyle: const pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 8.5),
+              ? [
+                  '#',
+                  'Date',
+                  'Category',
+                  'Description',
+                  'Mode',
+                  'Debit (-)',
+                  'Credit (+)',
+                  'Balance',
+                ]
+              : [
+                  '#',
+                  'Date',
+                  'Category',
+                  'Description',
+                  'Payment Mode',
+                  'Amount',
+                ],
+          headerStyle: const pw.TextStyle(
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.white,
+            fontSize: 8.5,
+          ),
           headerDecoration: pw.BoxDecoration(color: _headerBg),
           columnWidths: includeRunningBalance
               ? {
@@ -787,22 +1082,33 @@ class ExportService {
                 },
           cellAlignment: pw.Alignment.centerLeft,
           cellStyle: const pw.TextStyle(fontSize: 8),
-          cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+          cellPadding: const pw.EdgeInsets.symmetric(
+            horizontal: 5,
+            vertical: 4,
+          ),
           rowDecoration: const pw.BoxDecoration(
-            border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5)),
+            border: pw.Border(
+              bottom: pw.BorderSide(color: PdfColors.grey200, width: 0.5),
+            ),
           ),
           oddRowDecoration: pw.BoxDecoration(color: _lightGrey),
           data: List<List<dynamic>>.generate(mRecords.length, (i) {
             final item = mRecords[i];
             final mode = item["Payment_Mode"]?.toString() ?? "";
             final isIncome = mode == "Add CASH" || mode == "Add Online";
-            final amt = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
+            final amt = Money.rupees(item["Amount"]);
 
             if (includeRunningBalance) {
-              final debitStr = isIncome ? "-" : "-${_currencyFormatter.format(amt)}";
-              final creditStr = isIncome ? "+${_currencyFormatter.format(amt)}" : "-";
+              final debitStr = isIncome
+                  ? "-"
+                  : "-${_currencyFormatter.format(amt)}";
+              final creditStr = isIncome
+                  ? "+${_currencyFormatter.format(amt)}"
+                  : "-";
               final runBal = item["_pdfRunningBalance"] as double?;
-              final balStr = runBal != null ? _currencyFormatter.format(runBal) : "-";
+              final balStr = runBal != null
+                  ? _currencyFormatter.format(runBal)
+                  : "-";
 
               return [
                 (overallIndex++).toString(),
@@ -815,7 +1121,8 @@ class ExportService {
                 balStr,
               ];
             } else {
-              final formattedAmt = "${isIncome ? '+' : '-'}${_currencyFormatter.format(amt)}";
+              final formattedAmt =
+                  "${isIncome ? '+' : '-'}${_currencyFormatter.format(amt)}";
               return [
                 (overallIndex++).toString(),
                 _cleanPdfText(item["Date"]),
@@ -836,7 +1143,9 @@ class ExportService {
           padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: pw.BoxDecoration(
             color: _lightGrey,
-            borderRadius: const pw.BorderRadius.vertical(bottom: pw.Radius.circular(4)),
+            borderRadius: const pw.BorderRadius.vertical(
+              bottom: pw.Radius.circular(4),
+            ),
             border: pw.Border.all(color: _borderGrey, width: 0.5),
           ),
           child: pw.Column(
@@ -848,7 +1157,11 @@ class ExportService {
                 children: [
                   pw.Text(
                     "$monthName Monthly Summary",
-                    style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: _darkGreen),
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _darkGreen,
+                    ),
                   ),
                   pw.Text(
                     "Month Net: ${mNet >= 0 ? '+' : '-'}${_currencyFormatter.format(mNet.abs())}",
@@ -873,13 +1186,29 @@ class ExportService {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text("Total Income", style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                        pw.Text(
+                          "Total Income",
+                          style: const pw.TextStyle(
+                            fontSize: 7,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
                         pw.SizedBox(height: 1),
                         pw.Text(
                           "+${_currencyFormatter.format(mIncome)}",
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: _incomeColor),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _incomeColor,
+                          ),
                         ),
-                        pw.Text("Cash: ${_currencyFormatter.format(mCashAdded)} | Online: ${_currencyFormatter.format(mOnlineAdded)}", style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600)),
+                        pw.Text(
+                          "Cash: ${_currencyFormatter.format(mCashAdded)} | Online: ${_currencyFormatter.format(mOnlineAdded)}",
+                          style: const pw.TextStyle(
+                            fontSize: 6.5,
+                            color: PdfColors.grey600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -889,13 +1218,29 @@ class ExportService {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text("Total Expense", style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                        pw.Text(
+                          "Total Expense",
+                          style: const pw.TextStyle(
+                            fontSize: 7,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
                         pw.SizedBox(height: 1),
                         pw.Text(
                           "-${_currencyFormatter.format(mExpense)}",
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: _expenseColor),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _expenseColor,
+                          ),
                         ),
-                        pw.Text("Cash: ${_currencyFormatter.format(mCashSpent)} | Online: ${_currencyFormatter.format(mOnlineSpent)}", style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600)),
+                        pw.Text(
+                          "Cash: ${_currencyFormatter.format(mCashSpent)} | Online: ${_currencyFormatter.format(mOnlineSpent)}",
+                          style: const pw.TextStyle(
+                            fontSize: 6.5,
+                            color: PdfColors.grey600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -905,7 +1250,13 @@ class ExportService {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
-                        pw.Text("Month Savings", style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+                        pw.Text(
+                          "Month Savings",
+                          style: const pw.TextStyle(
+                            fontSize: 7,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
                         pw.SizedBox(height: 1),
                         pw.Text(
                           "${mNet >= 0 ? '+' : '-'}${_currencyFormatter.format(mNet.abs())}",
@@ -916,8 +1267,13 @@ class ExportService {
                           ),
                         ),
                         pw.Text(
-                          mIncome > 0 ? "${((mNet / mIncome) * 100).clamp(0, 100).toStringAsFixed(1)}% saved" : "0.0% saved",
-                          style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey600),
+                          mIncome > 0
+                              ? "${((mNet / mIncome) * 100).clamp(0, 100).toStringAsFixed(1)}% saved"
+                              : "0.0% saved",
+                          style: const pw.TextStyle(
+                            fontSize: 6.5,
+                            color: PdfColors.grey600,
+                          ),
                         ),
                       ],
                     ),
@@ -936,7 +1292,10 @@ class ExportService {
   // ===========================================================================
   // SHARED REUSABLE PDF COMPONENTS
   // ===========================================================================
-  static pw.Widget _buildPdfHeader(String subtitle, {pw.ImageProvider? logoImage}) {
+  static pw.Widget _buildPdfHeader(
+    String subtitle, {
+    pw.ImageProvider? logoImage,
+  }) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -956,13 +1315,20 @@ class ExportService {
                         height: 26,
                         margin: const pw.EdgeInsets.only(right: 8),
                         decoration: pw.BoxDecoration(
-                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                          borderRadius: const pw.BorderRadius.all(
+                            pw.Radius.circular(6),
+                          ),
                           border: pw.Border.all(color: _borderGrey, width: 0.5),
                         ),
                         child: pw.ClipRRect(
                           horizontalRadius: 6,
                           verticalRadius: 6,
-                          child: pw.Image(logoImage, width: 26, height: 26, fit: pw.BoxFit.cover),
+                          child: pw.Image(
+                            logoImage,
+                            width: 26,
+                            height: 26,
+                            fit: pw.BoxFit.cover,
+                          ),
                         ),
                       )
                     else
@@ -972,7 +1338,9 @@ class ExportService {
                         margin: const pw.EdgeInsets.only(right: 8),
                         decoration: pw.BoxDecoration(
                           color: _primaryGreen,
-                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                          borderRadius: const pw.BorderRadius.all(
+                            pw.Radius.circular(6),
+                          ),
                         ),
                         alignment: pw.Alignment.center,
                         child: pw.Text(
@@ -997,7 +1365,10 @@ class ExportService {
                 pw.SizedBox(height: 3),
                 pw.Text(
                   subtitle,
-                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                  style: const pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColors.grey700,
+                  ),
                 ),
                 pw.SizedBox(height: 3),
                 pw.Row(
@@ -1005,7 +1376,10 @@ class ExportService {
                   children: [
                     pw.Text(
                       "Smart",
-                      style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
+                      style: const pw.TextStyle(
+                        fontSize: 7.5,
+                        color: PdfColors.grey600,
+                      ),
                     ),
                     pw.Container(
                       width: 2.5,
@@ -1018,7 +1392,10 @@ class ExportService {
                     ),
                     pw.Text(
                       "Transparent",
-                      style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
+                      style: const pw.TextStyle(
+                        fontSize: 7.5,
+                        color: PdfColors.grey600,
+                      ),
                     ),
                     pw.Container(
                       width: 2.5,
@@ -1031,7 +1408,10 @@ class ExportService {
                     ),
                     pw.Text(
                       "Personal Financial Intelligence",
-                      style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
+                      style: const pw.TextStyle(
+                        fontSize: 7.5,
+                        color: PdfColors.grey600,
+                      ),
                     ),
                   ],
                 ),
@@ -1040,10 +1420,19 @@ class ExportService {
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.end,
               children: [
-                pw.Text("Generated On", style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600)),
+                pw.Text(
+                  "Generated On",
+                  style: const pw.TextStyle(
+                    fontSize: 8.5,
+                    color: PdfColors.grey600,
+                  ),
+                ),
                 pw.Text(
                   _exportDateFormatter.format(DateTime.now()),
-                  style: const pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold),
+                  style: const pw.TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -1061,7 +1450,9 @@ class ExportService {
       margin: const pw.EdgeInsets.only(top: 14),
       padding: const pw.EdgeInsets.only(top: 6),
       decoration: const pw.BoxDecoration(
-        border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+        border: pw.Border(
+          top: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+        ),
       ),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1071,17 +1462,27 @@ class ExportService {
             children: [
               pw.Text(
                 "FinTrack",
-                style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700, fontWeight: pw.FontWeight.bold),
+                style: const pw.TextStyle(
+                  fontSize: 7.5,
+                  color: PdfColors.grey700,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
               pw.Container(
                 width: 2.5,
                 height: 2.5,
                 margin: const pw.EdgeInsets.symmetric(horizontal: 4),
-                decoration: const pw.BoxDecoration(color: PdfColors.grey500, shape: pw.BoxShape.circle),
+                decoration: const pw.BoxDecoration(
+                  color: PdfColors.grey500,
+                  shape: pw.BoxShape.circle,
+                ),
               ),
               pw.Text(
                 "Personal Finance & Expense Intelligence",
-                style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
+                style: const pw.TextStyle(
+                  fontSize: 7.5,
+                  color: PdfColors.grey600,
+                ),
               ),
             ],
           ),
@@ -1122,19 +1523,29 @@ class ExportService {
             children: [
               pw.Text(
                 "Account Holder: ${_cleanPdfText(userName, defaultVal: 'User')}",
-                style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10.5),
+                style: const pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 10.5,
+                ),
               ),
               if (phoneNumber.isNotEmpty) ...[
                 pw.SizedBox(height: 2),
                 pw.Text(
                   "Phone: ${_cleanPdfText(phoneNumber, defaultVal: '')}",
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey800,
+                  ),
                 ),
               ],
               pw.SizedBox(height: 2),
               pw.Text(
                 "Filter Scope: ${_cleanPdfText(filter, defaultVal: 'All')}",
-                style: pw.TextStyle(fontSize: 8.5, color: _darkGreen, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 8.5,
+                  color: _darkGreen,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -1144,20 +1555,30 @@ class ExportService {
               if (statementId != null && statementId.isNotEmpty) ...[
                 pw.Text(
                   "Ref ID: $statementId",
-                  style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5, color: PdfColors.black),
+                  style: const pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8.5,
+                    color: PdfColors.black,
+                  ),
                 ),
                 pw.SizedBox(height: 2),
               ],
               if (period != null && period.isNotEmpty) ...[
                 pw.Text(
                   "Period: $period",
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800),
+                  style: const pw.TextStyle(
+                    fontSize: 8,
+                    color: PdfColors.grey800,
+                  ),
                 ),
                 pw.SizedBox(height: 2),
               ],
               pw.Text(
                 "Total Records: $recordCount",
-                style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800),
+                style: const pw.TextStyle(
+                  fontSize: 8.5,
+                  color: PdfColors.grey800,
+                ),
               ),
             ],
           ),
@@ -1166,7 +1587,11 @@ class ExportService {
     );
   }
 
-  static pw.Widget _buildStatBox(String label, String value, PdfColor textColor) {
+  static pw.Widget _buildStatBox(
+    String label,
+    String value,
+    PdfColor textColor,
+  ) {
     return pw.Expanded(
       child: pw.Container(
         padding: const pw.EdgeInsets.symmetric(vertical: 7, horizontal: 8),
@@ -1177,11 +1602,21 @@ class ExportService {
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text(label, style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey700)),
+            pw.Text(
+              label,
+              style: const pw.TextStyle(
+                fontSize: 7.5,
+                color: PdfColors.grey700,
+              ),
+            ),
             pw.SizedBox(height: 2),
             pw.Text(
               value,
-              style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: textColor),
+              style: pw.TextStyle(
+                fontSize: 9.5,
+                fontWeight: pw.FontWeight.bold,
+                color: textColor,
+              ),
             ),
           ],
         ),
@@ -1192,7 +1627,11 @@ class ExportService {
   // ===========================================================================
   // EMOJI & SPECIAL UNICODE SANITIZER (Prevents Missing Font Glyph Crashes)
   // ===========================================================================
-  static String _cleanPdfText(dynamic value, {String defaultVal = "-", int? maxLength}) {
+  static String _cleanPdfText(
+    dynamic value, {
+    String defaultVal = "-",
+    int? maxLength,
+  }) {
     if (value == null) return defaultVal;
     String str = value.toString();
     if (str.trim().isEmpty) return defaultVal;
@@ -1211,7 +1650,9 @@ class ExportService {
 
       // Check for surrogate pairs (emojis like 👟 U+1F45F, 🍷 U+1F377)
       if (codeUnit >= 0xD800 && codeUnit <= 0xDBFF) {
-        if (i + 1 < str.length && str.codeUnitAt(i + 1) >= 0xDC00 && str.codeUnitAt(i + 1) <= 0xDFFF) {
+        if (i + 1 < str.length &&
+            str.codeUnitAt(i + 1) >= 0xDC00 &&
+            str.codeUnitAt(i + 1) <= 0xDFFF) {
           i++; // skip low surrogate
         }
         continue;
@@ -1276,10 +1717,7 @@ class ExportService {
       "app": "FinTrack",
       "version": "2.2.0",
       "exported_at": DateTime.now().toIso8601String(),
-      "user": {
-        "name": userName,
-        "phone_number": phoneNumber,
-      },
+      "user": {"name": userName, "phone_number": phoneNumber},
       "total_expenses_count": expenses.length,
       "total_friends_count": friends.length,
       "expenses": expenses.map((e) => sanitizeForJson(e)).toList(),
@@ -1323,15 +1761,16 @@ class ExportService {
       friends: friends,
     );
     final bytes = Uint8List.fromList(utf8.encode(jsonString));
-    final fileName = 'FinTrack_Backup_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json';
-
-    final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/$fileName');
-    await file.writeAsBytes(bytes, flush: true);
+    final fileName =
+        'FinTrack_Backup_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json';
 
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(file.path, mimeType: 'application/json', name: fileName)],
+        files: [
+          XFile.fromData(bytes, mimeType: 'application/json', name: fileName),
+        ],
+        fileNameOverrides: [fileName],
+        sharePositionOrigin: const Rect.fromLTWH(0, 0, 1, 1),
         subject: 'FinTrack Full Financial Backup',
         text: 'FinTrack personal data backup archive (JSON format).',
       ),
@@ -1348,16 +1787,24 @@ class ExportService {
   }) {
     final buffer = StringBuffer();
     // CSV Header row
-    buffer.writeln("Date,Category,Payment Mode,Amount,Description,Running Balance");
+    buffer.writeln(
+      "Date,Category,Payment Mode,Amount,Description,Running Balance",
+    );
 
     for (final record in expenses) {
-      final date = '"${(record["Date"] ?? "").toString().replaceAll('"', '""')}"';
-      final category = '"${(record["Category"] ?? "").toString().replaceAll('"', '""')}"';
-      final mode = '"${(record["Payment_Mode"] ?? "").toString().replaceAll('"', '""')}"';
-      final amount = record["Amount"] ?? "0";
-      final desc = '"${(record["Description"] ?? "").toString().replaceAll('"', '""')}"';
-      final running = record["_runningBalance"]?.toString() ?? "";
-      buffer.writeln("$date,$category,$mode,$amount,$desc,$running");
+      String cell(dynamic value) {
+        var text = (value ?? '').toString();
+        if (RegExp(r'^\s*[=+@＝＋＠−－-]|^[\t\r\n]').hasMatch(text)) {
+          text = "'$text";
+        }
+        return '"${text.replaceAll('"', '""')}"';
+      }
+
+      final amount = Money.decimal(Money.paise(record['Amount']));
+      final running = record['_runningBalance']?.toString() ?? '';
+      buffer.writeln(
+        '${cell(record["Date"])},${cell(record["Category"])},${cell(record["Payment_Mode"])},$amount,${cell(record["Description"])},${cell(running)}',
+      );
     }
 
     return buffer.toString();
@@ -1369,17 +1816,17 @@ class ExportService {
   }) async {
     final csvString = generateCsvString(expenses: expenses);
     final bytes = Uint8List.fromList(utf8.encode(csvString));
-    final fileName = 'FinTrack_Transactions_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
-
-    final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/$fileName');
-    await file.writeAsBytes(bytes, flush: true);
+    final fileName =
+        'FinTrack_Transactions_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
 
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(file.path, mimeType: 'text/csv', name: fileName)],
+        files: [XFile.fromData(bytes, mimeType: 'text/csv', name: fileName)],
+        fileNameOverrides: [fileName],
+        sharePositionOrigin: const Rect.fromLTWH(0, 0, 1, 1),
         subject: 'FinTrack CSV Transactions',
-        text: 'FinTrack exported transactions spreadsheet (Excel/CSV compatible).',
+        text:
+            'FinTrack exported transactions spreadsheet (Excel/CSV compatible).',
       ),
     );
   }

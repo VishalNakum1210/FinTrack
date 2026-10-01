@@ -1,3 +1,4 @@
+import 'money.dart';
 import 'package:flutter/foundation.dart';
 
 /// Represents a participant in a split bill or group trip.
@@ -18,10 +19,10 @@ class SplitParticipant {
       identical(this, other) ||
       other is SplitParticipant &&
           runtimeType == other.runtimeType &&
-          ((isMe && other.isMe) || phone == other.phone);
+          phone == other.phone;
 
   @override
-  int get hashCode => isMe ? 0 : phone.hashCode;
+  int get hashCode => phone.hashCode;
 
   @override
   String toString() => 'SplitParticipant($name, phone: $phone, isMe: $isMe)';
@@ -50,15 +51,44 @@ class GroupExpense {
     this.customShares,
   });
 
+  void validate() {
+    final amountPaise = Money.tryPaise(amount);
+    if (amountPaise == null ||
+        amountPaise <= 0 ||
+        participants.isEmpty ||
+        participants.map((p) => p.phone).toSet().length !=
+            participants.length) {
+      throw ArgumentError('Invalid amount or duplicate/empty participants');
+    }
+    if (customShares != null) {
+      if (customShares!.length != participants.length ||
+          !participants.every((p) => customShares!.containsKey(p.phone))) {
+        throw ArgumentError('Every participant needs an exact share');
+      }
+      int sum = 0;
+      for (final value in customShares!.values) {
+        final cents = Money.tryPaise(value);
+        if (cents == null || cents < 0) {
+          throw ArgumentError('Invalid custom share');
+        }
+        sum += cents;
+      }
+      if (sum != amountPaise) {
+        throw ArgumentError('Custom shares must equal the bill total');
+      }
+    }
+  }
+
   /// Computes the share for a specific participant in this expense.
   double shareFor(SplitParticipant participant) {
+    validate();
     if (!participants.contains(participant)) return 0.0;
     if (customShares != null && customShares!.containsKey(participant.phone)) {
       return customShares![participant.phone] ?? 0.0;
     }
     if (participants.isEmpty) return 0.0;
     final index = participants.indexOf(participant);
-    final totalCents = (amount * 100).round();
+    final totalCents = Money.paise(amount);
     final baseCents = totalCents ~/ participants.length;
     final remainder = totalCents % participants.length;
     final participantCents = baseCents + (index < remainder ? 1 : 0);
@@ -71,7 +101,8 @@ class GroupExpense {
 class PersonDebtLine {
   final SplitParticipant otherPerson;
   final double amount;
-  final bool isGive; // true: this person gives to otherPerson; false: this person gets from otherPerson
+  final bool
+  isGive; // true: this person gives to otherPerson; false: this person gets from otherPerson
   final String reason;
 
   const PersonDebtLine({
@@ -92,7 +123,8 @@ class PersonSettlement {
   final SplitParticipant person;
   final double totalPaid;
   final double totalConsumed;
-  final double netBalance; // positive = gets money overall, negative = owes money overall
+  final double
+  netBalance; // positive = gets money overall, negative = owes money overall
   final List<PersonDebtLine> giveLines;
   final List<PersonDebtLine> getLines;
 
@@ -105,9 +137,9 @@ class PersonSettlement {
     required this.getLines,
   });
 
-  bool get isSettled => netBalance.abs() < 0.01;
-  bool get willGet => netBalance > 0.01;
-  bool get willGive => netBalance < -0.01;
+  bool get isSettled => Money.paise(netBalance) == 0;
+  bool get willGet => Money.paise(netBalance) > 0;
+  bool get willGive => Money.paise(netBalance) < 0;
 }
 
 /// Core calculation engine for multi-payer group splits and per-person breakdown.
@@ -119,6 +151,9 @@ class SplitHelper {
     required List<GroupExpense> expenses,
     required List<SplitParticipant> allParticipants,
   }) {
+    for (final expense in expenses) {
+      expense.validate();
+    }
     // Unify all declared participants and any participants referenced in expenses
     final Map<String, SplitParticipant> participantMap = {};
     for (final p in allParticipants) {
@@ -134,35 +169,36 @@ class SplitHelper {
     final effectiveParticipants = participantMap.values.toList();
     if (effectiveParticipants.isEmpty) return [];
 
-    final Map<String, double> totalPaidMap = {};
-    final Map<String, double> totalConsumedMap = {};
+    final Map<String, int> totalPaidMap = {};
+    final Map<String, int> totalConsumedMap = {};
 
     // grossDebts[debtorPhone][creditorPhone] = total amount debtor owes creditor
-    final Map<String, Map<String, double>> grossDebts = {};
+    final Map<String, Map<String, int>> grossDebts = {};
     final Map<String, Set<String>> pairwiseReasons = {};
 
     for (final p1 in effectiveParticipants) {
-      totalPaidMap[p1.phone] = 0.0;
-      totalConsumedMap[p1.phone] = 0.0;
+      totalPaidMap[p1.phone] = 0;
+      totalConsumedMap[p1.phone] = 0;
       grossDebts[p1.phone] = {};
       for (final p2 in effectiveParticipants) {
-        grossDebts[p1.phone]![p2.phone] = 0.0;
+        grossDebts[p1.phone]![p2.phone] = 0;
       }
     }
 
     // Step 1: Accumulate total paid, consumed, and directional debts per bill
     for (final exp in expenses) {
       final payer = exp.payer;
-      totalPaidMap[payer.phone] = (totalPaidMap[payer.phone] ?? 0.0) + exp.amount;
+      totalPaidMap[payer.phone] =
+          (totalPaidMap[payer.phone] ?? 0) + Money.paise(exp.amount);
 
       for (final consumer in exp.participants) {
-        final share = exp.shareFor(consumer);
+        final share = Money.paise(exp.shareFor(consumer));
         totalConsumedMap[consumer.phone] =
-            (totalConsumedMap[consumer.phone] ?? 0.0) + share;
+            (totalConsumedMap[consumer.phone] ?? 0) + share;
 
         if (consumer.phone != payer.phone && share > 0.0) {
           grossDebts[consumer.phone]?[payer.phone] =
-              (grossDebts[consumer.phone]?[payer.phone] ?? 0.0) + share;
+              (grossDebts[consumer.phone]?[payer.phone] ?? 0) + share;
 
           final pairKey = _pairKey(consumer.phone, payer.phone);
           pairwiseReasons.putIfAbsent(pairKey, () => <String>{}).add(exp.title);
@@ -174,10 +210,10 @@ class SplitHelper {
     final List<PersonSettlement> result = [];
 
     for (final p1 in effectiveParticipants) {
-      final paid = totalPaidMap[p1.phone] ?? 0.0;
-      final consumed = totalConsumedMap[p1.phone] ?? 0.0;
+      final paid = totalPaidMap[p1.phone] ?? 0;
+      final consumed = totalConsumedMap[p1.phone] ?? 0;
       final rawNet = paid - consumed;
-      final net = ((rawNet * 100).round() / 100);
+      final net = rawNet / 100;
 
       final List<PersonDebtLine> giveLines = [];
       final List<PersonDebtLine> getLines = [];
@@ -185,16 +221,16 @@ class SplitHelper {
       for (final p2 in effectiveParticipants) {
         if (p1.phone == p2.phone) continue;
 
-        final youOweOther = grossDebts[p1.phone]?[p2.phone] ?? 0.0;
-        final otherOwesYou = grossDebts[p2.phone]?[p1.phone] ?? 0.0;
+        final youOweOther = grossDebts[p1.phone]?[p2.phone] ?? 0;
+        final otherOwesYou = grossDebts[p2.phone]?[p1.phone] ?? 0;
         final netDiff = otherOwesYou - youOweOther;
 
         final pairKey = _pairKey(p1.phone, p2.phone);
         final reasons = (pairwiseReasons[pairKey] ?? <String>{}).join(", ");
 
-        if (netDiff > 0.01) {
+        if (netDiff > 0) {
           // p1 gets from p2
-          final amount = ((netDiff * 100).round() / 100);
+          final amount = netDiff / 100;
           getLines.add(
             PersonDebtLine(
               otherPerson: p2,
@@ -203,9 +239,9 @@ class SplitHelper {
               reason: reasons,
             ),
           );
-        } else if (netDiff < -0.01) {
+        } else if (netDiff < 0) {
           // p1 gives to p2
-          final amount = ((netDiff.abs() * 100).round() / 100);
+          final amount = netDiff.abs() / 100;
           giveLines.add(
             PersonDebtLine(
               otherPerson: p2,
@@ -220,8 +256,8 @@ class SplitHelper {
       result.add(
         PersonSettlement(
           person: p1,
-          totalPaid: ((paid * 100).round() / 100),
-          totalConsumed: ((consumed * 100).round() / 100),
+          totalPaid: paid / 100,
+          totalConsumed: consumed / 100,
           netBalance: net,
           giveLines: giveLines,
           getLines: getLines,

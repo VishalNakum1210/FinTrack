@@ -98,7 +98,11 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
               const SizedBox(width: 4),
@@ -165,7 +169,9 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFDCEDC8) : Colors.transparent,
+                  color: isSelected
+                      ? const Color(0xFFDCEDC8)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   border: isSelected
                       ? Border.all(color: const Color(0xFFA5D6A7), width: 1)
@@ -176,7 +182,9 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
                     _tabs[index],
                     style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      fontWeight: isSelected
+                          ? FontWeight.w800
+                          : FontWeight.w600,
                       color: isSelected ? _darkGreen : _textMuted,
                     ),
                   ),
@@ -228,7 +236,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: const Color(0xFF7B1FA2),
           title: "4. User-Entered Records & Calculations",
           content:
-              "All income, expense, and friend ledger amounts are inputted voluntarily by the user. FinTrack does not execute bank transfers, settle monetary debts directly, or verify financial transactions with external banking institutions. Any financial reconciliation between friends remains the sole responsibility of the individuals involved.",
+              "All income, expense, and friend ledger amounts are inputted voluntarily by the user. Ledger nets reflect your recorded income and personal expense shares, not verified cash in hand or bank balances. FinTrack does not execute bank transfers, settle monetary debts directly, or verify financial transactions with external banking institutions. Any financial reconciliation between friends remains the sole responsibility of the individuals involved.",
         ),
         const SizedBox(height: 12),
         _buildSectionCard(
@@ -237,7 +245,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: const Color(0xFFE11D48),
           title: "5. Account Termination & Data Deletion",
           content:
-              "You retain the absolute right to delete your FinTrack account at any time through the Profile screen. Account deletion irreversibly purges your personal profile, all recorded expenses, and friend ledger history from our active database.",
+              "You can delete your FinTrack account through the Profile screen after confirming your password. The app removes financial history, feedback, and profile contact details before deleting the authentication account. A minimal ownership/deletion marker retains the account identifier and UID to support safe retries and prevent orphaned-history reuse; it can be replaced when that identifier is registered again after cleanup. If authentication deletion fails, retry from Profile when connected.",
         ),
         const SizedBox(height: 12),
         _buildSectionCard(
@@ -291,7 +299,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: const Color(0xFFB45309),
           title: "4. Local Session Protection",
           content:
-              "Session tokens on your device are cryptographically signed using HMAC-SHA256 and stored within Android Keystore / iOS Keychain (Flutter Secure Storage) to prevent unauthorized local tampering.",
+              "Firebase Authentication manages your sign-in session. Profile metadata is cached using Flutter Secure Storage, and local metadata alone never grants access to cloud data. Financial data may also be cached by Firebase for offline access; protect your device and exported statements.",
         ),
         const SizedBox(height: 12),
         _buildSectionCard(

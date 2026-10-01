@@ -20,11 +20,23 @@ class CurrencyHelper {
   );
 
   /// Formats any numeric value into standard Indian Currency (e.g. ₹ 1,500)
-  static String format(num value, {bool showDecimals = false, bool compactSymbol = false}) {
+  static String format(
+    num value, {
+    bool showDecimals = false,
+    bool compactSymbol = false,
+  }) {
     if (compactSymbol) {
-      return _compactInr.format(value);
+      return (value % 1 == 0
+              ? _compactInr
+              : NumberFormat.currency(
+                  locale: 'en_IN',
+                  symbol: '₹',
+                  decimalDigits: 2,
+                ))
+          .format(value);
     }
-    if (showDecimals || (value is double && value.truncateToDouble() != value)) {
+    if (showDecimals ||
+        (value is double && value.truncateToDouble() != value)) {
       return _inrWithDecimals.format(value);
     }
     return _inrNoDecimals.format(value);
@@ -54,15 +66,24 @@ class CurrencyHelper {
   /// Parses a dynamic string or number safely into double
   static double parse(dynamic value) {
     if (value == null) return 0.0;
-    if (value is num) return value.toDouble();
-    final cleanStr = value.toString().replaceAll(',', '').replaceAll('₹', '').trim();
-    return double.tryParse(cleanStr) ?? 0.0;
+    if (value is num) return value.isFinite ? value.toDouble() : 0.0;
+    final cleanStr = value
+        .toString()
+        .replaceAll(',', '')
+        .replaceAll('₹', '')
+        .trim();
+    final parsed = double.tryParse(cleanStr);
+    return parsed != null && parsed.isFinite ? parsed : 0.0;
   }
 }
 
 extension CurrencyFormatting on num {
   String toINR({bool showDecimals = false, bool compactSymbol = false}) {
-    return CurrencyHelper.format(this, showDecimals: showDecimals, compactSymbol: compactSymbol);
+    return CurrencyHelper.format(
+      this,
+      showDecimals: showDecimals,
+      compactSymbol: compactSymbol,
+    );
   }
 
   String toCompactINR() {

@@ -1,3 +1,4 @@
+import 'package:fin_track/utils/money.dart';
 import 'package:fin_track/friends_pages/add_friends.dart';
 import 'package:fin_track/friends_pages/add_friend_spent.dart';
 import 'package:fin_track/friends_pages/specific_friend_page.dart';
@@ -50,8 +51,8 @@ class _FriendPageState extends State<FriendPage> {
 
   Future<void> exportAllFriendsToPdf(
     List<Map<String, dynamic>> friends,
-    int totalGet,
-    int totalGive,
+    double totalGet,
+    double totalGive,
   ) async {
     if (friends.isEmpty) {
       Fluttertoast.showToast(msg: "No friends in ledger to export");
@@ -73,16 +74,21 @@ class _FriendPageState extends State<FriendPage> {
   String _getInitials(String name) {
     final clean = name.trim();
     if (clean.isEmpty) return "F";
-    final parts = clean.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = clean
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.length == 1) {
       return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
     }
     return "${parts[0][0]}${parts[1][0]}".toUpperCase();
   }
 
-  void _showSettleModal(String friendName, String friendNumber, int net) {
+  void _showSettleModal(String friendName, String friendNumber, double net) {
     if (net == 0) {
-      Fluttertoast.showToast(msg: "All settled up with $friendName! No outstanding balance.");
+      Fluttertoast.showToast(
+        msg: "All settled up with $friendName! No outstanding balance.",
+      );
       return;
     }
 
@@ -122,7 +128,9 @@ class _FriendPageState extends State<FriendPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isOwed ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                    color: isOwed
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
@@ -133,7 +141,9 @@ class _FriendPageState extends State<FriendPage> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: isOwed ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                          color: isOwed
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFC62828),
                         ),
                       ),
                       Text(
@@ -141,7 +151,9 @@ class _FriendPageState extends State<FriendPage> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: isOwed ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                          color: isOwed
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFC62828),
                         ),
                       ),
                     ],
@@ -156,18 +168,30 @@ class _FriendPageState extends State<FriendPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AddFriendExpenses(friendNumber: friendNumber),
+                          builder: (_) =>
+                              AddFriendExpenses(friendNumber: friendNumber),
                         ),
                       );
                     },
-                    icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
+                    icon: const Icon(
+                      Icons.receipt_long_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                     label: Text(
-                      isOwed ? "Record Received Settlement" : "Record Payment Made",
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      isOwed
+                          ? "Record Received Settlement"
+                          : "Record Payment Made",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryGreen,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -187,25 +211,33 @@ class _FriendPageState extends State<FriendPage> {
         var displayedFriends = searchQuery.trim().isEmpty
             ? List<Map<String, dynamic>>.from(allFriends)
             : allFriends.where((friend) {
-                final name = (friend["friend_name"] ?? "").toString().toLowerCase();
+                final name = (friend["friend_name"] ?? "")
+                    .toString()
+                    .toLowerCase();
                 final number = (friend["friend_number"] ?? "").toString();
                 final query = searchQuery.toLowerCase();
                 return name.contains(query) || number.contains(query);
               }).toList();
 
         if (sortBy == "Name") {
-          displayedFriends.sort((a, b) => (a["friend_name"] ?? "")
-              .toString()
-              .toLowerCase()
-              .compareTo((b["friend_name"] ?? "").toString().toLowerCase()));
+          displayedFriends.sort(
+            (a, b) => (a["friend_name"] ?? "")
+                .toString()
+                .toLowerCase()
+                .compareTo((b["friend_name"] ?? "").toString().toLowerCase()),
+          );
         } else if (sortBy == "Balance") {
           displayedFriends.sort((a, b) {
-            final balA = ((double.tryParse(a["total_get"]?.toString() ?? '0') ?? 0) -
-                    (double.tryParse(a["total_give"]?.toString() ?? '0') ?? 0))
-                .abs();
-            final balB = ((double.tryParse(b["total_get"]?.toString() ?? '0') ?? 0) -
-                    (double.tryParse(b["total_give"]?.toString() ?? '0') ?? 0))
-                .abs();
+            final balA =
+                ((double.tryParse(a["total_get"]?.toString() ?? '0') ?? 0) -
+                        (double.tryParse(a["total_give"]?.toString() ?? '0') ??
+                            0))
+                    .abs();
+            final balB =
+                ((double.tryParse(b["total_get"]?.toString() ?? '0') ?? 0) -
+                        (double.tryParse(b["total_give"]?.toString() ?? '0') ??
+                            0))
+                    .abs();
             return balB.compareTo(balA);
           });
         }
@@ -254,9 +286,14 @@ class _FriendPageState extends State<FriendPage> {
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.picture_as_pdf_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
-                onPressed: () => exportAllFriendsToPdf(allFriends, totalGet, totalGive),
+                onPressed: () =>
+                    exportAllFriendsToPdf(allFriends, totalGet, totalGive),
               ),
               const SizedBox(width: 8),
             ],
@@ -265,50 +302,52 @@ class _FriendPageState extends State<FriendPage> {
             color: primaryGreen,
             onRefresh: () => _loadFriends(force: true),
             child: (isLoading && allFriends.isEmpty)
-                ? const Center(child: CircularProgressIndicator(color: primaryGreen))
+                ? const Center(
+                    child: CircularProgressIndicator(color: primaryGreen),
+                  )
                 : (friendProvider.hasError && allFriends.isEmpty)
-                    ? ErrorRetryWidget(
-                        message: friendProvider.errorMessage,
-                        primaryColor: primaryGreen,
-                        onRetry: () => _loadFriends(force: true),
-                      )
-                    : SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 1. SEARCH BAR + ADD FRIEND BUTTON
-                            _buildSearchAndAddBar(),
-                            const SizedBox(height: 16),
+                ? ErrorRetryWidget(
+                    message: friendProvider.errorMessage,
+                    primaryColor: primaryGreen,
+                    onRetry: () => _loadFriends(force: true),
+                  )
+                : SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. SEARCH BAR + ADD FRIEND BUTTON
+                        _buildSearchAndAddBar(),
+                        const SizedBox(height: 16),
 
-                            // 2. OVERALL BALANCE BANNER (You Get vs You Owe)
-                            _buildOverallBalanceBanner(
-                              totalGet: totalGet,
-                              totalGive: totalGive,
-                            ),
-                            const SizedBox(height: 16),
-
-                            // 3. SORT PILLS & SPLIT BILL QUICK ACTION ROW
-                            _buildSortAndActionRow(displayedFriends.length),
-                            const SizedBox(height: 14),
-
-                            // 4. FRIENDS LIST
-                            if (displayedFriends.isEmpty)
-                              _buildEmptyState()
-                            else
-                              ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: displayedFriends.length,
-                                itemBuilder: (context, index) {
-                                  final friend = displayedFriends[index];
-                                  return _buildFriendCard(friend);
-                                },
-                              ),
-                          ],
+                        // 2. OVERALL BALANCE BANNER (You Get vs You Owe)
+                        _buildOverallBalanceBanner(
+                          totalGet: totalGet,
+                          totalGive: totalGive,
                         ),
-                      ),
+                        const SizedBox(height: 16),
+
+                        // 3. SORT PILLS & SPLIT BILL QUICK ACTION ROW
+                        _buildSortAndActionRow(displayedFriends.length),
+                        const SizedBox(height: 14),
+
+                        // 4. FRIENDS LIST
+                        if (displayedFriends.isEmpty)
+                          _buildEmptyState()
+                        else
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: displayedFriends.length,
+                            itemBuilder: (context, index) {
+                              final friend = displayedFriends[index];
+                              return _buildFriendCard(friend);
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
           ),
         );
       },
@@ -338,11 +377,22 @@ class _FriendPageState extends State<FriendPage> {
               style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
               decoration: InputDecoration(
                 hintText: "Search",
-                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8), size: 20),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 14,
+                ),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: Color(0xFF94A3B8),
+                  size: 20,
+                ),
                 suffixIcon: searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
+                        icon: const Icon(
+                          Icons.clear,
+                          size: 16,
+                          color: Color(0xFF94A3B8),
+                        ),
                         onPressed: () {
                           searchController.clear();
                           setState(() => searchQuery = "");
@@ -378,7 +428,9 @@ class _FriendPageState extends State<FriendPage> {
             ),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: primaryGreen, width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               backgroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               elevation: 0,
@@ -390,8 +442,8 @@ class _FriendPageState extends State<FriendPage> {
   }
 
   Widget _buildOverallBalanceBanner({
-    required int totalGet,
-    required int totalGive,
+    required double totalGet,
+    required double totalGive,
   }) {
     return Row(
       children: [
@@ -488,20 +540,29 @@ class _FriendPageState extends State<FriendPage> {
                     onTap: () => setState(() => sortBy = s),
                     child: Container(
                       margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: sortBy == s ? primaryGreen : Colors.white,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: sortBy == s ? primaryGreen : const Color(0xFFE2E8F0),
+                          color: sortBy == s
+                              ? primaryGreen
+                              : const Color(0xFFE2E8F0),
                         ),
                       ),
                       child: Text(
                         s,
                         style: TextStyle(
                           fontSize: 11.5,
-                          fontWeight: sortBy == s ? FontWeight.bold : FontWeight.w500,
-                          color: sortBy == s ? Colors.white : const Color(0xFF64748B),
+                          fontWeight: sortBy == s
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          color: sortBy == s
+                              ? Colors.white
+                              : const Color(0xFF64748B),
                         ),
                       ),
                     ),
@@ -527,7 +588,11 @@ class _FriendPageState extends State<FriendPage> {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.call_split_rounded, size: 14, color: Color(0xFF6D28D9)),
+                Icon(
+                  Icons.call_split_rounded,
+                  size: 14,
+                  color: Color(0xFF6D28D9),
+                ),
                 SizedBox(width: 4),
                 Text(
                   "Split Bill",
@@ -548,8 +613,8 @@ class _FriendPageState extends State<FriendPage> {
   Widget _buildFriendCard(Map<String, dynamic> friend) {
     final friendName = (friend["friend_name"] ?? "Friend").toString();
     final friendNumber = (friend["friend_number"] ?? "").toString();
-    final fGet = (double.tryParse(friend["total_get"]?.toString() ?? '0') ?? 0.0).round();
-    final fGive = (double.tryParse(friend["total_give"]?.toString() ?? '0') ?? 0.0).round();
+    final fGet = Money.rupees(friend["total_get"]);
+    final fGive = Money.rupees(friend["total_give"]);
     final net = fGet - fGive;
     final initials = _getInitials(friendName);
 
@@ -605,16 +670,23 @@ class _FriendPageState extends State<FriendPage> {
             final confirmed = await showDeleteConfirmDialog(
               context,
               title: "Delete Friend",
-              message: "Are you sure you want to remove $friendName from your ledger?",
+              message:
+                  "Are you sure you want to remove $friendName from your ledger?",
             );
             if (confirmed == true) {
               final phone = await SessionManager.getPhoneNumber() ?? "";
               if (phone.isNotEmpty && mounted) {
-                await context.read<FriendProvider>().deleteFriend(
-                      userPhone: phone,
-                      friendNumber: friendNumber,
-                    );
-                Fluttertoast.showToast(msg: "Friend removed from ledger");
+                final provider = context.read<FriendProvider>();
+                final removed = await provider.deleteFriend(
+                  userPhone: phone,
+                  friendNumber: friendNumber,
+                );
+                Fluttertoast.showToast(
+                  msg: removed
+                      ? "Friend removed from ledger"
+                      : provider.lastError ??
+                            'Unable to delete friend. Please retry.',
+                );
               }
             }
           },
@@ -681,7 +753,10 @@ class _FriendPageState extends State<FriendPage> {
                     // Status Pill
                     Flexible(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: pillBg,
                           borderRadius: BorderRadius.circular(10),
@@ -704,10 +779,14 @@ class _FriendPageState extends State<FriendPage> {
                     SizedBox(
                       height: 34,
                       child: OutlinedButton(
-                        onPressed: () => _showSettleModal(friendName, friendNumber, net),
+                        onPressed: () =>
+                            _showSettleModal(friendName, friendNumber, net),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: primaryGreen,
-                          side: const BorderSide(color: primaryGreen, width: 1.2),
+                          side: const BorderSide(
+                            color: primaryGreen,
+                            width: 1.2,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -749,11 +828,17 @@ class _FriendPageState extends State<FriendPage> {
               color: const Color(0xFF8BC24A).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.people_alt_outlined, size: 40, color: primaryGreen),
+            child: const Icon(
+              Icons.people_alt_outlined,
+              size: 40,
+              color: primaryGreen,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
-            searchQuery.isNotEmpty ? "No friends found matching \"$searchQuery\"" : "No friends added yet",
+            searchQuery.isNotEmpty
+                ? "No friends found matching \"$searchQuery\""
+                : "No friends added yet",
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -777,12 +862,17 @@ class _FriendPageState extends State<FriendPage> {
               if (res == true) _loadFriends(force: true);
             },
             icon: const Icon(Icons.person_add_rounded, size: 18),
-            label: const Text("Add First Friend", style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text(
+              "Add First Friend",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ],

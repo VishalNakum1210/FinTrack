@@ -1,3 +1,4 @@
+import 'package:fin_track/utils/money.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/user_provider.dart';
@@ -97,11 +98,9 @@ class PassbookPageState extends State<PassbookApp> {
       context: context,
       firstDate: DateTime(now.year - 3),
       lastDate: DateTime(now.year + 1),
-      initialDateRange: customDateRange ??
-          DateTimeRange(
-            start: DateTime(now.year, now.month, 1),
-            end: now,
-          ),
+      initialDateRange:
+          customDateRange ??
+          DateTimeRange(start: DateTime(now.year, now.month, 1), end: now),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -125,11 +124,14 @@ class PassbookPageState extends State<PassbookApp> {
     }
   }
 
-  void _showTransactionDetails(BuildContext context, Map<String, dynamic> item) {
+  void _showTransactionDetails(
+    BuildContext context,
+    Map<String, dynamic> item,
+  ) {
     final category = (item["Category"] ?? "Other").toString();
     final desc = (item["Description"] ?? "No description").toString();
     final method = (item["Payment_Mode"] ?? "").toString();
-    final amount = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
+    final amount = Money.rupees(item["Amount"]);
     final date = (item["Date"] ?? "").toString();
     final isIncome = ["Add CASH", "Add Online"].contains(method);
     final key = (item["key"] ?? "").toString();
@@ -209,7 +211,9 @@ class PassbookPageState extends State<PassbookApp> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: isIncome ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                    color: isIncome
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFC62828),
                   ),
                 ),
               ],
@@ -218,12 +222,20 @@ class PassbookPageState extends State<PassbookApp> {
             if (desc.isNotEmpty) ...[
               const Text(
                 "Description / Merchant",
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 desc,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                ),
               ),
               const SizedBox(height: 14),
             ],
@@ -235,12 +247,20 @@ class PassbookPageState extends State<PassbookApp> {
                     children: [
                       const Text(
                         "Payment Mode",
-                        style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         method,
-                        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E293B),
+                        ),
                       ),
                     ],
                   ),
@@ -252,12 +272,20 @@ class PassbookPageState extends State<PassbookApp> {
                       children: [
                         const Text(
                           "Balance After",
-                          style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           runningBal.toINR(),
-                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFF2E7D32)),
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2E7D32),
+                          ),
                         ),
                       ],
                     ),
@@ -267,18 +295,29 @@ class PassbookPageState extends State<PassbookApp> {
             if (splitFriend != null && splitFriend.isNotEmpty) ...[
               const SizedBox(height: 14),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFEDE9FE),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.group_outlined, size: 16, color: Color(0xFF6D28D9)),
+                    const Icon(
+                      Icons.group_outlined,
+                      size: 16,
+                      color: Color(0xFF6D28D9),
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       "Shared transaction with $splitFriend",
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF6D28D9)),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6D28D9),
+                      ),
                     ),
                   ],
                 ),
@@ -294,17 +333,25 @@ class PassbookPageState extends State<PassbookApp> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red.shade700,
                         side: BorderSide(color: Colors.red.shade200),
-                        backgroundColor: Colors.red.shade50.withValues(alpha: 0.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        backgroundColor: Colors.red.shade50.withValues(
+                          alpha: 0.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       icon: const Icon(Icons.delete_outline, size: 18),
-                      label: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        "Delete",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       onPressed: () async {
                         Navigator.pop(ctx);
                         final confirmed = await showDeleteConfirmDialog(
                           context,
                           title: "Delete Record",
-                          message: "Are you sure you want to delete this record?",
+                          message:
+                              "Delete this record? If it belongs to a split, all linked bill and friend records will be deleted together.",
                         );
                         if (confirmed == true && key.isNotEmpty) {
                           await deleteRecord(key);
@@ -322,13 +369,21 @@ class PassbookPageState extends State<PassbookApp> {
                         backgroundColor: const Color(0xFF8BC24A),
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text("Edit", style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        "Edit",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       onPressed: () async {
                         Navigator.pop(ctx);
-                        final result = await showEditExpenseModal(context: context, record: item);
+                        final result = await showEditExpenseModal(
+                          context: context,
+                          record: item,
+                        );
                         if (result == true && mounted) {
                           setState(() {});
                         }
@@ -348,19 +403,19 @@ class PassbookPageState extends State<PassbookApp> {
     final phone = await SessionManager.getPhoneNumber() ?? "";
     if (mounted && phone.isNotEmpty) {
       await context.read<ExpenseProvider>().deleteExpense(
-            phoneNumber: phone,
-            key: key,
-          );
+        phoneNumber: phone,
+        key: key,
+      );
     }
   }
 
   Future<void> exportToPdf({
     required BuildContext context,
     required List<Map<String, dynamic>> records,
-    required int income,
-    required int expense,
-    required int spentCash,
-    required int spentOnline,
+    required double income,
+    required double expense,
+    required double spentCash,
+    required double spentOnline,
   }) async {
     final userProvider = context.read<UserProvider>();
     final userName = userProvider.name.isNotEmpty ? userProvider.name : "User";
@@ -390,11 +445,12 @@ class PassbookPageState extends State<PassbookApp> {
       final isIncome = ["Add CASH", "Add Online"].contains(method);
       if (isIncome) continue;
 
-      final dt = (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(item["Date"]);
+      final dt =
+          (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(item["Date"]);
       if (dt != null) {
         final diffDays = now.difference(dt).inDays;
         if (diffDays >= 0 && diffDays < 7) {
-          final amt = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
+          final amt = Money.rupees(item["Amount"]);
           sparks[6 - diffDays] += amt;
         }
       }
@@ -403,7 +459,11 @@ class PassbookPageState extends State<PassbookApp> {
   }
 
   /// Generates a contextual insight message based on active records.
-  String _generateSmartInsight(double inflow, double outflow, List<Map<String, dynamic>> records) {
+  String _generateSmartInsight(
+    double inflow,
+    double outflow,
+    List<Map<String, dynamic>> records,
+  ) {
     if (records.isEmpty) {
       return "Track your daily expenses to see automatic spending insights.";
     }
@@ -421,12 +481,14 @@ class PassbookPageState extends State<PassbookApp> {
       final method = (r["Payment_Mode"] ?? "").toString();
       if (["Add CASH", "Add Online"].contains(method)) continue;
       final cat = (r["Category"] ?? "Other").toString();
-      final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
-      catTotals[cat] = (catTotals[cat] ?? 0.0) + amt;
+      final amt = Money.rupees(r["Amount"]);
+      catTotals[cat] = Money.sum([catTotals[cat] ?? 0, amt]);
     }
 
     if (catTotals.isNotEmpty) {
-      final topCat = catTotals.entries.reduce((a, b) => a.value > b.value ? a : b);
+      final topCat = catTotals.entries.reduce(
+        (a, b) => a.value > b.value ? a : b,
+      );
       return "💡 Highest spending category: ${topCat.key} (${topCat.value.toINR()}).";
     }
 
@@ -441,10 +503,14 @@ class PassbookPageState extends State<PassbookApp> {
         List<Map<String, dynamic>> rawRecords = expenseProvider.records;
 
         // 1. Calculate running balances chronologically across all user records (L3 DRY fix)
-        final chronologicalRecords = BalanceHelper.computeRunningBalances(rawRecords);
+        final chronologicalRecords = BalanceHelper.computeRunningBalances(
+          rawRecords,
+        );
 
         // 2. Filter by Category
-        List<Map<String, dynamic>> filtered = chronologicalRecords.where((item) {
+        List<Map<String, dynamic>> filtered = chronologicalRecords.where((
+          item,
+        ) {
           if (selectedCategory == "All") return true;
           if (selectedCategory == "Expenses") {
             final method = (item["Payment_Mode"] ?? "").toString();
@@ -461,13 +527,18 @@ class PassbookPageState extends State<PassbookApp> {
         // 3. Filter by Month or Custom Date Range
         if (selectedMonth != null) {
           filtered = filtered.where((item) {
-            final dt = (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(item["Date"]);
+            final dt =
+                (item["_parsedDate"] as DateTime?) ??
+                DateHelper.parse(item["Date"]);
             if (dt == null) return false;
-            return dt.year == selectedMonth!.year && dt.month == selectedMonth!.month;
+            return dt.year == selectedMonth!.year &&
+                dt.month == selectedMonth!.month;
           }).toList();
         } else if (customDateRange != null) {
           filtered = filtered.where((item) {
-            final dt = (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(item["Date"]);
+            final dt =
+                (item["_parsedDate"] as DateTime?) ??
+                DateHelper.parse(item["Date"]);
             if (dt == null) return false;
             return !dt.isBefore(customDateRange!.start) &&
                 !dt.isAfter(customDateRange!.end.add(const Duration(days: 1)));
@@ -479,7 +550,9 @@ class PassbookPageState extends State<PassbookApp> {
           filtered = filtered.where((item) {
             final cat = (item["Category"] ?? "").toString().toLowerCase();
             final desc = (item["Description"] ?? "").toString().toLowerCase();
-            final method = (item["Payment_Mode"] ?? "").toString().toLowerCase();
+            final method = (item["Payment_Mode"] ?? "")
+                .toString()
+                .toLowerCase();
             final amt = (item["Amount"] ?? "").toString();
             final dt = (item["Date"] ?? "").toString().toLowerCase();
             return cat.contains(_searchQuery) ||
@@ -492,10 +565,12 @@ class PassbookPageState extends State<PassbookApp> {
 
         // 5. Sort Records
         filtered.sort((a, b) {
-          final DateTime? dateA = (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
-          final DateTime? dateB = (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
-          final amtA = double.tryParse(a["Amount"]?.toString() ?? '0') ?? 0.0;
-          final amtB = double.tryParse(b["Amount"]?.toString() ?? '0') ?? 0.0;
+          final DateTime? dateA =
+              (a["_parsedDate"] as DateTime?) ?? DateHelper.parse(a["Date"]);
+          final DateTime? dateB =
+              (b["_parsedDate"] as DateTime?) ?? DateHelper.parse(b["Date"]);
+          final amtA = Money.rupees(a["Amount"]);
+          final amtB = Money.rupees(b["Amount"]);
 
           if (currentSort == "Highest Amount") {
             return amtB.compareTo(amtA);
@@ -529,27 +604,31 @@ class PassbookPageState extends State<PassbookApp> {
         // Calculate inflow, outflow, and net saved for the current view
         double viewInflow = 0.0;
         double viewOutflow = 0.0;
-        int viewSpentCash = 0;
-        int viewSpentOnline = 0;
+        double viewSpentCash = 0.0;
+        double viewSpentOnline = 0.0;
 
         for (final item in _cachedSorted) {
           final method = (item["Payment_Mode"] ?? "").toString();
           final isIncome = ["Add CASH", "Add Online"].contains(method);
-          final amt = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
+          final amt = Money.rupees(item["Amount"]);
           if (isIncome) {
-            viewInflow += amt;
+            viewInflow = Money.sum([viewInflow, amt]);
           } else {
-            viewOutflow += amt;
+            viewOutflow = Money.sum([viewOutflow, amt]);
             if (method.toLowerCase().contains("cash")) {
-              viewSpentCash += amt.round();
+              viewSpentCash = Money.sum([viewSpentCash, amt]);
             } else {
-              viewSpentOnline += amt.round();
+              viewSpentOnline = Money.sum([viewSpentOnline, amt]);
             }
           }
         }
         final viewNetSaved = viewInflow - viewOutflow;
         final weeklySparks = _calculateWeeklySparks(_cachedSorted);
-        final insightMessage = _generateSmartInsight(viewInflow, viewOutflow, _cachedSorted);
+        final insightMessage = _generateSmartInsight(
+          viewInflow,
+          viewOutflow,
+          _cachedSorted,
+        );
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -609,14 +688,18 @@ class PassbookPageState extends State<PassbookApp> {
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.picture_as_pdf_rounded, color: green, size: 20),
+                  child: const Icon(
+                    Icons.picture_as_pdf_rounded,
+                    color: green,
+                    size: 20,
+                  ),
                 ),
                 onPressed: () {
                   exportToPdf(
                     context: context,
                     records: _cachedSorted,
-                    income: viewInflow.round(),
-                    expense: viewOutflow.round(),
+                    income: viewInflow,
+                    expense: viewOutflow,
                     spentCash: viewSpentCash,
                     spentOnline: viewSpentOnline,
                   );
@@ -680,7 +763,10 @@ class PassbookPageState extends State<PassbookApp> {
                                 Row(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFE8F5E9),
                                         borderRadius: BorderRadius.circular(8),
@@ -696,8 +782,14 @@ class PassbookPageState extends State<PassbookApp> {
                                     ),
                                     const SizedBox(width: 8),
                                     GestureDetector(
-                                      onTap: () => setState(() => customDateRange = null),
-                                      child: const Icon(Icons.close, size: 16, color: Color(0xFF64748B)),
+                                      onTap: () => setState(
+                                        () => customDateRange = null,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        size: 16,
+                                        color: Color(0xFF64748B),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -746,14 +838,26 @@ class PassbookPageState extends State<PassbookApp> {
                                   child: Center(
                                     child: OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(color: green, width: 1.5),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(14),
+                                        side: const BorderSide(
+                                          color: green,
+                                          width: 1.5,
                                         ),
-                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 20,
+                                          vertical: 12,
+                                        ),
                                       ),
-                                      onPressed: () => setState(() => _displayLimit += 50),
-                                      icon: const Icon(Icons.expand_more_rounded, color: green),
+                                      onPressed: () =>
+                                          setState(() => _displayLimit += 50),
+                                      icon: const Icon(
+                                        Icons.expand_more_rounded,
+                                        color: green,
+                                      ),
                                       label: Text(
                                         "Load More (${_cachedSorted.length - _displayLimit} remaining)",
                                         style: const TextStyle(
@@ -794,15 +898,26 @@ class PassbookPageState extends State<PassbookApp> {
         decoration: InputDecoration(
           hintText: "Search merchant, note, amount, mode...",
           hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF64748B),
+            size: 20,
+          ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.cancel, color: Color(0xFF94A3B8), size: 18),
+                  icon: const Icon(
+                    Icons.cancel,
+                    color: Color(0xFF94A3B8),
+                    size: 18,
+                  ),
                   onPressed: () => _searchController.clear(),
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
         ),
       ),
     );
@@ -811,16 +926,56 @@ class PassbookPageState extends State<PassbookApp> {
   Widget _buildCategoryChips() {
     final chips = [
       {'label': 'All', 'icon': Icons.grid_view_rounded, 'color': green},
-      {'label': 'Expenses', 'icon': Icons.arrow_upward_rounded, 'color': const Color(0xFFC62828)},
-      {'label': 'Income', 'icon': Icons.arrow_downward_rounded, 'color': const Color(0xFF2E7D32)},
-      {'label': 'Food', 'icon': CategoryTheme.getIcon("Food"), 'color': CategoryTheme.getColor("Food")},
-      {'label': 'Shopping', 'icon': CategoryTheme.getIcon("Shopping"), 'color': CategoryTheme.getColor("Shopping")},
-      {'label': 'Transport', 'icon': CategoryTheme.getIcon("Transport"), 'color': CategoryTheme.getColor("Transport")},
-      {'label': 'Bills', 'icon': Icons.receipt_outlined, 'color': const Color(0xFF0288D1)},
-      {'label': 'Education', 'icon': CategoryTheme.getIcon("Education"), 'color': CategoryTheme.getColor("Education")},
-      {'label': 'HealthCare', 'icon': CategoryTheme.getIcon("HealthCare"), 'color': CategoryTheme.getColor("HealthCare")},
-      {'label': 'Entertainment', 'icon': CategoryTheme.getIcon("Entertainment"), 'color': CategoryTheme.getColor("Entertainment")},
-      {'label': 'Other', 'icon': Icons.more_horiz_rounded, 'color': CategoryTheme.getColor("other")},
+      {
+        'label': 'Expenses',
+        'icon': Icons.arrow_upward_rounded,
+        'color': const Color(0xFFC62828),
+      },
+      {
+        'label': 'Income',
+        'icon': Icons.arrow_downward_rounded,
+        'color': const Color(0xFF2E7D32),
+      },
+      {
+        'label': 'Food',
+        'icon': CategoryTheme.getIcon("Food"),
+        'color': CategoryTheme.getColor("Food"),
+      },
+      {
+        'label': 'Shopping',
+        'icon': CategoryTheme.getIcon("Shopping"),
+        'color': CategoryTheme.getColor("Shopping"),
+      },
+      {
+        'label': 'Transport',
+        'icon': CategoryTheme.getIcon("Transport"),
+        'color': CategoryTheme.getColor("Transport"),
+      },
+      {
+        'label': 'Bills',
+        'icon': Icons.receipt_outlined,
+        'color': const Color(0xFF0288D1),
+      },
+      {
+        'label': 'Education',
+        'icon': CategoryTheme.getIcon("Education"),
+        'color': CategoryTheme.getColor("Education"),
+      },
+      {
+        'label': 'HealthCare',
+        'icon': CategoryTheme.getIcon("HealthCare"),
+        'color': CategoryTheme.getColor("HealthCare"),
+      },
+      {
+        'label': 'Entertainment',
+        'icon': CategoryTheme.getIcon("Entertainment"),
+        'color': CategoryTheme.getColor("Entertainment"),
+      },
+      {
+        'label': 'Other',
+        'icon': Icons.more_horiz_rounded,
+        'color': CategoryTheme.getColor("other"),
+      },
     ];
 
     return SingleChildScrollView(
@@ -831,7 +986,8 @@ class PassbookPageState extends State<PassbookApp> {
           final label = chip['label'] as String;
           final icon = chip['icon'] as IconData;
           final color = chip['color'] as Color;
-          final isSelected = selectedCategory.toLowerCase() == label.toLowerCase();
+          final isSelected =
+              selectedCategory.toLowerCase() == label.toLowerCase();
 
           return GestureDetector(
             onTap: () {
@@ -863,14 +1019,22 @@ class PassbookPageState extends State<PassbookApp> {
               ),
               child: Row(
                 children: [
-                  Icon(icon, color: isSelected ? Colors.white : color, size: 14),
+                  Icon(
+                    icon,
+                    color: isSelected ? Colors.white : color,
+                    size: 14,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     label,
                     style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected ? Colors.white : const Color(0xFF475569),
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
+                      color: isSelected
+                          ? Colors.white
+                          : const Color(0xFF475569),
                     ),
                   ),
                 ],
@@ -910,13 +1074,19 @@ class PassbookPageState extends State<PassbookApp> {
             child: DropdownButton<String>(
               value: currentSort,
               isDense: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF475569)),
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: Color(0xFF475569),
+              ),
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF1E293B),
               ),
-              items: sortList.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              items: sortList
+                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .toList(),
               onChanged: (val) {
                 if (val != null && val != currentSort) {
                   setState(() => currentSort = val);
@@ -941,7 +1111,11 @@ class PassbookPageState extends State<PassbookApp> {
                 color: Color(0xFFF1F5F9),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.receipt_long_outlined, size: 40, color: Color(0xFF94A3B8)),
+              child: const Icon(
+                Icons.receipt_long_outlined,
+                size: 40,
+                color: Color(0xFF94A3B8),
+              ),
             ),
             const SizedBox(height: 12),
             const Text(
@@ -973,34 +1147,45 @@ class PassbookPageState extends State<PassbookApp> {
       itemBuilder: (context, index) {
         final item = records[index];
         final rawDate = (item["Date"] ?? "").toString();
-        final dt = (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(rawDate);
-        final formattedCurrentDate = dt != null ? DateHelper.formatDisplay(dt) : rawDate;
+        final dt =
+            (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(rawDate);
+        final formattedCurrentDate = dt != null
+            ? DateHelper.formatDisplay(dt)
+            : rawDate;
 
         final prevItem = index > 0 ? records[index - 1] : null;
         final prevDt = prevItem != null
-            ? ((prevItem["_parsedDate"] as DateTime?) ?? DateHelper.parse(prevItem["Date"]))
+            ? ((prevItem["_parsedDate"] as DateTime?) ??
+                  DateHelper.parse(prevItem["Date"]))
             : null;
-        final formattedPrevDate = prevDt != null ? DateHelper.formatDisplay(prevDt) : "";
+        final formattedPrevDate = prevDt != null
+            ? DateHelper.formatDisplay(prevDt)
+            : "";
 
-        final showHeader = index == 0 || formattedCurrentDate != formattedPrevDate;
+        final showHeader =
+            index == 0 || formattedCurrentDate != formattedPrevDate;
 
         // Compute net day total for the header
         double dayNet = 0.0;
         int dayCount = 0;
         if (showHeader && dt != null) {
           for (int i = index; i < records.length; i++) {
-            final checkDt = (records[i]["_parsedDate"] as DateTime?) ?? DateHelper.parse(records[i]["Date"]);
+            final checkDt =
+                (records[i]["_parsedDate"] as DateTime?) ??
+                DateHelper.parse(records[i]["Date"]);
             if (checkDt != null &&
                 checkDt.year == dt.year &&
                 checkDt.month == dt.month &&
                 checkDt.day == dt.day) {
               dayCount++;
-              final amt = double.tryParse(records[i]["Amount"]?.toString() ?? '0') ?? 0.0;
+              final amt =
+                  double.tryParse(records[i]["Amount"]?.toString() ?? '0') ??
+                  0.0;
               final m = (records[i]["Payment_Mode"] ?? "").toString();
               if (["Add CASH", "Add Online"].contains(m)) {
-                dayNet += amt;
+                dayNet = Money.sum([dayNet, amt]);
               } else {
-                dayNet -= amt;
+                dayNet = Money.sum([dayNet, -amt]);
               }
             } else {
               break;
@@ -1011,7 +1196,7 @@ class PassbookPageState extends State<PassbookApp> {
         final category = (item["Category"] ?? "Other").toString();
         final desc = (item["Description"] ?? "").toString();
         final method = (item["Payment_Mode"] ?? "").toString();
-        final amount = double.tryParse(item["Amount"]?.toString() ?? '0') ?? 0.0;
+        final amount = Money.rupees(item["Amount"]);
         final isIncome = ["Add CASH", "Add Online"].contains(method);
         final itemKey = item["key"]?.toString() ?? "$index";
         final runningBal = item["_runningBalance"] as double?;
@@ -1038,7 +1223,11 @@ class PassbookPageState extends State<PassbookApp> {
                   color: Colors.red.shade400,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(Icons.delete_rounded, color: Colors.white, size: 24),
+                child: const Icon(
+                  Icons.delete_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
               confirmDismiss: (_) async {
                 return await showDeleteConfirmDialog(
@@ -1059,11 +1248,17 @@ class PassbookPageState extends State<PassbookApp> {
                 time: DateHelper.formatDisplay(rawDate),
                 amount: amount,
                 isIncome: isIncome,
-                runningBalance: (selectedCategory == "All" && _searchQuery.isEmpty) ? runningBal : null,
+                runningBalance:
+                    (selectedCategory == "All" && _searchQuery.isEmpty)
+                    ? runningBal
+                    : null,
                 splitFriendName: splitFriend,
                 onTap: () => _showTransactionDetails(context, item),
                 onEdit: () async {
-                  final result = await showEditExpenseModal(context: context, record: item);
+                  final result = await showEditExpenseModal(
+                    context: context,
+                    record: item,
+                  );
                   if (result == true && mounted) {
                     setState(() {});
                   }
@@ -1085,18 +1280,26 @@ class PassbookPageState extends State<PassbookApp> {
     String headerText = fallbackDate;
     if (date != null) {
       final now = DateTime.now();
-      final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+      final isToday =
+          date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day;
       final yesterday = now.subtract(const Duration(days: 1));
-      final isYesterday = date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day;
+      final isYesterday =
+          date.year == yesterday.year &&
+          date.month == yesterday.month &&
+          date.day == yesterday.day;
 
       final dayLabel = isToday
           ? "TODAY"
           : isYesterday
-              ? "YESTERDAY"
-              : DateFormat('d MMM yyyy').format(date).toUpperCase();
+          ? "YESTERDAY"
+          : DateFormat('d MMM yyyy').format(date).toUpperCase();
 
       final countLabel = count == 1 ? "1 Transaction" : "$count Transactions";
-      final netLabel = dayNet >= 0 ? "Net +${dayNet.toINR()}" : "Net -${dayNet.abs().toINR()}";
+      final netLabel = dayNet >= 0
+          ? "Net +${dayNet.toINR()}"
+          : "Net -${dayNet.abs().toINR()}";
 
       headerText = "$dayLabel • $countLabel • $netLabel";
     }

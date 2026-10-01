@@ -1,3 +1,4 @@
+import 'package:fin_track/utils/money.dart';
 import 'package:fin_track/services/export_service.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/date_helper.dart';
@@ -5,18 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 
-enum DatePreset {
-  thisMonth,
-  last3Months,
-  financialYear,
-  custom,
-}
+enum DatePreset { thisMonth, last3Months, financialYear, custom }
 
-enum TransactionTypeFilter {
-  all,
-  debitsOnly,
-  creditsOnly,
-}
+enum TransactionTypeFilter { all, debitsOnly, creditsOnly }
 
 /// Opens the modern FinTrack Export Financial Statement bottom sheet modal.
 Future<void> showExportStatementModal({
@@ -129,7 +121,9 @@ class _ExportStatementModalContentState
       firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 1),
       initialDateRange: DateTimeRange(
-        start: _startDate.isBefore(now) ? _startDate : DateTime(now.year, now.month, 1),
+        start: _startDate.isBefore(now)
+            ? _startDate
+            : DateTime(now.year, now.month, 1),
         end: _endDate.isAfter(now) ? now : _endDate,
       ),
       builder: (context, child) {
@@ -150,7 +144,14 @@ class _ExportStatementModalContentState
       setState(() {
         _selectedPreset = DatePreset.custom;
         _startDate = picked.start;
-        _endDate = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
+        _endDate = DateTime(
+          picked.end.year,
+          picked.end.month,
+          picked.end.day,
+          23,
+          59,
+          59,
+        );
       });
     }
   }
@@ -158,7 +159,8 @@ class _ExportStatementModalContentState
   List<Map<String, dynamic>> _filterRecords() {
     return widget.allRecords.where((item) {
       // 1. Date Filter
-      final dt = (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(item["Date"]);
+      final dt =
+          (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(item["Date"]);
       if (dt != null) {
         if (dt.isBefore(_startDate) || dt.isAfter(_endDate)) {
           return false;
@@ -190,7 +192,9 @@ class _ExportStatementModalContentState
   Future<void> _generatePdf({required bool isShare}) async {
     final filtered = _filterRecords();
     if (filtered.isEmpty) {
-      Fluttertoast.showToast(msg: "No transactions match your selected filters.");
+      Fluttertoast.showToast(
+        msg: "No transactions match your selected filters.",
+      );
       return;
     }
 
@@ -198,30 +202,30 @@ class _ExportStatementModalContentState
 
     try {
       // Compute financial totals
-      int totalIncome = 0;
-      int totalExpense = 0;
-      int addCash = 0;
-      int spentCash = 0;
-      int addOnline = 0;
-      int spentOnline = 0;
+      double totalIncome = 0.0;
+      double totalExpense = 0.0;
+      double addCash = 0.0;
+      double spentCash = 0.0;
+      double addOnline = 0.0;
+      double spentOnline = 0.0;
 
       for (final r in filtered) {
         final mode = (r["Payment_Mode"] ?? "").toString();
-        final amt = (double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0).round();
+        final amt = Money.rupees(r["Amount"]);
         if (mode == "Add CASH") {
-          totalIncome += amt;
-          addCash += amt;
+          totalIncome = Money.sum([totalIncome, amt]);
+          addCash = Money.sum([addCash, amt]);
         } else if (mode == "Add Online") {
-          totalIncome += amt;
-          addOnline += amt;
+          totalIncome = Money.sum([totalIncome, amt]);
+          addOnline = Money.sum([addOnline, amt]);
         } else if (mode == "Spent Cash") {
-          totalExpense += amt;
-          spentCash += amt;
+          totalExpense = Money.sum([totalExpense, amt]);
+          spentCash = Money.sum([spentCash, amt]);
         } else if (mode == "Spent Online") {
-          totalExpense += amt;
-          spentOnline += amt;
+          totalExpense = Money.sum([totalExpense, amt]);
+          spentOnline = Money.sum([spentOnline, amt]);
         } else {
-          totalExpense += amt;
+          totalExpense = Money.sum([totalExpense, amt]);
         }
       }
 
@@ -234,11 +238,15 @@ class _ExportStatementModalContentState
       }
 
       Fluttertoast.showToast(
-        msg: isShare ? "Preparing statement for sharing..." : "Opening statement preview...",
+        msg: isShare
+            ? "Preparing statement for sharing..."
+            : "Opening statement preview...",
       );
 
       await ExportService.exportPassbookPdf(
-        userName: widget.userName.isNotEmpty ? widget.userName : "Account Holder",
+        userName: widget.userName.isNotEmpty
+            ? widget.userName
+            : "Account Holder",
         phoneNumber: widget.phoneNumber,
         records: filtered,
         totalIncome: totalIncome,
@@ -272,15 +280,15 @@ class _ExportStatementModalContentState
   Widget build(BuildContext context) {
     final filtered = _filterRecords();
 
-    double previewInflow = 0;
-    double previewOutflow = 0;
+    double previewInflow = 0.0;
+    double previewOutflow = 0.0;
     for (final r in filtered) {
       final mode = (r["Payment_Mode"] ?? "").toString();
-      final amt = double.tryParse(r["Amount"]?.toString() ?? '0') ?? 0.0;
+      final amt = Money.rupees(r["Amount"]);
       if (mode == "Add CASH" || mode == "Add Online") {
-        previewInflow += amt;
+        previewInflow = Money.sum([previewInflow, amt]);
       } else {
-        previewOutflow += amt;
+        previewOutflow = Money.sum([previewOutflow, amt]);
       }
     }
     final previewNet = previewInflow - previewOutflow;
@@ -381,7 +389,10 @@ class _ExportStatementModalContentState
                     children: [
                       _buildPresetChip("This Month", DatePreset.thisMonth),
                       _buildPresetChip("Last 3 Months", DatePreset.last3Months),
-                      _buildPresetChip("Financial Year", DatePreset.financialYear),
+                      _buildPresetChip(
+                        "Financial Year",
+                        DatePreset.financialYear,
+                      ),
                       _buildCustomChip(),
                     ],
                   ),
@@ -426,7 +437,10 @@ class _ExportStatementModalContentState
                     decoration: BoxDecoration(
                       color: _cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFDCFCE7), width: 1.2),
+                      border: Border.all(
+                        color: const Color(0xFFDCFCE7),
+                        width: 1.2,
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,11 +525,7 @@ class _ExportStatementModalContentState
                                 ],
                               ),
                             ),
-                            Container(
-                              height: 32,
-                              width: 1,
-                              color: _borderGrey,
-                            ),
+                            Container(height: 32, width: 1, color: _borderGrey),
                             const SizedBox(width: 12),
                             // Outflow
                             Expanded(
@@ -542,11 +552,7 @@ class _ExportStatementModalContentState
                                 ],
                               ),
                             ),
-                            Container(
-                              height: 32,
-                              width: 1,
-                              color: _borderGrey,
-                            ),
+                            Container(height: 32, width: 1, color: _borderGrey),
                             const SizedBox(width: 12),
                             // Net Balance
                             Expanded(
@@ -590,15 +596,18 @@ class _ExportStatementModalContentState
                     title: "Include Category Breakdown",
                     subtitle: "Categorical spending distribution & shares",
                     value: _includeCategoryBreakdown,
-                    onChanged: (v) => setState(() => _includeCategoryBreakdown = v),
+                    onChanged: (v) =>
+                        setState(() => _includeCategoryBreakdown = v),
                   ),
                   const SizedBox(height: 6),
                   _buildOptionToggle(
                     icon: Icons.account_balance_wallet_outlined,
                     title: "Include Running Balance Column",
-                    subtitle: "Calculates progressive ledger after each transaction",
+                    subtitle:
+                        "Calculates progressive ledger after each transaction",
                     value: _includeRunningBalance,
-                    onChanged: (v) => setState(() => _includeRunningBalance = v),
+                    onChanged: (v) =>
+                        setState(() => _includeRunningBalance = v),
                   ),
                 ],
               ),
@@ -647,11 +656,17 @@ class _ExportStatementModalContentState
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: _textDark,
-                            side: const BorderSide(color: _borderGrey, width: 1.3),
+                            side: const BorderSide(
+                              color: _borderGrey,
+                              width: 1.3,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 8,
+                            ),
                           ),
                           icon: const Icon(
                             Icons.visibility_outlined,
@@ -682,7 +697,10 @@ class _ExportStatementModalContentState
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 8,
+                            ),
                           ),
                           icon: const Icon(
                             Icons.share_rounded,
@@ -794,11 +812,7 @@ class _ExportStatementModalContentState
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? _darkGreen : _textMuted,
-            ),
+            Icon(icon, size: 18, color: isSelected ? _darkGreen : _textMuted),
             const SizedBox(height: 4),
             Text(
               label,
@@ -850,10 +864,7 @@ class _ExportStatementModalContentState
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: _textMuted,
-                  ),
+                  style: const TextStyle(fontSize: 11, color: _textMuted),
                 ),
               ],
             ),

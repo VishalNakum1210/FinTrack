@@ -1,9 +1,10 @@
 import 'package:fin_track/get_information/session_manager.dart';
+import 'package:fin_track/utils/money.dart';
+import 'package:fin_track/services/retry_safe_writer.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/split_helper.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
@@ -30,14 +31,17 @@ class _SplitBillPageState extends State<SplitBillPage> {
   String singleBillPayerPhone = "me"; // "me" or friend phone number
 
   // ── Group Trip / Multi-Split State ──
-  final TextEditingController tripTitleController =
-      TextEditingController(text: "Trip Expenses");
+  final TextEditingController tripTitleController = TextEditingController(
+    text: "Trip Expenses",
+  );
   final Set<String> tripSelectedFriendNumbers = {};
   final List<GroupExpense> tripExpenses = [];
 
   String _currentUserPhone = "";
   String _currentUserName = "You";
   bool isLoading = false;
+  final String _singleSaveIntent = RetrySafeWriter.newIntent();
+  final String _tripSaveIntent = RetrySafeWriter.newIntent();
 
   final List<String> categories = const [
     "Food",
@@ -49,10 +53,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
     "Other",
   ];
 
-  final List<String> paymentModes = const [
-    "Spent Online",
-    "Spent Cash",
-  ];
+  final List<String> paymentModes = const ["Spent Online", "Spent Cash"];
 
   @override
   void initState() {
@@ -70,14 +71,16 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
   void _addToAmount(double delta) {
     final current =
-        double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
+        double.tryParse(amountController.text.replaceAll(',', '').trim()) ??
+        0.0;
     final newVal = current + delta;
     final str = newVal.truncateToDouble() == newVal
         ? newVal.toInt().toString()
         : newVal.toStringAsFixed(2);
     amountController.text = str;
-    amountController.selection =
-        TextSelection.fromPosition(TextPosition(offset: str.length));
+    amountController.selection = TextSelection.fromPosition(
+      TextPosition(offset: str.length),
+    );
   }
 
   void _clearAmount() {
@@ -100,12 +103,6 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
   Future<void> _loadInitialData() async {
     String phone = await SessionManager.getPhoneNumber() ?? "";
-    if (phone.isEmpty) {
-      final authEmail = FirebaseAuth.instance.currentUser?.email;
-      if (authEmail != null && authEmail.endsWith('@fintrack.app')) {
-        phone = authEmail.split('@').first;
-      }
-    }
     phone = phone.trim();
     final username = await SessionManager.getUsername() ?? "You";
     if (mounted) {
@@ -128,8 +125,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
     super.dispose();
   }
 
-  Future<void> pickDate(
-      {DateTime? initial, required Function(DateTime) onPicked}) async {
+  Future<void> pickDate({
+    DateTime? initial,
+    required Function(DateTime) onPicked,
+  }) async {
     final now = DateTime.now();
     final init = initial ?? selectedDate;
     final DateTime? picked = await showDatePicker(
@@ -146,14 +145,15 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
   // Helper: Get SplitParticipant for Current User
   SplitParticipant get _meParticipant => SplitParticipant(
-        phone: _currentUserPhone.isNotEmpty ? _currentUserPhone : "0000000000",
-        name: _currentUserName.isNotEmpty ? _currentUserName : "You",
-        isMe: true,
-      );
+    phone: _currentUserPhone.isNotEmpty ? _currentUserPhone : "0000000000",
+    name: _currentUserName.isNotEmpty ? _currentUserName : "You",
+    isMe: true,
+  );
 
   // Helper: Build Participants List for Group Trip
   List<SplitParticipant> _getTripParticipants(
-      List<Map<String, dynamic>> allFriends) {
+    List<Map<String, dynamic>> allFriends,
+  ) {
     final List<SplitParticipant> participants = [_meParticipant];
     for (final f in allFriends) {
       final phone = (f["friend_number"] ?? f["phone"] ?? "").toString();
@@ -177,29 +177,33 @@ class _SplitBillPageState extends State<SplitBillPage> {
       return;
     }
 
-    final totalAmount = double.tryParse(rawAmount.replaceAll(',', '').trim());
+    final totalPaise = Money.tryPaise(rawAmount.replaceAll(',', '').trim());
+    final totalAmount = totalPaise == null ? null : totalPaise / 100;
     if (totalAmount == null || totalAmount <= 0) {
       Fluttertoast.showToast(msg: "Please enter a valid amount");
       return;
     }
 
     if (selectedFriendNumbers.isEmpty) {
-      Fluttertoast.showToast(msg: "Please select at least 1 friend to split with");
+      Fluttertoast.showToast(
+        msg: "Please select at least 1 friend to split with",
+      );
       return;
     }
 
     final totalPeople = selectedFriendNumbers.length + 1;
-    final sharePerPerson = ((totalAmount / totalPeople) * 100).round() / 100;
+    final sharePerPerson = (Money.paise(totalAmount) ~/ totalPeople) / 100;
     final myShare =
-        ((totalAmount - (sharePerPerson * selectedFriendNumbers.length)) * 100)
-                .round() /
-            100;
+        (Money.paise(totalAmount) -
+            Money.paise(sharePerPerson) * selectedFriendNumbers.length) /
+        100;
     final formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
 
     final myShareStr = myShare.truncateToDouble() == myShare
         ? myShare.toInt().toString()
         : myShare.toStringAsFixed(2);
-    final sharePerPersonStr = sharePerPerson.truncateToDouble() == sharePerPerson
+    final sharePerPersonStr =
+        sharePerPerson.truncateToDouble() == sharePerPerson
         ? sharePerPerson.toInt().toString()
         : sharePerPerson.toStringAsFixed(2);
     final totalAmountStr = totalAmount.truncateToDouble() == totalAmount
@@ -214,6 +218,8 @@ class _SplitBillPageState extends State<SplitBillPage> {
       context: context,
       isDismissible: false,
       enableDrag: false,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -223,7 +229,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
           builder: (modalCtx, setModalState) {
             return PopScope(
               canPop: !isSaving,
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(22),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -238,9 +244,13 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Text("Total Bill: ₹$totalAmountStr",
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w600)),
+                    Text(
+                      "Total Bill: ₹$totalAmountStr",
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       isPayerMe
@@ -255,31 +265,41 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text("Your Share: ₹$myShareStr (to Passbook)",
-                        style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF2E7D32),
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      "Your Share: ₹$myShareStr (to Passbook)",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF2E7D32),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 6),
-                    Text("Each Friend's Share: ₹$sharePerPersonStr",
-                        style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFFE65100),
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      "Each Friend's Share: ₹$sharePerPersonStr",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFFE65100),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed:
-                                isSaving ? null : () => Navigator.pop(modalCtx),
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.pop(modalCtx),
                             style: OutlinedButton.styleFrom(
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               side: const BorderSide(color: Color(0xFFCBD5E1)),
                             ),
-                            child: const Text("Cancel",
-                                style: TextStyle(color: Color(0xFF64748B))),
+                            child: const Text(
+                              "Cancel",
+                              style: TextStyle(color: Color(0xFF64748B)),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -295,48 +315,43 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                     try {
                                       String userPhone =
                                           await SessionManager.getPhoneNumber() ??
-                                              "";
-                                      if (userPhone.isEmpty) {
-                                        final authEmail = FirebaseAuth
-                                            .instance.currentUser?.email;
-                                        if (authEmail != null &&
-                                            authEmail.endsWith('@fintrack.app')) {
-                                          userPhone =
-                                              authEmail.split('@').first;
-                                        }
-                                      }
+                                          "";
                                       userPhone = userPhone.trim();
                                       if (userPhone.isEmpty) {
                                         Fluttertoast.showToast(
-                                            msg:
-                                                "User session not found. Please log in again.");
+                                          msg:
+                                              "User session not found. Please log in again.",
+                                        );
                                         setModalState(() => isSaving = false);
                                         return;
                                       }
 
                                       if (!mounted) return;
-                                      final friendProvider =
-                                          context.read<FriendProvider>();
+                                      final friendProvider = context
+                                          .read<FriendProvider>();
 
                                       if (isPayerMe) {
-                                        final splitSuccess =
-                                            await friendProvider
-                                                .atomicFullBillSplit(
-                                          userPhone: userPhone,
-                                          myShareAmount: myShareStr,
-                                          myDescription:
-                                              "$description (Your 1/$totalPeople share of ₹$totalAmountStr)",
-                                          totalAmount: totalAmountStr,
-                                          paymentMode: selectedMode,
-                                          category: selectedCategory,
-                                          date: formattedDate,
-                                          friendNumbers:
-                                              selectedFriendNumbers.toList(),
-                                          amountPerFriend: sharePerPersonStr,
-                                          friendDescription:
-                                              "Split: $description (Total ₹$totalAmountStr across $totalPeople people)",
-                                          categoryType: "Give Money To Friend",
-                                        );
+                                        final splitSuccess = await friendProvider
+                                            .atomicFullBillSplit(
+                                              intentId: _singleSaveIntent,
+                                              userPhone: userPhone,
+                                              myShareAmount: myShareStr,
+                                              myDescription:
+                                                  "$description (Your 1/$totalPeople share of ₹$totalAmountStr)",
+                                              totalAmount: totalAmountStr,
+                                              paymentMode: selectedMode,
+                                              category: selectedCategory,
+                                              date: formattedDate,
+                                              friendNumbers:
+                                                  selectedFriendNumbers
+                                                      .toList(),
+                                              amountPerFriend:
+                                                  sharePerPersonStr,
+                                              friendDescription:
+                                                  "Split: $description (Total ₹$totalAmountStr across $totalPeople people)",
+                                              categoryType:
+                                                  "Give Money To Friend",
+                                            );
 
                                         if (splitSuccess) {
                                           Fluttertoast.showToast(
@@ -351,33 +366,38 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                           }
                                         } else {
                                           Fluttertoast.showToast(
-                                              msg:
-                                                  "Failed to record bill split. Please retry.");
+                                            msg: friendProvider.lastError ??
+                                                RetrySafeWriter
+                                                    .instance
+                                                    .failureMessage,
+                                          );
                                           if (modalCtx.mounted) {
                                             setModalState(
-                                                () => isSaving = false);
+                                              () => isSaving = false,
+                                            );
                                           }
                                         }
                                       } else {
-                                        final splitSuccess =
-                                            await friendProvider
-                                                .atomicFullBillSplit(
-                                          userPhone: userPhone,
-                                          myShareAmount: myShareStr,
-                                          myDescription:
-                                              "$description (Your share paid by friend)",
-                                          totalAmount: totalAmountStr,
-                                          paymentMode: selectedMode,
-                                          category: selectedCategory,
-                                          date: formattedDate,
-                                          friendNumbers: [
-                                            singleBillPayerPhone
-                                          ],
-                                          amountPerFriend: myShareStr,
-                                          friendDescription:
-                                              "Split: $description (You owe friend your share of ₹$totalAmountStr)",
-                                          categoryType: "Take Money From Friend",
-                                        );
+                                        final splitSuccess = await friendProvider
+                                            .atomicFullBillSplit(
+                                              intentId: _singleSaveIntent,
+                                              userPhone: userPhone,
+                                              myShareAmount: myShareStr,
+                                              myDescription:
+                                                  "$description (Your share paid by friend)",
+                                              totalAmount: totalAmountStr,
+                                              paymentMode: selectedMode,
+                                              category: selectedCategory,
+                                              date: formattedDate,
+                                              friendNumbers: [
+                                                singleBillPayerPhone,
+                                              ],
+                                              amountPerFriend: myShareStr,
+                                              friendDescription:
+                                                  "Split: $description (You owe friend your share of ₹$totalAmountStr)",
+                                              categoryType:
+                                                  "Take Money From Friend",
+                                            );
 
                                         if (splitSuccess) {
                                           Fluttertoast.showToast(
@@ -392,17 +412,22 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                           }
                                         } else {
                                           Fluttertoast.showToast(
-                                              msg:
-                                                  "Failed to record bill split. Please retry.");
+                                            msg: friendProvider.lastError ??
+                                                RetrySafeWriter
+                                                    .instance
+                                                    .failureMessage,
+                                          );
                                           if (modalCtx.mounted) {
                                             setModalState(
-                                                () => isSaving = false);
+                                              () => isSaving = false,
+                                            );
                                           }
                                         }
                                       }
                                     } catch (e) {
                                       Fluttertoast.showToast(
-                                          msg: "Error splitting bill: $e");
+                                        msg: "Error splitting bill: $e",
+                                      );
                                       if (modalCtx.mounted) {
                                         setModalState(() => isSaving = false);
                                       }
@@ -412,13 +437,15 @@ class _SplitBillPageState extends State<SplitBillPage> {
                               backgroundColor: const Color(0xFF8BC24A),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: isSaving
                                   ? const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         SizedBox(
                                           width: 16,
@@ -432,15 +459,17 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                         Text(
                                           "Splitting...",
                                           style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
                                         ),
                                       ],
                                     )
                                   : const Text(
                                       "Confirm & Split",
                                       style: TextStyle(
-                                          fontWeight: FontWeight.bold),
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                             ),
                           ),
@@ -463,7 +492,8 @@ class _SplitBillPageState extends State<SplitBillPage> {
   void _openAddExpenseModal(List<SplitParticipant> participants) {
     if (participants.length < 2) {
       Fluttertoast.showToast(
-          msg: "Please select at least 1 friend to include in the trip first");
+        msg: "Please select at least 1 friend to include in the trip first",
+      );
       return;
     }
 
@@ -471,8 +501,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
     final amountCtrl = TextEditingController();
     String expCategory = "Food";
     SplitParticipant expPayer = participants.first;
-    final Set<String> expConsumerPhones =
-        participants.map((p) => p.phone).toSet();
+    final Set<String> expConsumerPhones = participants
+        .map((p) => p.phone)
+        .toSet();
     DateTime expDate = DateTime.now();
 
     showModalBottomSheet(
@@ -524,7 +555,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                         fillColor: const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                       ),
                     ),
@@ -532,10 +565,13 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
                     TextField(
                       controller: amountCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       style: const TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.bold),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                       decoration: InputDecoration(
                         labelText: "Total Amount",
                         prefixText: "₹ ",
@@ -543,7 +579,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                         fillColor: const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                       ),
                     ),
@@ -558,13 +596,16 @@ class _SplitBillPageState extends State<SplitBillPage> {
                             decoration: InputDecoration(
                               labelText: "Category",
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                               filled: true,
                               fillColor: const Color(0xFFF8FAFC),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFFE2E8F0)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0),
+                                ),
                               ),
                             ),
                             items: categories.map((cat) {
@@ -572,9 +613,11 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                 value: cat,
                                 child: Row(
                                   children: [
-                                    Icon(CategoryTheme.getIcon(cat),
-                                        size: 18,
-                                        color: CategoryTheme.getColor(cat)),
+                                    Icon(
+                                      CategoryTheme.getIcon(cat),
+                                      size: 18,
+                                      color: CategoryTheme.getColor(cat),
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -607,22 +650,30 @@ class _SplitBillPageState extends State<SplitBillPage> {
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 14),
+                              horizontal: 12,
+                              vertical: 14,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.calendar_today_rounded,
-                                    size: 16, color: Color(0xFF8BC24A)),
+                                const Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 16,
+                                  color: Color(0xFF8BC24A),
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   DateFormat('dd MMM').format(expDate),
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ],
                             ),
@@ -649,8 +700,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                         return ChoiceChip(
                           label: Text(p.isMe ? "You" : p.name),
                           selected: isSelected,
-                          selectedColor:
-                              const Color(0xFF8BC24A).withValues(alpha: 0.25),
+                          selectedColor: const Color(
+                            0xFF8BC24A,
+                          ).withValues(alpha: 0.25),
                           labelStyle: TextStyle(
                             color: isSelected
                                 ? const Color(0xFF2E7D32)
@@ -686,8 +738,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                         return FilterChip(
                           label: Text(p.isMe ? "You" : p.name),
                           selected: isIncluded,
-                          selectedColor:
-                              const Color(0xFF8BC24A).withValues(alpha: 0.2),
+                          selectedColor: const Color(
+                            0xFF8BC24A,
+                          ).withValues(alpha: 0.2),
                           onSelected: (selected) {
                             setModalState(() {
                               if (selected) {
@@ -697,7 +750,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                   expConsumerPhones.remove(p.phone);
                                 } else {
                                   Fluttertoast.showToast(
-                                      msg: "At least 1 person must share this expense");
+                                    msg:
+                                        "At least 1 person must share this expense",
+                                  );
                                 }
                               }
                             });
@@ -711,22 +766,33 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       onPressed: () {
                         final title = titleCtrl.text.trim();
                         final rawAmt = amountCtrl.text.trim();
-                        final parsedAmt = double.tryParse(rawAmt);
+                        final rawPaise = Money.tryPaise(rawAmt);
+                        final parsedAmt = rawPaise == null
+                            ? null
+                            : rawPaise / 100;
 
                         if (title.isEmpty) {
                           Fluttertoast.showToast(
-                              msg: "Please enter an expense title");
+                            msg: "Please enter an expense title",
+                          );
                           return;
                         }
                         if (parsedAmt == null || parsedAmt <= 0) {
                           Fluttertoast.showToast(
-                              msg: "Please enter a valid amount");
+                            msg: "Please enter a valid amount",
+                          );
                           return;
                         }
 
                         final consumers = participants
                             .where((p) => expConsumerPhones.contains(p.phone))
                             .toList();
+                        if (consumers.isEmpty) {
+                          Fluttertoast.showToast(
+                            msg: 'Select at least one participant',
+                          );
+                          return;
+                        }
 
                         final newExpense = GroupExpense(
                           id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -756,7 +822,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       child: const Text(
                         "Add to Trip",
                         style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                   ],
@@ -789,8 +857,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
       allParticipants: participants,
     );
 
-    final totalTripAmount =
-        tripExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final totalTripAmount = tripExpenses.fold<double>(
+      0.0,
+      (sum, e) => sum + e.amount,
+    );
     final totalTripStr = totalTripAmount.toINR();
     final formattedDate = DateFormat('d/M/yyyy').format(DateTime.now());
 
@@ -800,6 +870,8 @@ class _SplitBillPageState extends State<SplitBillPage> {
       context: context,
       isDismissible: false,
       enableDrag: false,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -809,7 +881,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
           builder: (modalCtx, setModalState) {
             return PopScope(
               canPop: !isSaving,
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(22),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -827,33 +899,44 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     Text(
                       "Total Trip Expenses: $totalTripStr (${tripExpenses.length} bills)",
                       style: const TextStyle(
-                          fontSize: 14.5, fontWeight: FontWeight.w600),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       "Participants: ${participants.length} people",
                       style: const TextStyle(
-                          fontSize: 13.5, color: Color(0xFF64748B)),
+                        fontSize: 13.5,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Text(
                       "Saving will atomically update your Passbook and all mutual balances in each friend's ledger.",
-                      style: TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF475569),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed:
-                                isSaving ? null : () => Navigator.pop(modalCtx),
+                            onPressed: isSaving
+                                ? null
+                                : () => Navigator.pop(modalCtx),
                             style: OutlinedButton.styleFrom(
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               side: const BorderSide(color: Color(0xFFCBD5E1)),
                             ),
-                            child: const Text("Review",
-                                style: TextStyle(color: Color(0xFF64748B))),
+                            child: const Text(
+                              "Review",
+                              style: TextStyle(color: Color(0xFF64748B)),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -869,38 +952,31 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                     try {
                                       String userPhone =
                                           await SessionManager.getPhoneNumber() ??
-                                              "";
-                                      if (userPhone.isEmpty) {
-                                        final authEmail = FirebaseAuth
-                                            .instance.currentUser?.email;
-                                        if (authEmail != null &&
-                                            authEmail.endsWith('@fintrack.app')) {
-                                          userPhone =
-                                              authEmail.split('@').first;
-                                        }
-                                      }
+                                          "";
                                       userPhone = userPhone.trim();
                                       if (userPhone.isEmpty) {
                                         Fluttertoast.showToast(
-                                            msg:
-                                                "User session not found. Please log in again.");
+                                          msg:
+                                              "User session not found. Please log in again.",
+                                        );
                                         setModalState(() => isSaving = false);
                                         return;
                                       }
 
                                       if (!mounted) return;
-                                      final friendProvider =
-                                          context.read<FriendProvider>();
+                                      final friendProvider = context
+                                          .read<FriendProvider>();
 
                                       final success = await friendProvider
                                           .batchSaveMultiSplit(
-                                        userPhone: userPhone,
-                                        tripTitle: tripTitle,
-                                        formattedDate: formattedDate,
-                                        paymentMode: "Spent Online",
-                                        expenses: tripExpenses,
-                                        settlements: settlements,
-                                      );
+                                            intentId: _tripSaveIntent,
+                                            userPhone: userPhone,
+                                            tripTitle: tripTitle,
+                                            formattedDate: formattedDate,
+                                            paymentMode: selectedMode,
+                                            expenses: tripExpenses,
+                                            settlements: settlements,
+                                          );
 
                                       if (success) {
                                         Fluttertoast.showToast(
@@ -926,7 +1002,8 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                       }
                                     } catch (e) {
                                       Fluttertoast.showToast(
-                                          msg: "Error saving trip: $e");
+                                        msg: "Error saving trip: $e",
+                                      );
                                       if (modalCtx.mounted) {
                                         setModalState(() => isSaving = false);
                                       }
@@ -936,7 +1013,8 @@ class _SplitBillPageState extends State<SplitBillPage> {
                               backgroundColor: const Color(0xFF8BC24A),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             child: isSaving
                                 ? const Row(
@@ -954,15 +1032,17 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                       Text(
                                         "Saving...",
                                         style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                     ],
                                   )
                                 : const Text(
                                     "Save to Ledgers",
                                     style: TextStyle(
-                                        fontWeight: FontWeight.bold),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                           ),
                         ),
@@ -1009,8 +1089,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     children: [
                       IconButton(
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_rounded,
-                            color: Color(0xFF1E293B)),
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Color(0xFF1E293B),
+                        ),
                       ),
                       const SizedBox(width: 4),
                       const Expanded(
@@ -1050,7 +1132,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                 boxShadow: _activeTab == 0
                                     ? [
                                         BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.05),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.05,
+                                          ),
                                           blurRadius: 4,
                                           offset: const Offset(0, 2),
                                         ),
@@ -1092,7 +1176,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                 boxShadow: _activeTab == 1
                                     ? [
                                         BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.05),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.05,
+                                          ),
                                           blurRadius: 4,
                                           offset: const Offset(0, 2),
                                         ),
@@ -1130,7 +1216,11 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     _buildSingleBillView(primary, friends),
                   ] else ...[
                     _buildGroupTripView(
-                        primary, friends, tripParticipants, settlements),
+                      primary,
+                      friends,
+                      tripParticipants,
+                      settlements,
+                    ),
                   ],
 
                   const SizedBox(height: 30),
@@ -1155,23 +1245,27 @@ class _SplitBillPageState extends State<SplitBillPage> {
   // SINGLE BILL SPLIT WIDGETS
   // ────────────────────────────────────────────────────────────
   Widget _buildSingleBillView(
-      Color primary, List<Map<String, dynamic>> friends) {
-    final totalAmount =
-        double.tryParse(amountController.text.replaceAll(',', '').trim()) ?? 0.0;
+    Color primary,
+    List<Map<String, dynamic>> friends,
+  ) {
+    final totalAmount = Money.rupees(
+      amountController.text.replaceAll(',', '').trim(),
+    );
     final totalPeople = selectedFriendNumbers.length + 1;
     final sharePerPerson = totalAmount > 0
-        ? ((totalAmount / totalPeople) * 100).round() / 100
+        ? (Money.paise(totalAmount) ~/ totalPeople) / 100
         : 0.0;
     final myShare = totalAmount > 0
-        ? ((totalAmount - (sharePerPerson * selectedFriendNumbers.length)) * 100)
-                .round() /
-            100
+        ? (Money.paise(totalAmount) -
+                  Money.paise(sharePerPerson) * selectedFriendNumbers.length) /
+              100
         : 0.0;
 
     final myShareStr = myShare.truncateToDouble() == myShare
         ? myShare.toInt().toString()
         : myShare.toStringAsFixed(2);
-    final sharePerPersonStr = sharePerPerson.truncateToDouble() == sharePerPerson
+    final sharePerPersonStr =
+        sharePerPerson.truncateToDouble() == sharePerPerson
         ? sharePerPerson.toInt().toString()
         : sharePerPerson.toStringAsFixed(2);
     final totalAmountStr = totalAmount.truncateToDouble() == totalAmount
@@ -1204,13 +1298,15 @@ class _SplitBillPageState extends State<SplitBillPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "Total Bill Amount",
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
-                      color: Color(0xFF64748B),
+                  const Expanded(
+                    child: Text(
+                      "Total Bill Amount",
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                   ),
                   if (amountController.text.isNotEmpty)
@@ -1243,8 +1339,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                   Expanded(
                     child: TextField(
                       controller: amountController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       maxLength: 10,
                       style: const TextStyle(
                         fontSize: 34,
@@ -1313,22 +1410,31 @@ class _SplitBillPageState extends State<SplitBillPage> {
                 style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
                 decoration: InputDecoration(
                   hintText: "Enter bill title (e.g. Dinner, Movie, Uber)",
-                  hintStyle:
-                      const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-                  prefixIcon: const Icon(Icons.receipt_long_rounded,
-                      color: Color(0xFF8BC24A), size: 22),
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 13.5,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.receipt_long_rounded,
+                    color: Color(0xFF8BC24A),
+                    size: 22,
+                  ),
                   filled: true,
                   fillColor: const Color(0xFFF8FAFC),
                   counterText: "",
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: const BorderSide(
-                        color: Color(0xFF8BC24A), width: 1.8),
+                      color: Color(0xFF8BC24A),
+                      width: 1.8,
+                    ),
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
@@ -1343,8 +1449,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
                 },
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(14),
@@ -1352,18 +1460,23 @@ class _SplitBillPageState extends State<SplitBillPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_month_rounded,
-                          color: Color(0xFF8BC24A), size: 20),
+                      const Icon(
+                        Icons.calendar_month_rounded,
+                        color: Color(0xFF8BC24A),
+                        size: 20,
+                      ),
                       const SizedBox(width: 10),
-                      Text(
-                        DateFormat('dd MMMM yyyy').format(selectedDate),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
+                      Expanded(
+                        child: Text(
+                          DateFormat('dd MMMM yyyy').format(selectedDate),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E293B),
+                          ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       const Text(
                         "Change",
                         style: TextStyle(
@@ -1386,13 +1499,16 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       decoration: InputDecoration(
                         labelText: "Category",
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                       ),
                       items: categories.map((cat) {
@@ -1400,9 +1516,11 @@ class _SplitBillPageState extends State<SplitBillPage> {
                           value: cat,
                           child: Row(
                             children: [
-                              Icon(CategoryTheme.getIcon(cat),
-                                  size: 18,
-                                  color: CategoryTheme.getColor(cat)),
+                              Icon(
+                                CategoryTheme.getIcon(cat),
+                                size: 18,
+                                color: CategoryTheme.getColor(cat),
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -1428,13 +1546,16 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       decoration: InputDecoration(
                         labelText: "Paid Via",
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                       ),
                       items: paymentModes.map((mode) {
@@ -1493,25 +1614,27 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       avatar: const Icon(Icons.person, size: 16),
                       label: const Text("You (I Paid)"),
                       selected: singleBillPayerPhone == "me",
-                      selectedColor:
-                          const Color(0xFF8BC24A).withValues(alpha: 0.25),
+                      selectedColor: const Color(
+                        0xFF8BC24A,
+                      ).withValues(alpha: 0.25),
                       onSelected: (val) {
                         if (val) _onSingleBillPayerSelected("me");
                       },
                     ),
                     const SizedBox(width: 8),
                     ...friends.map((f) {
-                      final phone =
-                          (f["friend_number"] ?? f["phone"] ?? "").toString();
-                      final name =
-                          (f["friend_name"] ?? f["name"] ?? phone).toString();
+                      final phone = (f["friend_number"] ?? f["phone"] ?? "")
+                          .toString();
+                      final name = (f["friend_name"] ?? f["name"] ?? phone)
+                          .toString();
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
                           label: Text(name),
                           selected: singleBillPayerPhone == phone,
-                          selectedColor: const Color(0xFF8BC24A)
-                              .withValues(alpha: 0.25),
+                          selectedColor: const Color(
+                            0xFF8BC24A,
+                          ).withValues(alpha: 0.25),
                           onSelected: (val) {
                             if (val) {
                               _onSingleBillPayerSelected(phone);
@@ -1545,8 +1668,11 @@ class _SplitBillPageState extends State<SplitBillPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   const Text(
                     "Split with Friends",
@@ -1565,10 +1691,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
                           } else {
                             selectedFriendNumbers.clear();
                             for (final f in friends) {
-                              selectedFriendNumbers.add((f["friend_number"] ??
-                                      f["phone"] ??
-                                      "")
-                                  .toString());
+                              selectedFriendNumbers.add(
+                                (f["friend_number"] ?? f["phone"] ?? "")
+                                    .toString(),
+                              );
                             }
                           }
                         });
@@ -1602,13 +1728,14 @@ class _SplitBillPageState extends State<SplitBillPage> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: friends.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1),
                   itemBuilder: (context, idx) {
                     final f = friends[idx];
-                    final phone =
-                        (f["friend_number"] ?? f["phone"] ?? "").toString();
-                    final name =
-                        (f["friend_name"] ?? f["name"] ?? phone).toString();
+                    final phone = (f["friend_number"] ?? f["phone"] ?? "")
+                        .toString();
+                    final name = (f["friend_name"] ?? f["name"] ?? phone)
+                        .toString();
                     final isChecked = selectedFriendNumbers.contains(phone);
 
                     return Material(
@@ -1624,12 +1751,20 @@ class _SplitBillPageState extends State<SplitBillPage> {
                             }
                           });
                         },
-                        title: Text(name,
-                            style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600)),
-                        subtitle: Text(phone,
-                            style: const TextStyle(
-                                fontSize: 12, color: Color(0xFF94A3B8))),
+                        title: Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          phone,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
                         activeColor: const Color(0xFF8BC24A),
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -1649,13 +1784,17 @@ class _SplitBillPageState extends State<SplitBillPage> {
               color: const Color(0xFFF7FEE7),
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                  color: const Color(0xFF8BC24A).withValues(alpha: 0.5)),
+                color: const Color(0xFF8BC24A).withValues(alpha: 0.5),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     const Text(
                       "Live Calculation",
@@ -1692,7 +1831,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       ? "• Your share: ₹$myShareStr (to Passbook)\n• Friends will owe you: ₹$totalCollectStr"
                       : "• Your share: ₹$myShareStr (You will owe to payer)",
                   style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF475569), height: 1.4),
+                    fontSize: 13,
+                    color: Color(0xFF475569),
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -1705,10 +1847,13 @@ class _SplitBillPageState extends State<SplitBillPage> {
           child: ElevatedButton.icon(
             onPressed:
                 (isLoading || totalAmount <= 0 || selectedFriendNumbers.isEmpty)
-                    ? null
-                    : handleSplitBill,
-            icon: const Icon(Icons.call_split_rounded,
-                color: Colors.white, size: 20),
+                ? null
+                : handleSplitBill,
+            icon: const Icon(
+              Icons.call_split_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
             label: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
@@ -1717,15 +1862,17 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     : "Select Friends & Enter Bill",
                 maxLines: 1,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.bold),
+                  color: Colors.white,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: primary,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
           ),
         ),
@@ -1742,12 +1889,37 @@ class _SplitBillPageState extends State<SplitBillPage> {
     List<SplitParticipant> participants,
     List<PersonSettlement> settlements,
   ) {
-    final totalTripSpent =
-        tripExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final totalTripSpent = tripExpenses.fold<double>(
+      0.0,
+      (sum, e) => sum + e.amount,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        DropdownButtonFormField<String>(
+          key: const ValueKey('trip-payment-mode'),
+          initialValue: selectedMode,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Paid Via',
+            helperText:
+                'Applies to your payments. Separate cash and online trips.',
+            helperMaxLines: 2,
+          ),
+          items: paymentModes
+              .map(
+                (mode) => DropdownMenuItem(
+                  value: mode,
+                  child: Text(mode, overflow: TextOverflow.ellipsis),
+                ),
+              )
+              .toList(),
+          onChanged: (mode) {
+            if (mode != null) setState(() => selectedMode = mode);
+          },
+        ),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -1776,14 +1948,17 @@ class _SplitBillPageState extends State<SplitBillPage> {
               TextField(
                 controller: tripTitleController,
                 style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B)),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                ),
                 decoration: InputDecoration(
                   labelText: "Trip Name",
                   hintText: "e.g. Goa Trip 2026, Weekend Outing",
-                  prefixIcon: const Icon(Icons.beach_access_rounded,
-                      color: Color(0xFF8BC24A)),
+                  prefixIcon: const Icon(
+                    Icons.beach_access_rounded,
+                    color: Color(0xFF8BC24A),
+                  ),
                   filled: true,
                   fillColor: const Color(0xFFF8FAFC),
                   border: OutlineInputBorder(
@@ -1843,29 +2018,33 @@ class _SplitBillPageState extends State<SplitBillPage> {
                   Chip(
                     avatar: const CircleAvatar(
                       backgroundColor: Color(0xFF2E7D32),
-                      child: Text("Y",
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold)),
+                      child: Text(
+                        "Y",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     label: Text(_currentUserName),
-                    backgroundColor:
-                        const Color(0xFF8BC24A).withValues(alpha: 0.15),
+                    backgroundColor: const Color(
+                      0xFF8BC24A,
+                    ).withValues(alpha: 0.15),
                   ),
                   ...friends.map((f) {
-                    final phone =
-                        (f["friend_number"] ?? f["phone"] ?? "").toString();
-                    final name =
-                        (f["friend_name"] ?? f["name"] ?? phone).toString();
-                    final isChecked =
-                        tripSelectedFriendNumbers.contains(phone);
+                    final phone = (f["friend_number"] ?? f["phone"] ?? "")
+                        .toString();
+                    final name = (f["friend_name"] ?? f["name"] ?? phone)
+                        .toString();
+                    final isChecked = tripSelectedFriendNumbers.contains(phone);
 
                     return FilterChip(
                       label: Text(name),
                       selected: isChecked,
-                      selectedColor:
-                          const Color(0xFF8BC24A).withValues(alpha: 0.25),
+                      selectedColor: const Color(
+                        0xFF8BC24A,
+                      ).withValues(alpha: 0.25),
                       onSelected: (val) {
                         setState(() {
                           if (val) {
@@ -1942,7 +2121,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       backgroundColor: const Color(0xFF8BC24A),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -1962,14 +2143,18 @@ class _SplitBillPageState extends State<SplitBillPage> {
                   child: Center(
                     child: Column(
                       children: [
-                        Icon(Icons.receipt_long_rounded,
-                            size: 40, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.receipt_long_rounded,
+                          size: 40,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 8),
                         const Text(
                           "No expenses added yet",
                           style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF64748B)),
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                         const SizedBox(height: 4),
                         const Text(
@@ -1986,11 +2171,11 @@ class _SplitBillPageState extends State<SplitBillPage> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: tripExpenses.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 10),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 10),
                   itemBuilder: (ctx, idx) {
                     final exp = tripExpenses[idx];
-                    final payerName =
-                        exp.payer.isMe ? "You" : exp.payer.name;
+                    final payerName = exp.payer.isMe ? "You" : exp.payer.name;
 
                     return Container(
                       padding: const EdgeInsets.all(12),
@@ -2023,8 +2208,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13.5),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                  ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
@@ -2032,8 +2218,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                      fontSize: 11.5,
-                                      color: Color(0xFF64748B)),
+                                    fontSize: 11.5,
+                                    color: Color(0xFF64748B),
+                                  ),
                                 ),
                               ],
                             ),
@@ -2044,15 +2231,19 @@ class _SplitBillPageState extends State<SplitBillPage> {
                             child: Text(
                               exp.amount.toINR(),
                               style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: Color(0xFF1E293B)),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Color(0xFF1E293B),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 4),
                           IconButton(
-                            icon: const Icon(Icons.delete_outline,
-                                color: Colors.redAccent, size: 20),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                              size: 20,
+                            ),
                             onPressed: () {
                               setState(() {
                                 tripExpenses.removeAt(idx);
@@ -2100,7 +2291,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF8BC24A).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
@@ -2108,9 +2301,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       child: const Text(
                         "Live Preview",
                         style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2E7D32)),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2E7D32),
+                        ),
                       ),
                     ),
                   ],
@@ -2135,8 +2329,11 @@ class _SplitBillPageState extends State<SplitBillPage> {
               onPressed: isLoading
                   ? null
                   : () => handleSaveGroupTrip(participants),
-              icon: const Icon(Icons.done_all_rounded,
-                  color: Colors.white, size: 20),
+              icon: const Icon(
+                Icons.done_all_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               label: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
@@ -2213,9 +2410,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
                 child: Text(
                   name.isNotEmpty ? name[0].toUpperCase() : "?",
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -2233,8 +2431,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: badgeBg,
                   borderRadius: BorderRadius.circular(12),
@@ -2257,14 +2457,18 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
           if (s.giveLines.isNotEmpty) ...[
             ...s.giveLines.map((line) {
-              final toName =
-                  line.otherPerson.isMe ? "You" : line.otherPerson.name;
+              final toName = line.otherPerson.isMe
+                  ? "You"
+                  : line.otherPerson.name;
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(
                   children: [
-                    const Icon(Icons.arrow_upward_rounded,
-                        color: Color(0xFFC62828), size: 16),
+                    const Icon(
+                      Icons.arrow_upward_rounded,
+                      color: Color(0xFFC62828),
+                      size: 16,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -2287,7 +2491,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF94A3B8)),
+                            fontSize: 11,
+                            color: Color(0xFF94A3B8),
+                          ),
                         ),
                       ),
                     ],
@@ -2299,14 +2505,18 @@ class _SplitBillPageState extends State<SplitBillPage> {
 
           if (s.getLines.isNotEmpty) ...[
             ...s.getLines.map((line) {
-              final fromName =
-                  line.otherPerson.isMe ? "You" : line.otherPerson.name;
+              final fromName = line.otherPerson.isMe
+                  ? "You"
+                  : line.otherPerson.name;
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(
                   children: [
-                    const Icon(Icons.arrow_downward_rounded,
-                        color: Color(0xFF2E7D32), size: 16),
+                    const Icon(
+                      Icons.arrow_downward_rounded,
+                      color: Color(0xFF2E7D32),
+                      size: 16,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -2329,7 +2539,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF94A3B8)),
+                            fontSize: 11,
+                            color: Color(0xFF94A3B8),
+                          ),
                         ),
                       ),
                     ],
@@ -2364,7 +2576,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 11.5, color: Color(0xFF64748B)),
+                      fontSize: 11.5,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -2375,7 +2589,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 11.5, color: Color(0xFF64748B)),
+                      fontSize: 11.5,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ],

@@ -4,7 +4,8 @@ import 'package:fin_track/get_information/session_manager.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fin_track/utils/input_validator.dart';
 
 class UserProvider extends ChangeNotifier {
   bool _isLoading = false;
@@ -14,7 +15,9 @@ class UserProvider extends ChangeNotifier {
   String _phoneNumber = "";
   String _address = "";
 
-  static const String _cacheKey = 'cached_user_profile';
+  static const _storage = FlutterSecureStorage();
+  String get _cacheKey =>
+      'cached_user_profile_${SessionManager.authenticatedUid ?? 'signed_out'}';
 
   UserProvider() {
     _hydrateFromLocalStorage();
@@ -58,10 +61,15 @@ class UserProvider extends ChangeNotifier {
   Future<void> _hydrateFromLocalStorage() async {
     bool hasUpdated = false;
     try {
-      final sp = await SharedPreferences.getInstance();
-      final cached = sp.getString(_cacheKey);
-      if (cached != null && cached.isNotEmpty) {
+      final cached = await _storage.read(key: _cacheKey);
+      if (cached != null &&
+          cached.isNotEmpty &&
+          SessionManager.authenticatedPhone != null) {
         final data = jsonDecode(cached) as Map<String, dynamic>;
+        if (data['phone_number'] != SessionManager.authenticatedPhone ||
+            data['owner_uid'] != SessionManager.authenticatedUid) {
+          return;
+        }
         final cName = (data['name'] ?? '').toString().trim();
         if (cName.isNotEmpty && cName != 'User' && cName != _name) {
           _name = cName;
@@ -75,7 +83,8 @@ class UserProvider extends ChangeNotifier {
           _address = (data['address'] ?? '').toString();
           hasUpdated = true;
         }
-        if ((data['phone_number'] ?? '').toString().isNotEmpty && _phoneNumber.isEmpty) {
+        if ((data['phone_number'] ?? '').toString().isNotEmpty &&
+            _phoneNumber.isEmpty) {
           _phoneNumber = (data['phone_number'] ?? '').toString();
           hasUpdated = true;
         }
@@ -121,13 +130,16 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final phone = _phoneNumber.isNotEmpty
-          ? _phoneNumber
-          : await SessionManager.getPhoneNumber();
+      final phone = SessionManager.authenticatedPhone;
+      final uid = SessionManager.authenticatedUid;
 
-      if (phone != null && phone.isNotEmpty) {
+      if (phone != null && phone.isNotEmpty && uid != null) {
         _phoneNumber = phone;
         final details = await getUserInformation(phone);
+        if (phone != SessionManager.authenticatedPhone ||
+            uid != SessionManager.authenticatedUid) {
+          return;
+        }
 
         // Flexible key resolution for name
         String? remoteName;
@@ -139,7 +151,7 @@ class UserProvider extends ChangeNotifier {
           'fullName',
           'FullName',
           'displayName',
-          'DisplayName'
+          'DisplayName',
         ]) {
           final val = details[key]?.trim();
           if (val != null && val.isNotEmpty && val != 'User') {
@@ -158,12 +170,21 @@ class UserProvider extends ChangeNotifier {
           } catch (_) {}
         }
 
+        // Self-heal RTDB if legacy user node is missing owner_uid
+        if (details["owner_uid"] == null || details["owner_uid"] != uid) {
+          try {
+            final ref = FirebaseDatabase.instance.ref("user_details/$phone");
+            await ref.update({"owner_uid": uid});
+          } catch (_) {}
+        }
+
         final remoteEmail = (details["email"] ?? details["Email"] ?? "").trim();
         if (remoteEmail.isNotEmpty) {
           _email = remoteEmail;
         }
 
-        final remoteAddress = (details["address"] ?? details["Address"] ?? "").trim();
+        final remoteAddress = (details["address"] ?? details["Address"] ?? "")
+            .trim();
         if (remoteAddress.isNotEmpty) {
           _address = remoteAddress;
         }
@@ -173,11 +194,13 @@ class UserProvider extends ChangeNotifier {
           final currentUser = FirebaseAuth.instance.currentUser;
           if (currentUser != null &&
               _name != 'User' &&
-              (currentUser.displayName == null || currentUser.displayName != _name)) {
+              (currentUser.displayName == null ||
+                  currentUser.displayName != _name)) {
             await currentUser.updateDisplayName(_name);
           }
         } catch (_) {}
 
+        if (uid != SessionManager.authenticatedUid) return;
         // Persist to SessionManager
         await SessionManager.saveSession(
           phoneNumber: _phoneNumber,
@@ -187,14 +210,15 @@ class UserProvider extends ChangeNotifier {
 
         // Update offline cache
         try {
-          final sp = await SharedPreferences.getInstance();
-          await sp.setString(
-            _cacheKey,
-            jsonEncode({
+          if (uid != SessionManager.authenticatedUid) return;
+          await _storage.write(
+            key: 'cached_user_profile_$uid',
+            value: jsonEncode({
               'name': _name,
               'email': _email,
               'address': _address,
               'phone_number': _phoneNumber,
+              'owner_uid': uid,
             }),
           );
         } catch (_) {}
@@ -202,10 +226,15 @@ class UserProvider extends ChangeNotifier {
     } catch (_) {
       // Offline fallback: restore from cached profile if available
       try {
-        final sp = await SharedPreferences.getInstance();
-        final cached = sp.getString(_cacheKey);
-        if (cached != null && cached.isNotEmpty) {
+        final cached = await _storage.read(key: _cacheKey);
+        if (cached != null &&
+            cached.isNotEmpty &&
+            SessionManager.authenticatedPhone != null) {
           final data = jsonDecode(cached) as Map<String, dynamic>;
+          if (data['phone_number'] != SessionManager.authenticatedPhone ||
+              data['owner_uid'] != SessionManager.authenticatedUid) {
+            return;
+          }
           final cName = (data['name'] ?? '').toString().trim();
           if (cName.isNotEmpty && cName != 'User') {
             _name = cName;
@@ -231,15 +260,21 @@ class UserProvider extends ChangeNotifier {
     required String email,
     required String address,
   }) async {
-    if (_phoneNumber.isEmpty) return false;
+    final uid = SessionManager.authenticatedUid;
+    if (_phoneNumber != SessionManager.authenticatedPhone ||
+        uid == null ||
+        !InputValidator.phone(_phoneNumber) ||
+        name.trim().isEmpty ||
+        name.length > 50 ||
+        email.length > 100 ||
+        address.length > 200) {
+      return false;
+    }
 
     try {
       final ref = FirebaseDatabase.instance.ref("user_details/$_phoneNumber");
-      await ref.update({
-        "name": name,
-        "email": email,
-        "address": address,
-      });
+      await ref.update({"name": name, "email": email, "address": address});
+      if (uid != SessionManager.authenticatedUid) return false;
 
       _name = name;
       _email = email;
@@ -250,6 +285,7 @@ class UserProvider extends ChangeNotifier {
         await FirebaseAuth.instance.currentUser?.updateDisplayName(name);
       } catch (_) {}
 
+      if (uid != SessionManager.authenticatedUid) return false;
       await SessionManager.saveSession(
         phoneNumber: _phoneNumber,
         username: name,
@@ -257,13 +293,17 @@ class UserProvider extends ChangeNotifier {
       );
 
       try {
-        final sp = await SharedPreferences.getInstance();
-        await sp.setString(_cacheKey, jsonEncode({
-          'name': _name,
-          'email': _email,
-          'address': _address,
-          'phone_number': _phoneNumber,
-        }));
+        if (uid != SessionManager.authenticatedUid) return false;
+        await _storage.write(
+          key: 'cached_user_profile_$uid',
+          value: jsonEncode({
+            'name': _name,
+            'email': _email,
+            'address': _address,
+            'phone_number': _phoneNumber,
+            'owner_uid': uid,
+          }),
+        );
       } catch (_) {}
 
       notifyListeners();
@@ -274,14 +314,13 @@ class UserProvider extends ChangeNotifier {
   }
 
   void clearUser() {
+    final oldCacheKey = 'cached_user_profile_$_phoneNumber';
     _name = "User";
     _email = "";
     _phoneNumber = "";
     _address = "";
     _hasError = false;
-    SharedPreferences.getInstance().then((sp) {
-      sp.remove(_cacheKey);
-    }).catchError((_) {});
+    _storage.delete(key: oldCacheKey).catchError((_) {});
     notifyListeners();
   }
 
