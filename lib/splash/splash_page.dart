@@ -166,11 +166,20 @@ class _SplashPageState extends State<SplashPage> {
       final currentUser = FirebaseAuth.instance.currentUser;
       final expectedEmail = '$phoneNumber@fintrack.app';
 
+      final isEmailMatch = currentUser != null &&
+          currentUser.email != null &&
+          currentUser.email!.toLowerCase().trim() ==
+              expectedEmail.toLowerCase().trim();
+      final isPhoneMatch = currentUser != null &&
+          currentUser.phoneNumber != null &&
+          currentUser.phoneNumber!.replaceAll(RegExp(r'\D'), '').endsWith(
+                phoneNumber?.replaceAll(RegExp(r'\D'), '') ?? '___',
+              );
+
       if (hasValidSession &&
           phoneNumber != null &&
           phoneNumber.isNotEmpty &&
-          currentUser != null &&
-          currentUser.email == expectedEmail) {
+          (isEmailMatch || isPhoneMatch)) {
         context.read<UserProvider>().loadUserSession();
         context.read<ExpenseProvider>().fetchExpenses(phoneNumber);
         context.read<FriendProvider>().fetchFriends(phoneNumber);
@@ -180,8 +189,11 @@ class _SplashPageState extends State<SplashPage> {
           MaterialPageRoute(builder: (context) => const NavPageSelector()),
         );
         return;
-      } else if (hasValidSession) {
-        // Clear stale local session on auth mismatch
+      } else if (hasValidSession &&
+          currentUser != null &&
+          !isEmailMatch &&
+          !isPhoneMatch) {
+        // Clear stale local session on verified auth mismatch
         await SessionManager.clearSession();
         await FirebaseAuth.instance.signOut();
       }

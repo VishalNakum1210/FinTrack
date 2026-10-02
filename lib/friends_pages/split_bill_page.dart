@@ -6,6 +6,7 @@ import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/currency_helper.dart';
 import 'package:fin_track/utils/split_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -95,6 +96,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
         selectedFriendNumbers.remove(oldPayer);
       }
       if (newPayerPhone != "me") {
+        selectedFriendNumbers.clear();
         selectedFriendNumbers.add(newPayerPhone);
       }
       singleBillPayerPhone = newPayerPhone;
@@ -144,11 +146,16 @@ class _SplitBillPageState extends State<SplitBillPage> {
   }
 
   // Helper: Get SplitParticipant for Current User
-  SplitParticipant get _meParticipant => SplitParticipant(
-    phone: _currentUserPhone.isNotEmpty ? _currentUserPhone : "0000000000",
-    name: _currentUserName.isNotEmpty ? _currentUserName : "You",
-    isMe: true,
-  );
+  SplitParticipant get _meParticipant {
+    final phone = _currentUserPhone.isNotEmpty
+        ? _currentUserPhone
+        : (SessionManager.authenticatedPhone ?? "");
+    return SplitParticipant(
+      phone: phone.isNotEmpty ? phone : "0000000000",
+      name: _currentUserName.isNotEmpty ? _currentUserName : "You",
+      isMe: true,
+    );
+  }
 
   // Helper: Build Participants List for Group Trip
   List<SplitParticipant> _getTripParticipants(
@@ -191,12 +198,37 @@ class _SplitBillPageState extends State<SplitBillPage> {
       return;
     }
 
+    final isPayerMe = singleBillPayerPhone == "me";
+
+    if (!isPayerMe && selectedFriendNumbers.length > 1) {
+      Fluttertoast.showToast(
+        msg:
+            "Multi-friend bills where a friend pays must be split in the Group Trip tab",
+      );
+      return;
+    }
+
+    if (!isPayerMe && !selectedFriendNumbers.contains(singleBillPayerPhone)) {
+      selectedFriendNumbers.clear();
+      selectedFriendNumbers.add(singleBillPayerPhone);
+    }
+
     final totalPeople = selectedFriendNumbers.length + 1;
-    final sharePerPerson = (Money.paise(totalAmount) ~/ totalPeople) / 100;
-    final myShare =
-        (Money.paise(totalAmount) -
-            Money.paise(sharePerPerson) * selectedFriendNumbers.length) /
-        100;
+    final double sharePerPerson;
+    final double myShare;
+
+    if (isPayerMe) {
+      sharePerPerson = (Money.paise(totalAmount) ~/ totalPeople) / 100;
+      myShare =
+          (Money.paise(totalAmount) -
+              Money.paise(sharePerPerson) * selectedFriendNumbers.length) /
+          100;
+    } else {
+      final friendPaise = Money.paise(totalAmount) ~/ 2;
+      final myPaise = Money.paise(totalAmount) - friendPaise;
+      sharePerPerson = friendPaise / 100;
+      myShare = myPaise / 100;
+    }
     final formattedDate = DateFormat('d/M/yyyy').format(selectedDate);
 
     final myShareStr = myShare.truncateToDouble() == myShare
@@ -209,8 +241,6 @@ class _SplitBillPageState extends State<SplitBillPage> {
     final totalAmountStr = totalAmount.truncateToDouble() == totalAmount
         ? totalAmount.toInt().toString()
         : totalAmount.toStringAsFixed(2);
-
-    final isPayerMe = singleBillPayerPhone == "me";
 
     bool isSaving = false;
 
@@ -392,7 +422,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                                               friendNumbers: [
                                                 singleBillPayerPhone,
                                               ],
-                                              amountPerFriend: myShareStr,
+                                              amountPerFriend: sharePerPersonStr,
                                               friendDescription:
                                                   "Split: $description (You owe friend your share of ₹$totalAmountStr)",
                                               categoryType:
@@ -1342,6 +1372,11 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d+\.?\d{0,2}'),
+                        ),
+                      ],
                       maxLength: 10,
                       style: const TextStyle(
                         fontSize: 34,

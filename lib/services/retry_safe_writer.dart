@@ -207,7 +207,7 @@ class RetrySafeWriter {
         await commit({
           ...updates,
           'WriteOperations/$user/$id': {'timestamp': ServerValue.timestamp},
-        });
+        }).timeout(acknowledgementTimeout);
       } catch (err) {
         // A replay is rejected by the immutable server marker. Read it instead
         // of replacing existing records (which may since have been edited).
@@ -221,7 +221,7 @@ class RetrySafeWriter {
         // Fallback: If WriteOperations is denied (e.g. server rules not yet updated),
         // commit core transaction updates directly so user data is not lost.
         try {
-          await commit(updates);
+          await commit(updates).timeout(acknowledgementTimeout);
         } catch (coreErr) {
           final errorStr = coreErr.toString().toLowerCase();
           if (errorStr.contains('permission-denied') ||

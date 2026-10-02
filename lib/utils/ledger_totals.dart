@@ -25,9 +25,18 @@ class LedgerTotals {
 
   static Map<String, dynamic> normalize(Map<String, dynamic> friend) {
     final raw = friend['Records'];
-    final records = raw is Map
-        ? raw.values.whereType<Map>().map((r) => Map<String, dynamic>.from(r))
-        : <Map<String, dynamic>>[];
+    final Iterable<Map<String, dynamic>> records;
+    if (raw is Map) {
+      records = raw.values
+          .whereType<Map>()
+          .map((r) => Map<String, dynamic>.from(r));
+    } else if (raw is Iterable) {
+      records = raw
+          .whereType<Map>()
+          .map((r) => Map<String, dynamic>.from(r));
+    } else {
+      records = const [];
+    }
     final totals = LedgerTotals.fromRecords(records);
     return {
       ...friend,

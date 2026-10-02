@@ -86,7 +86,11 @@ class SessionManager {
       return false;
     }
     final elapsed = DateTime.now().millisecondsSinceEpoch - lastActive;
-    if (elapsed < 0 || elapsed > sessionExpiryDays * 86400000) {
+    if (elapsed < 0) {
+      await updateLastActive();
+      return true;
+    }
+    if (elapsed > sessionExpiryDays * 86400000) {
       await clearSession();
       try {
         await FirebaseAuth.instance.signOut();

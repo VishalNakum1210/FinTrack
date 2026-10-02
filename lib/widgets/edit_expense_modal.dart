@@ -67,6 +67,8 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
     "Owed",
   ];
 
+  String _originalPaymentMode = "";
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +76,7 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
     final rawDesc = (widget.record["Description"] ?? "").toString();
     final rawCategory = (widget.record["Category"] ?? "Other").toString();
     final storedMode = (widget.record["Payment_Mode"] ?? "").toString();
+    _originalPaymentMode = storedMode;
     final rawMode = storedMode.startsWith('Owed to ') ? 'Owed' : storedMode;
     final rawDate = (widget.record["Date"] ?? "").toString();
 
@@ -158,7 +161,11 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
     if (!mounted) return;
     setState(() => _isSaving = true);
 
-    final dateStr = DateFormat("dd/MM/yyyy").format(_selectedDate);
+    final dateStr = DateFormat("d/M/yyyy").format(_selectedDate);
+    final modeToSave =
+        (_selectedMode == 'Owed' && _originalPaymentMode.startsWith('Owed to '))
+            ? _originalPaymentMode
+            : _selectedMode;
 
     final success = await expenseProvider.updateExpense(
       phoneNumber: phone,
@@ -167,7 +174,7 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
         parsedAmount.truncateToDouble() == parsedAmount ? 0 : 2,
       ),
       category: _selectedCategory,
-      paymentMode: _selectedMode,
+      paymentMode: modeToSave,
       description: descText,
       date: dateStr,
     );

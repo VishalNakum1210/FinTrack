@@ -63,7 +63,16 @@ class _AddFriendsState extends State<AddFriends> {
       return;
     }
 
-    if (phoneNumber == userPhoneNumber) {
+    final normInput = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    final normUser = userPhoneNumber.replaceAll(RegExp(r'\D'), '');
+    final cleanInput = normInput.length >= 10
+        ? normInput.substring(normInput.length - 10)
+        : normInput;
+    final cleanUser = normUser.length >= 10
+        ? normUser.substring(normUser.length - 10)
+        : normUser;
+
+    if (cleanInput.isNotEmpty && cleanInput == cleanUser) {
       Fluttertoast.showToast(msg: "You cannot add yourself as a friend");
       return;
     }
@@ -113,7 +122,7 @@ class _AddFriendsState extends State<AddFriends> {
         friendName: name,
         friendNumber: phoneNumber,
         note: note,
-        date: DateFormat('dd/MM/yyyy').format(now),
+        date: DateFormat('d/M/yyyy').format(now),
       );
 
       if (result == AddFriendResult.added) {

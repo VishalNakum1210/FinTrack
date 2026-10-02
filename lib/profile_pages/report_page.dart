@@ -274,48 +274,51 @@ class _ReportPageState extends State<Reportpage> {
           return _matchesPeriod(d, selectedPeriod);
         }).toList();
 
-        // 2. Compute Filtered Metrics
-        double periodIncome = 0.0;
-        double periodExpense = 0.0;
-        double periodCashSpent = 0.0;
-        double periodOnlineSpent = 0.0;
-        double periodCashAdded = 0.0;
-        double periodOnlineAdded = 0.0;
-        final Map<String, double> periodCategoryTotals = {};
+        // 2. Compute Filtered Metrics using integer paise to avoid float drift
+        int periodIncomePaise = 0;
+        int periodExpensePaise = 0;
+        int periodCashSpentPaise = 0;
+        int periodOnlineSpentPaise = 0;
+        int periodCashAddedPaise = 0;
+        int periodOnlineAddedPaise = 0;
+        final Map<String, int> periodCategoryTotalsPaise = {};
 
         for (var r in filteredRecords) {
           final mode = (r["Payment_Mode"] ?? "").toString();
           final category = (r["Category"] ?? "Other").toString();
-          final amt = Money.rupees(r["Amount"]);
+          final amtPaise = Money.paise(r["Amount"]);
 
           if (mode == "Add CASH") {
-            periodIncome = Money.sum([periodIncome, amt]);
-            periodCashAdded = Money.sum([periodCashAdded, amt]);
+            periodIncomePaise += amtPaise;
+            periodCashAddedPaise += amtPaise;
           } else if (mode == "Add Online") {
-            periodIncome = Money.sum([periodIncome, amt]);
-            periodOnlineAdded = Money.sum([periodOnlineAdded, amt]);
+            periodIncomePaise += amtPaise;
+            periodOnlineAddedPaise += amtPaise;
           } else if (mode == "Spent Cash") {
-            periodExpense = Money.sum([periodExpense, amt]);
-            periodCashSpent = Money.sum([periodCashSpent, amt]);
-            periodCategoryTotals[category] = Money.sum([
-              periodCategoryTotals[category] ?? 0,
-              amt,
-            ]);
+            periodExpensePaise += amtPaise;
+            periodCashSpentPaise += amtPaise;
+            periodCategoryTotalsPaise[category] =
+                (periodCategoryTotalsPaise[category] ?? 0) + amtPaise;
           } else if (mode == "Spent Online") {
-            periodExpense = Money.sum([periodExpense, amt]);
-            periodOnlineSpent = Money.sum([periodOnlineSpent, amt]);
-            periodCategoryTotals[category] = Money.sum([
-              periodCategoryTotals[category] ?? 0,
-              amt,
-            ]);
+            periodExpensePaise += amtPaise;
+            periodOnlineSpentPaise += amtPaise;
+            periodCategoryTotalsPaise[category] =
+                (periodCategoryTotalsPaise[category] ?? 0) + amtPaise;
           } else {
-            periodExpense = Money.sum([periodExpense, amt]);
-            periodCategoryTotals[category] = Money.sum([
-              periodCategoryTotals[category] ?? 0,
-              amt,
-            ]);
+            periodExpensePaise += amtPaise;
+            periodCategoryTotalsPaise[category] =
+                (periodCategoryTotalsPaise[category] ?? 0) + amtPaise;
           }
         }
+
+        final double periodIncome = periodIncomePaise / 100.0;
+        final double periodExpense = periodExpensePaise / 100.0;
+        final double periodCashSpent = periodCashSpentPaise / 100.0;
+        final double periodOnlineSpent = periodOnlineSpentPaise / 100.0;
+        final double periodCashAdded = periodCashAddedPaise / 100.0;
+        final double periodOnlineAdded = periodOnlineAddedPaise / 100.0;
+        final Map<String, double> periodCategoryTotals =
+            periodCategoryTotalsPaise.map((k, v) => MapEntry(k, v / 100.0));
 
         final periodBalance = periodIncome - periodExpense;
         final healthScore = calculateHealthScore(periodIncome, periodExpense);
@@ -327,8 +330,8 @@ class _ReportPageState extends State<Reportpage> {
             : 0.0;
 
         // Friend Ledger Filtered Calculation
-        double periodFriendGiven = 0.0;
-        double periodFriendTaken = 0.0;
+        int periodFriendGivenPaise = 0;
+        int periodFriendTakenPaise = 0;
         bool hasFriendRecords = false;
 
         for (final f in friendProvider.friends) {
@@ -339,12 +342,12 @@ class _ReportPageState extends State<Reportpage> {
               if (rv is Map) {
                 final d = DateHelper.parse(rv["Date"]);
                 if (_matchesPeriod(d, selectedPeriod)) {
-                  final amt = Money.rupees(rv["Amount"]);
+                  final amtPaise = Money.paise(rv["Amount"]);
                   final type = rv["Type"]?.toString() ?? "";
                   if (type == "Take Money From Friend") {
-                    periodFriendTaken = Money.sum([periodFriendTaken, amt]);
+                    periodFriendTakenPaise += amtPaise;
                   } else {
-                    periodFriendGiven = Money.sum([periodFriendGiven, amt]);
+                    periodFriendGivenPaise += amtPaise;
                   }
                 }
               }
@@ -354,11 +357,11 @@ class _ReportPageState extends State<Reportpage> {
 
         final friendGiven =
             (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
-            ? periodFriendGiven
+            ? (periodFriendGivenPaise / 100.0)
             : friendProvider.totalGet.toDouble();
         final friendTaken =
             (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
-            ? periodFriendTaken
+            ? (periodFriendTakenPaise / 100.0)
             : friendProvider.totalGive.toDouble();
 
         void triggerPdfExport() {

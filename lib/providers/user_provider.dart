@@ -171,7 +171,7 @@ class UserProvider extends ChangeNotifier {
         }
 
         // Self-heal RTDB if legacy user node is missing owner_uid
-        if (details["owner_uid"] == null || details["owner_uid"] != uid) {
+        if (details["owner_uid"] == null) {
           try {
             final ref = FirebaseDatabase.instance.ref("user_details/$phone");
             await ref.update({"owner_uid": uid});

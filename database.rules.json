@@ -113,10 +113,10 @@
             ".validate": "newData.isNumber() && newData.val() >= 946684800000 && newData.val() <= now"
           },
           "total_get": {
-            ".validate": "data.exists() && newData.val() == data.val()"
+            ".validate": "(!data.exists() && (newData.val() == 0 || newData.val() == 0.0)) || (data.exists() && newData.val() == data.val())"
           },
           "total_give": {
-            ".validate": "data.exists() && newData.val() == data.val()"
+            ".validate": "(!data.exists() && (newData.val() == 0 || newData.val() == 0.0)) || (data.exists() && newData.val() == data.val())"
           },
           "Records": {
             ".indexOn": [

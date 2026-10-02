@@ -185,8 +185,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
         } catch (dbError) {
           Fluttertoast.showToast(
             msg:
-                "Account created, but profile setup is pending. Sign in to retry when connected.",
+                "Account created! Please sign in to complete profile setup.",
           );
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+            );
+          }
         }
       }
     } on FirebaseAuthException catch (e) {

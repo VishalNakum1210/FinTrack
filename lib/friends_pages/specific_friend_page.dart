@@ -162,6 +162,10 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
             isGive: isGive,
             amount: amount,
           );
+      if (success) {
+        _records.removeWhere((r) => r['key'] == key);
+        if (mounted) setState(() {});
+      }
       Fluttertoast.showToast(
         msg: success ? 'Record deleted' : 'Unable to delete record',
       );
@@ -212,6 +216,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
       }
       record['Amount'] = cleanNewAmount;
       record['Description'] = newDesc;
+      if (mounted) setState(() {});
       Fluttertoast.showToast(msg: 'Transaction updated');
     } catch (e) {
       Fluttertoast.showToast(msg: 'Unable to update transaction');

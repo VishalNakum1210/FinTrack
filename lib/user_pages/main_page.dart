@@ -298,12 +298,13 @@ class _UserMainPageState extends State<UserMainPage> {
         final biggestCategory = expenseProvider.biggestCategory;
         final highestTransaction = expenseProvider.highestTransaction;
 
-        // Calculate 7-day spending trend vs previous 7 days
+        // Calculate 7-day spending trend vs previous 7 days (normalized to calendar midnight)
         final now = DateTime.now();
-        final sevenDaysAgo = now.subtract(const Duration(days: 7));
-        final fourteenDaysAgo = now.subtract(const Duration(days: 14));
-        double last7Expense = 0.0;
-        double prev7Expense = 0.0;
+        final todayMidnight = DateTime(now.year, now.month, now.day);
+        final sevenDaysAgo = todayMidnight.subtract(const Duration(days: 7));
+        final fourteenDaysAgo = todayMidnight.subtract(const Duration(days: 14));
+        int last7ExpensePaise = 0;
+        int prev7ExpensePaise = 0;
         for (final r in records) {
           final mode = (r["Payment_Mode"] ?? "").toString();
           final isExpense = mode != "Add CASH" && mode != "Add Online";
@@ -311,15 +312,17 @@ class _UserMainPageState extends State<UserMainPage> {
             final date =
                 (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
             if (date != null) {
-              final amt = Money.rupees(r["Amount"]);
+              final amtPaise = Money.paise(r["Amount"]);
               if (date.isAfter(sevenDaysAgo)) {
-                last7Expense = Money.sum([last7Expense, amt]);
+                last7ExpensePaise += amtPaise;
               } else if (date.isAfter(fourteenDaysAgo)) {
-                prev7Expense = Money.sum([prev7Expense, amt]);
+                prev7ExpensePaise += amtPaise;
               }
             }
           }
         }
+        final double last7Expense = last7ExpensePaise / 100.0;
+        final double prev7Expense = prev7ExpensePaise / 100.0;
 
         // Compute running balances for recent transaction cards (L3 DRY fix)
         final recordsWithBalance =

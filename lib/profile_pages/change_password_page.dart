@@ -4,6 +4,7 @@ import 'package:fin_track/get_information/session_manager.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -34,6 +35,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   DateTime? lockoutUntil;
   Timer? _lockoutTimer;
 
+  static const _prefLockoutKey = 'change_pw_lockout_epoch';
+  static const _prefAttemptsKey = 'change_pw_attempts';
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +46,57 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     });
     confirmPasswordController.addListener(() {
       if (mounted) setState(() {});
+    });
+    _loadLockoutState();
+  }
+
+  Future<void> _loadLockoutState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lockoutEpoch = prefs.getInt(_prefLockoutKey);
+      final storedAttempts = prefs.getInt(_prefAttemptsKey) ?? 0;
+      if (lockoutEpoch != null) {
+        final until = DateTime.fromMillisecondsSinceEpoch(lockoutEpoch);
+        if (DateTime.now().isBefore(until)) {
+          if (mounted) {
+            setState(() {
+              failedAttempts = storedAttempts;
+              lockoutUntil = until;
+            });
+            _startLockoutTimer();
+          }
+        } else {
+          await prefs.remove(_prefLockoutKey);
+          await prefs.remove(_prefAttemptsKey);
+        }
+      } else {
+        if (mounted && storedAttempts > 0) {
+          setState(() {
+            failedAttempts = storedAttempts;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _startLockoutTimer() {
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (lockoutUntil != null && DateTime.now().isAfter(lockoutUntil!)) {
+        timer.cancel();
+        SharedPreferences.getInstance().then((p) {
+          p.remove(_prefLockoutKey);
+          p.remove(_prefAttemptsKey);
+        });
+        if (mounted) {
+          setState(() {
+            lockoutUntil = null;
+            failedAttempts = 0;
+          });
+        }
+      } else if (mounted) {
+        setState(() {});
+      }
     });
   }
 
@@ -122,6 +177,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       failedAttempts = 0;
       lockoutUntil = null;
       _lockoutTimer?.cancel();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_prefLockoutKey);
+        await prefs.remove(_prefAttemptsKey);
+      } catch (_) {}
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -136,26 +196,26 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     } on FirebaseAuthException catch (e) {
       if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
         failedAttempts++;
-        if (failedAttempts >= 3) {
-          lockoutUntil = DateTime.now().add(const Duration(minutes: 5));
-          _lockoutTimer?.cancel();
-          _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-            if (lockoutUntil != null && DateTime.now().isAfter(lockoutUntil!)) {
-              timer.cancel();
-              if (mounted) setState(() => lockoutUntil = null);
-            } else if (mounted) {
-              setState(() {});
-            }
-          });
-          Fluttertoast.showToast(
-            msg: "3 failed attempts. Locked for 5 minutes.",
-          );
-        } else {
-          Fluttertoast.showToast(
-            msg:
-                "Old password is incorrect (${3 - failedAttempts} attempts remaining)",
-          );
-        }
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(_prefAttemptsKey, failedAttempts);
+          if (failedAttempts >= 3) {
+            lockoutUntil = DateTime.now().add(const Duration(minutes: 5));
+            await prefs.setInt(
+              _prefLockoutKey,
+              lockoutUntil!.millisecondsSinceEpoch,
+            );
+            _startLockoutTimer();
+            Fluttertoast.showToast(
+              msg: "3 failed attempts. Locked for 5 minutes.",
+            );
+          } else {
+            Fluttertoast.showToast(
+              msg:
+                  "Old password is incorrect (${3 - failedAttempts} attempts remaining)",
+            );
+          }
+        } catch (_) {}
       } else if (e.code == 'weak-password') {
         Fluttertoast.showToast(
           msg: "New password is too weak. Please use a stronger password.",

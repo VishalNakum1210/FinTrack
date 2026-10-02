@@ -694,11 +694,25 @@ class _FriendPageState extends State<FriendPage> {
             );
           },
           onLongPress: () async {
+            final String title;
+            final String message;
+            if (net > 0) {
+              title = "Delete Friend with Unsettled Balance";
+              message =
+                  "Warning: They owe you ₹${net.toStringAsFixed(2)}. Deleting $friendName will permanently erase all associated debt records from your ledger. Are you sure you want to proceed?";
+            } else if (net < 0) {
+              title = "Delete Friend with Unsettled Balance";
+              message =
+                  "Warning: You owe them ₹${(-net).toStringAsFixed(2)}. Deleting $friendName will permanently erase all associated debt records from your ledger. Are you sure you want to proceed?";
+            } else {
+              title = "Delete Friend";
+              message =
+                  "Are you sure you want to remove $friendName from your ledger?";
+            }
             final confirmed = await showDeleteConfirmDialog(
               context,
-              title: "Delete Friend",
-              message:
-                  "Are you sure you want to remove $friendName from your ledger?",
+              title: title,
+              message: message,
             );
             if (confirmed == true) {
               final phone = await SessionManager.getPhoneNumber() ?? "";

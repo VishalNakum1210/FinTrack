@@ -103,32 +103,34 @@ class ExportService {
         return tA.compareTo(tB);
       });
 
-      double bal = 0.0;
+      int balPaise = 0;
       for (final r in chronoList) {
         final mode = (r["Payment_Mode"] ?? "").toString();
-        final amt = Money.rupees(r["Amount"]);
+        final amtPaise = Money.paise(r["Amount"]);
         if (mode == "Add CASH" || mode == "Add Online") {
-          bal = Money.sum([bal, amt]);
+          balPaise += amtPaise;
         } else {
-          bal = Money.sum([bal, -amt]);
+          balPaise -= amtPaise;
         }
-        r["_pdfRunningBalance"] = bal;
+        r["_pdfRunningBalance"] = balPaise / 100.0;
       }
     }
 
     // Category breakdown totals
-    final Map<String, double> catTotals = {};
+    final Map<String, int> catTotalsPaise = {};
     if (includeCategoryBreakdown) {
       for (final r in records) {
         final mode = (r["Payment_Mode"] ?? "").toString();
         final isIncome = mode == "Add CASH" || mode == "Add Online";
         if (!isIncome) {
           final cat = (r["Category"] ?? "General").toString();
-          final amt = Money.rupees(r["Amount"]);
-          catTotals[cat] = Money.sum([catTotals[cat] ?? 0, amt]);
+          final amtPaise = Money.paise(r["Amount"]);
+          catTotalsPaise[cat] = (catTotalsPaise[cat] ?? 0) + amtPaise;
         }
       }
     }
+    final Map<String, double> catTotals =
+        catTotalsPaise.map((k, v) => MapEntry(k, v / 100.0));
 
     final logoImage = await _loadAppLogo();
 
@@ -1794,7 +1796,11 @@ class ExportService {
     for (final record in expenses) {
       String cell(dynamic value) {
         var text = (value ?? '').toString();
-        if (RegExp(r'^\s*[=+@＝＋＠−－-]|^[\t\r\n]').hasMatch(text)) {
+        text = text.replaceAllMapped(
+          RegExp(r'(^|[\r\n])(\s*[=+@＝＋＠−－-])', multiLine: true),
+          (match) => "${match.group(1)}'${match.group(2)}",
+        );
+        if (RegExp(r'^[\t\r\n]').hasMatch(text) && !text.startsWith("'")) {
           text = "'$text";
         }
         return '"${text.replaceAll('"', '""')}"';

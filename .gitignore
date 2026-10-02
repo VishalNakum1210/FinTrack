@@ -60,3 +60,8 @@ app.*.map.json
 *.zip
 *.tar.gz
 *.mp4
+
+# Generated export reports and local backups
+*.pdf
+*.csv
+FinTrack_Backup_*.json

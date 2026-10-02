@@ -3,7 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 /// Internal links only: no new user-facing bill management workflow.
 class SplitIntegrity {
   static String operationId(String key) {
-    final branch = RegExp(r'^(.{20})_(?:expense_|debt_)?\d+$').firstMatch(key);
+    final branch = RegExp(r'^(.+?)_(?:expense_|debt_)?\d+$').firstMatch(key);
     return branch?.group(1) ?? key;
   }
 

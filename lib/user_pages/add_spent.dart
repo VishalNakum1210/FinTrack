@@ -6,6 +6,7 @@ import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -480,6 +481,11 @@ class _AddSpentState extends State<AddSpent> {
                                     const TextInputType.numberWithOptions(
                                       decimal: true,
                                     ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'^\d+\.?\d{0,2}'),
+                                  ),
+                                ],
                                 maxLength: 10,
                                 style: const TextStyle(
                                   fontSize: 34,
@@ -1105,6 +1111,7 @@ class _AddSpentState extends State<AddSpent> {
                                       ),
                                     );
                                     if (res == true && context.mounted) {
+                                      _clearDraft();
                                       Navigator.pop(context, true);
                                     }
                                   },

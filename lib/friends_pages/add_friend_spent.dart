@@ -3,6 +3,7 @@ import 'package:fin_track/services/retry_safe_writer.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/providers/friend_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -90,11 +91,17 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
   }
 
   Future<void> pickDate() async {
+    final now = DateTime.now();
+    final clampedInit = selectedDate.isAfter(now)
+        ? now
+        : (selectedDate.isBefore(DateTime(2000))
+            ? DateTime(2000)
+            : selectedDate);
     DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: selectedDate,
+      initialDate: clampedInit,
       firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
+      lastDate: now,
     );
 
     if (picked != null) {
@@ -351,6 +358,11 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
                                     const TextInputType.numberWithOptions(
                                       decimal: true,
                                     ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'^\d+\.?\d{0,2}'),
+                                  ),
+                                ],
                                 maxLength: 10,
                                 style: const TextStyle(
                                   fontSize: 34,

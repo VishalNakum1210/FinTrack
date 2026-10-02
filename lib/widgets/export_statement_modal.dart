@@ -121,10 +121,10 @@ class _ExportStatementModalContentState
       firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 1),
       initialDateRange: DateTimeRange(
-        start: _startDate.isBefore(now)
-            ? _startDate
-            : DateTime(now.year, now.month, 1),
-        end: _endDate.isAfter(now) ? now : _endDate,
+        start: _startDate.isBefore(DateTime(now.year - 5))
+            ? DateTime(now.year, now.month, 1)
+            : (_startDate.isAfter(_endDate) ? _endDate : _startDate),
+        end: _endDate.isAfter(DateTime(now.year + 1)) ? now : _endDate,
       ),
       builder: (context, child) {
         return Theme(
@@ -202,34 +202,40 @@ class _ExportStatementModalContentState
     setState(() => _isGenerating = true);
 
     try {
-      // Compute financial totals
-      double totalIncome = 0.0;
-      double totalExpense = 0.0;
-      double addCash = 0.0;
-      double spentCash = 0.0;
-      double addOnline = 0.0;
-      double spentOnline = 0.0;
+      // Compute financial totals in integer paise
+      int totalIncomePaise = 0;
+      int totalExpensePaise = 0;
+      int addCashPaise = 0;
+      int spentCashPaise = 0;
+      int addOnlinePaise = 0;
+      int spentOnlinePaise = 0;
 
       for (final r in filtered) {
         final mode = (r["Payment_Mode"] ?? "").toString();
-        final amt = Money.rupees(r["Amount"]);
+        final amtPaise = Money.paise(r["Amount"]);
         if (mode == "Add CASH") {
-          totalIncome = Money.sum([totalIncome, amt]);
-          addCash = Money.sum([addCash, amt]);
+          totalIncomePaise += amtPaise;
+          addCashPaise += amtPaise;
         } else if (mode == "Add Online") {
-          totalIncome = Money.sum([totalIncome, amt]);
-          addOnline = Money.sum([addOnline, amt]);
+          totalIncomePaise += amtPaise;
+          addOnlinePaise += amtPaise;
         } else if (mode == "Spent Cash") {
-          totalExpense = Money.sum([totalExpense, amt]);
-          spentCash = Money.sum([spentCash, amt]);
+          totalExpensePaise += amtPaise;
+          spentCashPaise += amtPaise;
         } else if (mode == "Spent Online") {
-          totalExpense = Money.sum([totalExpense, amt]);
-          spentOnline = Money.sum([spentOnline, amt]);
+          totalExpensePaise += amtPaise;
+          spentOnlinePaise += amtPaise;
         } else {
-          totalExpense = Money.sum([totalExpense, amt]);
+          totalExpensePaise += amtPaise;
         }
       }
 
+      final double totalIncome = totalIncomePaise / 100.0;
+      final double totalExpense = totalExpensePaise / 100.0;
+      final double addCash = addCashPaise / 100.0;
+      final double spentCash = spentCashPaise / 100.0;
+      final double addOnline = addOnlinePaise / 100.0;
+      final double spentOnline = spentOnlinePaise / 100.0;
       final currentBalance = totalIncome - totalExpense;
       String filterLabel = widget.initialCategory;
       if (_typeFilter == TransactionTypeFilter.debitsOnly) {
