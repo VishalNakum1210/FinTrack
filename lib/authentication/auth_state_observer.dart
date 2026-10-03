@@ -64,7 +64,6 @@ class _AuthStateObserverState extends State<AuthStateObserver>
         'user-disabled',
         'user-not-found',
         'invalid-user-token',
-        'user-token-expired',
       ].contains(error.code)) {
         await FirebaseAuth.instance.signOut();
       }

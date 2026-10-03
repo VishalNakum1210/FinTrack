@@ -1,4 +1,5 @@
 import 'package:fin_track/utils/money.dart';
+import 'package:fin_track/utils/balance_helper.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:fin_track/utils/date_helper.dart';
@@ -1793,7 +1794,11 @@ class ExportService {
       "Date,Category,Payment Mode,Amount,Description,Running Balance",
     );
 
-    for (final record in expenses) {
+    final recordsToProcess = expenses.any((e) => e.containsKey('_runningBalance'))
+        ? expenses
+        : BalanceHelper.computeRunningBalances(expenses);
+
+    for (final record in recordsToProcess) {
       String cell(dynamic value) {
         var text = (value ?? '').toString();
         text = text.replaceAllMapped(
@@ -1807,7 +1812,12 @@ class ExportService {
       }
 
       final amount = Money.decimal(Money.paise(record['Amount']));
-      final running = record['_runningBalance']?.toString() ?? '';
+      final runningVal = record['_runningBalance'];
+      final running = runningVal != null
+          ? (runningVal is num
+              ? Money.decimal(Money.paise(runningVal))
+              : runningVal.toString())
+          : '';
       buffer.writeln(
         '${cell(record["Date"])},${cell(record["Category"])},${cell(record["Payment_Mode"])},$amount,${cell(record["Description"])},${cell(running)}',
       );

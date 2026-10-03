@@ -35,6 +35,7 @@ class ExpenseProvider extends ChangeNotifier {
   double get spentOnline => _spentOnline / 100;
   double get addCash => _addCash / 100;
   double get addOnline => _addOnline / 100;
+  double get owed => _owed / 100;
 
   double get totalIncome => (_addCash + _addOnline) / 100;
   double get totalExpense => (_spentCash + _spentOnline + _owed) / 100;
@@ -350,6 +351,13 @@ class ExpenseProvider extends ChangeNotifier {
         await FirebaseDatabase.instance.ref().update({
           for (final path in splitPaths) path: null,
         });
+        _records.removeWhere(
+          (r) =>
+              splitPaths.contains('Expenses/$phoneNumber/${r['key']}') ||
+              r['key'] == key,
+        );
+        _recalculateDerivedTotals();
+        notifyListeners();
         return true;
       }
       removedIdx = _records.indexWhere((r) => r['key'] == key);
@@ -468,8 +476,14 @@ class ExpenseProvider extends ChangeNotifier {
       if (filterType == "Spent Cash" ||
           filterType == "Spent Online" ||
           filterType == "Add CASH" ||
-          filterType == "Add Online") {
-        return r["Payment_Mode"] == filterType;
+          filterType == "Add Online" ||
+          filterType == "Owed" ||
+          filterType.startsWith("Owed to ")) {
+        final mode = (r["Payment_Mode"] ?? "").toString();
+        if (filterType == "Owed") {
+          return mode == "Owed" || mode.startsWith("Owed to ");
+        }
+        return mode == filterType;
       }
       return r["Category"] == filterType;
     }).toList();
@@ -482,9 +496,12 @@ class ExpenseProvider extends ChangeNotifier {
     if (filterType == "Spent Online") return spentOnline;
     if (filterType == "Add CASH") return addCash;
     if (filterType == "Add Online") return addOnline;
+    if (filterType == "Owed") return owed;
 
     int total = 0;
     for (var r in _records) {
+      final mode = (r["Payment_Mode"] ?? "").toString();
+      if (mode.startsWith("Add")) continue;
       if (r["Category"] == filterType) {
         total += Money.paise(r["Amount"]);
       }

@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   final String? initialPhoneNumber;
@@ -31,6 +32,9 @@ class _LoginPageState extends State<LoginPage> {
   int lockoutSeconds = 0;
   Timer? lockoutTimer;
 
+  static const _prefLockoutKey = 'login_lockout_epoch';
+  static const _prefAttemptsKey = 'login_failed_attempts';
+
   static const Color _brandGreen = Color(0xFF8BC24A);
   static const Color _canvasBackground = Color(0xFFF8FAFC);
   static const Color _primaryText = Color(0xFF1E293B);
@@ -44,6 +48,37 @@ class _LoginPageState extends State<LoginPage> {
         widget.initialPhoneNumber!.isNotEmpty) {
       username.text = widget.initialPhoneNumber!;
     }
+    _loadLockoutState();
+  }
+
+  Future<void> _loadLockoutState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lockoutEpoch = prefs.getInt(_prefLockoutKey);
+      final storedAttempts = prefs.getInt(_prefAttemptsKey) ?? 0;
+      if (lockoutEpoch != null) {
+        final until = DateTime.fromMillisecondsSinceEpoch(lockoutEpoch);
+        final remaining = until.difference(DateTime.now()).inSeconds;
+        if (remaining > 0) {
+          if (mounted) {
+            setState(() {
+              failedAttempts = storedAttempts;
+              lockoutSeconds = remaining;
+            });
+            _startLockoutTimerTicker();
+          }
+        } else {
+          await prefs.remove(_prefLockoutKey);
+          await prefs.remove(_prefAttemptsKey);
+        }
+      } else {
+        if (mounted && storedAttempts > 0) {
+          setState(() {
+            failedAttempts = storedAttempts;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -54,10 +89,20 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void startLockoutTimer() {
+  void startLockoutTimer([int seconds = 30]) {
+    final until = DateTime.now().add(Duration(seconds: seconds));
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setInt(_prefLockoutKey, until.millisecondsSinceEpoch);
+      prefs.setInt(_prefAttemptsKey, failedAttempts);
+    }).catchError((_) {});
+
     setState(() {
-      lockoutSeconds = 30;
+      lockoutSeconds = seconds;
     });
+    _startLockoutTimerTicker();
+  }
+
+  void _startLockoutTimerTicker() {
     lockoutTimer?.cancel();
     lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
@@ -68,6 +113,10 @@ class _LoginPageState extends State<LoginPage> {
             lockoutSeconds = 0;
             failedAttempts = 0;
             timer.cancel();
+            SharedPreferences.getInstance().then((prefs) {
+              prefs.remove(_prefLockoutKey);
+              prefs.remove(_prefAttemptsKey);
+            }).catchError((_) {});
           }
         });
       } else {
@@ -217,6 +266,14 @@ class _LoginPageState extends State<LoginPage> {
           context.read<FriendProvider>().fetchFriends(phoneNumber);
         }
 
+        failedAttempts = 0;
+        lockoutSeconds = 0;
+        lockoutTimer?.cancel();
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.remove(_prefLockoutKey);
+          prefs.remove(_prefAttemptsKey);
+        }).catchError((_) {});
+
         Fluttertoast.showToast(msg: "Login successful");
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
@@ -227,6 +284,9 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on FirebaseAuthException catch (e) {
       failedAttempts++;
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setInt(_prefAttemptsKey, failedAttempts);
+      }).catchError((_) {});
       if (failedAttempts >= 5) {
         startLockoutTimer();
         Fluttertoast.showToast(

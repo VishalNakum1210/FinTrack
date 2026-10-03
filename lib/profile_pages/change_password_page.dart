@@ -167,8 +167,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     });
 
     try {
+      final authEmail = user.email ?? "$phoneNumber@fintrack.app";
       final cred = EmailAuthProvider.credential(
-        email: "$phoneNumber@fintrack.app",
+        email: authEmail,
         password: oldPassword,
       );
       await user.reauthenticateWithCredential(cred);

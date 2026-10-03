@@ -321,11 +321,20 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
+                      final netDebtPaise = net.abs();
+                      final initialAmt = netDebtPaise > 0
+                          ? (netDebtPaise / 100.0).toStringAsFixed(2)
+                          : null;
+                      final initialType = isOwed
+                          ? "Take Money From Friend"
+                          : "Give Money To Friend";
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => AddFriendExpenses(
                             friendNumber: widget.friendNumber,
+                            initialAmount: initialAmt,
+                            initialType: initialType,
                           ),
                         ),
                       );

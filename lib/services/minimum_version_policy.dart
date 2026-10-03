@@ -57,15 +57,19 @@ class VersionPolicyException extends StateError {
 /// A failed refresh must still enforce the last verified policy. On the first
 /// launch, an unavailable policy is retried instead of silently bypassed.
 class MinimumVersionPolicy {
+  static String canonical(String version) =>
+      version.split('+').first.split('-').first.trim();
+
   static bool valid(String? version) =>
-      version != null && RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version);
+      version != null &&
+      RegExp(r'^\d+\.\d+\.\d+$').hasMatch(canonical(version));
 
   static bool isLower(String current, String minimum) {
     if (!valid(current) || !valid(minimum)) {
       throw ArgumentError('Invalid version');
     }
-    final c = current.split('.').map(int.parse).toList();
-    final m = minimum.split('.').map(int.parse).toList();
+    final c = canonical(current).split('.').map(int.parse).toList();
+    final m = canonical(minimum).split('.').map(int.parse).toList();
     for (var i = 0; i < 3; i++) {
       if (c[i] != m[i]) return c[i] < m[i];
     }

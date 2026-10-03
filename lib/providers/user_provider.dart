@@ -14,6 +14,7 @@ class UserProvider extends ChangeNotifier {
   String _email = "";
   String _phoneNumber = "";
   String _address = "";
+  String? _loadedUid;
 
   static const _storage = FlutterSecureStorage();
   String get _cacheKey =>
@@ -135,6 +136,7 @@ class UserProvider extends ChangeNotifier {
 
       if (phone != null && phone.isNotEmpty && uid != null) {
         _phoneNumber = phone;
+        _loadedUid = uid;
         final details = await getUserInformation(phone);
         if (phone != SessionManager.authenticatedPhone ||
             uid != SessionManager.authenticatedUid) {
@@ -315,13 +317,19 @@ class UserProvider extends ChangeNotifier {
 
   void clearUser() {
     final oldCacheKey = _cacheKey;
+    final uidCacheKey =
+        _loadedUid != null ? 'cached_user_profile_$_loadedUid' : null;
     final phoneKey = 'cached_user_profile_$_phoneNumber';
+    _loadedUid = null;
     _name = "User";
     _email = "";
     _phoneNumber = "";
     _address = "";
     _hasError = false;
     _storage.delete(key: oldCacheKey).catchError((_) {});
+    if (uidCacheKey != null) {
+      _storage.delete(key: uidCacheKey).catchError((_) {});
+    }
     _storage.delete(key: phoneKey).catchError((_) {});
     notifyListeners();
   }

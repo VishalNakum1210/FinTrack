@@ -332,12 +332,10 @@ class _ReportPageState extends State<Reportpage> {
         // Friend Ledger Filtered Calculation
         int periodFriendGivenPaise = 0;
         int periodFriendTakenPaise = 0;
-        bool hasFriendRecords = false;
 
         for (final f in friendProvider.friends) {
           final recordsObj = f["Records"];
           if (recordsObj is Map) {
-            hasFriendRecords = true;
             recordsObj.forEach((rk, rv) {
               if (rv is Map) {
                 final d = DateHelper.parse(rv["Date"]);
@@ -346,7 +344,7 @@ class _ReportPageState extends State<Reportpage> {
                   final type = rv["Type"]?.toString() ?? "";
                   if (type == "Take Money From Friend") {
                     periodFriendTakenPaise += amtPaise;
-                  } else {
+                  } else if (type == "Give Money To Friend") {
                     periodFriendGivenPaise += amtPaise;
                   }
                 }
@@ -355,12 +353,10 @@ class _ReportPageState extends State<Reportpage> {
           }
         }
 
-        final friendGiven =
-            (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
+        final friendGiven = (selectedPeriod != ReportPeriod.allTime)
             ? (periodFriendGivenPaise / 100.0)
             : friendProvider.totalGet.toDouble();
-        final friendTaken =
-            (hasFriendRecords && selectedPeriod != ReportPeriod.allTime)
+        final friendTaken = (selectedPeriod != ReportPeriod.allTime)
             ? (periodFriendTakenPaise / 100.0)
             : friendProvider.totalGive.toDouble();
 
@@ -1465,7 +1461,9 @@ class _ReportPageState extends State<Reportpage> {
     Map<String, double> categoryTotals,
     double totalExpense,
   ) {
-    if (categoryTotals.isEmpty) {
+    if (categoryTotals.isEmpty ||
+        totalExpense <= 0 ||
+        categoryTotals.values.every((v) => v <= 0)) {
       return const Center(
         child: Text(
           "No category expenses for this period.",

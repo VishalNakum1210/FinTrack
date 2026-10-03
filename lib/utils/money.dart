@@ -16,7 +16,12 @@ class Money {
 
   static int? _parse(dynamic value, int maximum, int digits) {
     if (value is num && !value.isFinite) return null;
-    final text = value?.toString().trim() ?? '';
+    final String text;
+    if (value is num) {
+      text = value.toStringAsFixed(2);
+    } else {
+      text = value?.toString().replaceAll(',', '').trim() ?? '';
+    }
     final pattern = digits == 12
         ? _decimalPattern
         : RegExp(r'^-?\d{1,14}(?:\.\d{1,2})?$');
@@ -43,7 +48,7 @@ class Money {
   }
 
   static bool positive(dynamic value) => (tryPaise(value) ?? 0) > 0;
-  static double sum(Iterable<dynamic> values) {
+  static int sumPaise(Iterable<dynamic> values) {
     final total = values.fold<BigInt>(
       BigInt.zero,
       (sum, value) => sum + BigInt.from(_parseAggregate(value)),
@@ -51,8 +56,10 @@ class Money {
     if (total.abs() > BigInt.from(maxAggregatePaise)) {
       throw RangeError('Monetary total exceeds the supported exact range');
     }
-    return total.toInt() / 100;
+    return total.toInt();
   }
+
+  static double sum(Iterable<dynamic> values) => sumPaise(values) / 100;
 
   static List<int> split(int totalPaise, int count) {
     if (totalPaise < 0 || count <= 0) throw ArgumentError('Invalid split');

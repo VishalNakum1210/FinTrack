@@ -864,7 +864,10 @@ class _SplitBillPageState extends State<SplitBillPage> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      titleCtrl.dispose();
+      amountCtrl.dispose();
+    });
   }
 
   // ────────────────────────────────────────────────────────────

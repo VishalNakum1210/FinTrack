@@ -1202,14 +1202,12 @@ class PassbookPageState extends State<PassbookApp> {
                 checkDt.month == dt.month &&
                 checkDt.day == dt.day) {
               dayCount++;
-              final amt =
-                  double.tryParse(records[i]["Amount"]?.toString() ?? '0') ??
-                  0.0;
+              final amtPaise = Money.paise(records[i]["Amount"]);
               final m = (records[i]["Payment_Mode"] ?? "").toString();
               if (["Add CASH", "Add Online"].contains(m)) {
-                dayNet = Money.sum([dayNet, amt]);
+                dayNet = Money.sum([dayNet, amtPaise / 100.0]);
               } else {
-                dayNet = Money.sum([dayNet, -amt]);
+                dayNet = Money.sum([dayNet, -amtPaise / 100.0]);
               }
             } else {
               break;

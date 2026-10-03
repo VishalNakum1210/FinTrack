@@ -10,7 +10,15 @@ import 'package:provider/provider.dart';
 
 class AddFriendExpenses extends StatefulWidget {
   final String friendNumber;
-  const AddFriendExpenses({super.key, required this.friendNumber});
+  final String? initialAmount;
+  final String? initialType;
+
+  const AddFriendExpenses({
+    super.key,
+    required this.friendNumber,
+    this.initialAmount,
+    this.initialType,
+  });
 
   @override
   State<AddFriendExpenses> createState() => _AddFriendExpensesState();
@@ -64,7 +72,14 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
   void initState() {
     super.initState();
     selectedMode = paymentModes.first;
-    selectedType = categoryTypes.first;
+    selectedType = (widget.initialType != null &&
+            categoryTypes.contains(widget.initialType))
+        ? widget.initialType!
+        : categoryTypes.first;
+
+    if (widget.initialAmount != null && widget.initialAmount!.isNotEmpty) {
+      amountController.text = widget.initialAmount!;
+    }
 
     amountController.addListener(_onAmountChanged);
 

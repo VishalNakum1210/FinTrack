@@ -2,8 +2,8 @@
 /// locally; configure the matching Firebase server policy before deployment.
 bool isPasswordStrong(String password) {
   if (password.length < 12 || password.length > 128) return false;
-  final letters = RegExp(r'[a-zA-Z]').hasMatch(password) ||
-      RegExp(r'\p{L}', unicode: true).hasMatch(password);
-  final digitOrSymbol = RegExp(r'[^a-zA-Z\s]').hasMatch(password);
+  final letters = RegExp(r'\p{L}', unicode: true).hasMatch(password);
+  final digitOrSymbol =
+      RegExp(r'[^\p{L}\s]', unicode: true).hasMatch(password);
   return letters && digitOrSymbol;
 }

@@ -77,8 +77,23 @@ class _ExportStatementModalContentState
     final now = DateTime.now();
     if (widget.initialDateRange != null) {
       _selectedPreset = DatePreset.custom;
-      _startDate = widget.initialDateRange!.start;
-      _endDate = widget.initialDateRange!.end;
+      _startDate = DateTime(
+        widget.initialDateRange!.start.year,
+        widget.initialDateRange!.start.month,
+        widget.initialDateRange!.start.day,
+        0,
+        0,
+        0,
+      );
+      _endDate = DateTime(
+        widget.initialDateRange!.end.year,
+        widget.initialDateRange!.end.month,
+        widget.initialDateRange!.end.day,
+        23,
+        59,
+        59,
+        999,
+      );
     } else {
       _selectedPreset = DatePreset.thisMonth;
       _startDate = DateTime(now.year, now.month, 1);
@@ -180,9 +195,15 @@ class _ExportStatementModalContentState
 
       // 3. Category Filter
       if (widget.initialCategory != "All") {
-        final cat = (item["Category"] ?? "").toString();
-        if (cat != widget.initialCategory) {
-          return false;
+        final initCat = widget.initialCategory.toLowerCase();
+        final isIncome = mode == "Add CASH" || mode == "Add Online";
+        if (initCat == "expenses" || initCat == "expense") {
+          if (isIncome) return false;
+        } else if (initCat == "income") {
+          if (!isIncome) return false;
+        } else {
+          final cat = (item["Category"] ?? "").toString().toLowerCase();
+          if (cat != initCat) return false;
         }
       }
 
