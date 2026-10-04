@@ -52,5 +52,33 @@ void main() {
       expect(result[3]['Date'], equals('12/01/2026'));
       expect(result[3]['_runningBalance'], equals(1200.0));
     });
+
+    test('does not deduct Owed transactions from cash running balance', () {
+      final records = [
+        {
+          'Amount': '1000',
+          'Date': '01/01/2026',
+          'Payment_Mode': 'Add CASH',
+          'timestamp': 100,
+        },
+        {
+          'Amount': '300',
+          'Date': '02/01/2026',
+          'Payment_Mode': 'Owed to Rahul',
+          'timestamp': 200,
+        },
+        {
+          'Amount': '200',
+          'Date': '03/01/2026',
+          'Payment_Mode': 'Spent Cash',
+          'timestamp': 300,
+        },
+      ];
+
+      final result = BalanceHelper.computeRunningBalances(records);
+      expect(result[0]['_runningBalance'], equals(1000.0));
+      expect(result[1]['_runningBalance'], equals(1000.0)); // Owed does not decrease cash
+      expect(result[2]['_runningBalance'], equals(800.0)); // Spent Cash decreases cash
+    });
   });
 }

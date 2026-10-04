@@ -13,6 +13,8 @@ void main() {
       expect(Money.sum(['0.10', '0.20']), .30);
       for (final input in [
         '0.001',
+        0.001,
+        10.456,
         'NaN',
         'Infinity',
         '1e20',

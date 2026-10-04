@@ -16,15 +16,14 @@ class SplitIntegrity {
   }) {
     final id = splitId ?? operationId(key);
     final paths = <String>[];
+    final suffixRegex = RegExp('^${RegExp.escape(id)}_\\d+\$');
     bool matches(dynamic recordKey, dynamic record) =>
         record is Map &&
         (record['split_id'] == id ||
             recordKey == id ||
             recordKey.toString().startsWith('${id}_expense_') ||
             recordKey.toString().startsWith('${id}_debt_') ||
-            RegExp(
-              '^${RegExp.escape(id)}_\\d+\$',
-            ).hasMatch(recordKey.toString()));
+            suffixRegex.hasMatch(recordKey.toString()));
     for (final entry in expenses.entries) {
       if (matches(entry.key, entry.value)) {
         paths.add('Expenses/$phone/${entry.key}');
@@ -32,8 +31,17 @@ class SplitIntegrity {
     }
     for (final friend in friends.entries) {
       if (friend.value is! Map) continue;
-      final records = (friend.value as Map)['Records'];
-      if (records is! Map) continue;
+      final rawRecords = (friend.value as Map)['Records'];
+      Map? records;
+      if (rawRecords is Map) {
+        records = rawRecords;
+      } else if (rawRecords is Iterable) {
+        records = {
+          for (var i = 0; i < rawRecords.length; i++)
+            i.toString(): rawRecords.elementAt(i)
+        };
+      }
+      if (records == null) continue;
       for (final entry in records.entries) {
         if (matches(entry.key, entry.value)) {
           paths.add('Friends/$phone/${friend.key}/Records/${entry.key}');

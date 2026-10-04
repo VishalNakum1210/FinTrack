@@ -440,6 +440,7 @@ class PassbookPageState extends State<PassbookApp> {
   /// Calculates a 7-day spending activity array for the sparkline chart.
   List<double> _calculateWeeklySparks(List<Map<String, dynamic>> records) {
     final now = DateTime.now();
+    final todayMidnight = DateTime(now.year, now.month, now.day);
     final sparks = List<double>.filled(7, 0.0);
     for (final item in records) {
       final method = (item["Payment_Mode"] ?? "").toString();
@@ -449,7 +450,8 @@ class PassbookPageState extends State<PassbookApp> {
       final dt =
           (item["_parsedDate"] as DateTime?) ?? DateHelper.parse(item["Date"]);
       if (dt != null) {
-        final diffDays = now.difference(dt).inDays;
+        final itemMidnight = DateTime(dt.year, dt.month, dt.day);
+        final diffDays = todayMidnight.difference(itemMidnight).inDays;
         if (diffDays >= 0 && diffDays < 7) {
           final amt = Money.rupees(item["Amount"]);
           sparks[6 - diffDays] += amt;
@@ -644,7 +646,8 @@ class PassbookPageState extends State<PassbookApp> {
             }
           }
         }
-        final viewNetSaved = viewInflow - viewOutflow;
+        final viewNetSaved =
+            (Money.paise(viewInflow) - Money.paise(viewOutflow)) / 100.0;
         final weeklySparks = _calculateWeeklySparks(_cachedSorted);
         final insightMessage = _generateSmartInsight(
           viewInflow,
@@ -1193,24 +1196,22 @@ class PassbookPageState extends State<PassbookApp> {
         double dayNet = 0.0;
         int dayCount = 0;
         if (showHeader && dt != null) {
-          for (int i = index; i < records.length; i++) {
+          for (final r in _cachedSorted) {
             final checkDt =
-                (records[i]["_parsedDate"] as DateTime?) ??
-                DateHelper.parse(records[i]["Date"]);
+                (r["_parsedDate"] as DateTime?) ??
+                DateHelper.parse(r["Date"]);
             if (checkDt != null &&
                 checkDt.year == dt.year &&
                 checkDt.month == dt.month &&
                 checkDt.day == dt.day) {
               dayCount++;
-              final amtPaise = Money.paise(records[i]["Amount"]);
-              final m = (records[i]["Payment_Mode"] ?? "").toString();
+              final amtPaise = Money.paise(r["Amount"]);
+              final m = (r["Payment_Mode"] ?? "").toString();
               if (["Add CASH", "Add Online"].contains(m)) {
                 dayNet = Money.sum([dayNet, amtPaise / 100.0]);
-              } else {
+              } else if (!m.startsWith("Owed")) {
                 dayNet = Money.sum([dayNet, -amtPaise / 100.0]);
               }
-            } else {
-              break;
             }
           }
         }

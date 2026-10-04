@@ -38,15 +38,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   static const _prefLockoutKey = 'change_pw_lockout_epoch';
   static const _prefAttemptsKey = 'change_pw_attempts';
 
+  void _onPasswordChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
-    newPasswordController.addListener(() {
-      if (mounted) setState(() {});
-    });
-    confirmPasswordController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    newPasswordController.addListener(_onPasswordChanged);
+    confirmPasswordController.addListener(_onPasswordChanged);
     _loadLockoutState();
   }
 
@@ -295,6 +295,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   @override
   void dispose() {
     _lockoutTimer?.cancel();
+    newPasswordController.removeListener(_onPasswordChanged);
+    confirmPasswordController.removeListener(_onPasswordChanged);
     oldPasswordController.dispose();
     newPasswordController.dispose();
     confirmPasswordController.dispose();
@@ -328,9 +330,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         confirmText.isNotEmpty &&
         newPassText == confirmText;
 
-    return Scaffold(
-      backgroundColor: _canvasBg,
-      appBar: AppBar(
+    return PopScope(
+      canPop: !isLoading,
+      child: Scaffold(
+        backgroundColor: _canvasBg,
+        appBar: AppBar(
         backgroundColor: _primaryGreen,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -718,6 +722,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

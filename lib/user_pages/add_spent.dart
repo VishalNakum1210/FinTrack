@@ -157,6 +157,7 @@ class _AddSpentState extends State<AddSpent> {
       if (descriptionController.text.isEmpty) {
         descriptionController.text = draft['description']?.toString() ?? '';
       }
+      if (mounted) setState(() {});
     } catch (_) {}
   }
 
@@ -255,6 +256,13 @@ class _AddSpentState extends State<AddSpent> {
       return;
     }
     selectedFriendNumber = effectiveFriendNumber;
+    if (selectedFriendNumber != null && friends.isNotEmpty) {
+      final matched = friends.firstWhere(
+        (f) => f["friend_number"] == selectedFriendNumber,
+        orElse: () => friends.first,
+      );
+      selectedFriendName = matched["friend_name"]?.toString() ?? "Friend";
+    }
 
     setState(() {
       isLoading = true;
@@ -392,7 +400,9 @@ class _AddSpentState extends State<AddSpent> {
         ? friendSharePreview.toInt().toString()
         : friendSharePreview.toStringAsFixed(2);
 
-    return Scaffold(
+    return PopScope(
+      canPop: !isLoading,
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
@@ -483,7 +493,7 @@ class _AddSpentState extends State<AddSpent> {
                                     ),
                                 inputFormatters: [
                                   FilteringTextInputFormatter.allow(
-                                    RegExp(r'^\d+\.?\d{0,2}'),
+                                    RegExp(r'^\d*\.?\d{0,2}'),
                                   ),
                                 ],
                                 maxLength: 10,
@@ -1179,7 +1189,8 @@ class _AddSpentState extends State<AddSpent> {
             ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _quickAddChip(String label, VoidCallback onTap) {

@@ -50,6 +50,23 @@ class ExportService {
     }
   }
 
+  /// Safely loads a Unicode-compatible font theme supporting Indic and standard scripts.
+  static Future<pw.ThemeData?> _loadPdfTheme() async {
+    try {
+      final baseFont = await PdfGoogleFonts.notoSansDevanagariRegular();
+      final boldFont = await PdfGoogleFonts.notoSansDevanagariBold();
+      return pw.ThemeData.withFont(base: baseFont, bold: boldFont);
+    } catch (_) {
+      try {
+        final baseFont = await PdfGoogleFonts.notoSansRegular();
+        final boldFont = await PdfGoogleFonts.notoSansBold();
+        return pw.ThemeData.withFont(base: baseFont, bold: boldFont);
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
   // ===========================================================================
   // ===========================================================================
   // 1. PASSBOOK STATEMENT EXPORT (PDF)
@@ -73,7 +90,8 @@ class ExportService {
     bool isShare = false,
     String? statementId,
   }) async {
-    final pdf = pw.Document();
+    final pdfTheme = await _loadPdfTheme();
+    final pdf = pw.Document(theme: pdfTheme);
     final cashBalance = addCash - spentCash;
     final onlineBalance = addOnline - spentOnline;
     final effectiveStatementId =
@@ -331,7 +349,8 @@ class ExportService {
     required double totalGive,
     required List<Map<String, dynamic>> records,
   }) async {
-    final pdf = pw.Document();
+    final pdfTheme = await _loadPdfTheme();
+    final pdf = pw.Document(theme: pdfTheme);
     final netDue = totalGet - totalGive;
 
     final logoImage = await _loadAppLogo();
@@ -504,7 +523,8 @@ class ExportService {
     required double totalGet,
     required double totalGive,
   }) async {
-    final pdf = pw.Document();
+    final pdfTheme = await _loadPdfTheme();
+    final pdf = pw.Document(theme: pdfTheme);
     final netDue = totalGet - totalGive;
 
     final logoImage = await _loadAppLogo();
@@ -683,7 +703,8 @@ class ExportService {
     required Map<String, double> categoryTotals,
     required List<Map<String, dynamic>> records,
   }) async {
-    final pdf = pw.Document();
+    final pdfTheme = await _loadPdfTheme();
+    final pdf = pw.Document(theme: pdfTheme);
     final cashBalance = addCash - spentCash;
     final onlineBalance = addOnline - spentOnline;
 
@@ -1663,9 +1684,11 @@ class ExportService {
         continue;
       }
 
-      // Allow ASCII printable (32 to 126), newline (10), tab (9), and standard Latin-1 (160 to 255)
+      // Allow ASCII printable (32 to 126), newline (10), tab (9), standard Latin-1 (160 to 255),
+      // and Indic scripts (Devanagari 0x0900 to Malayalam 0x0D7F)
       if ((codeUnit >= 32 && codeUnit <= 126) ||
           (codeUnit >= 160 && codeUnit <= 255) ||
+          (codeUnit >= 0x0900 && codeUnit <= 0x0D7F) ||
           codeUnit == 10 ||
           codeUnit == 9) {
         buffer.writeCharCode(codeUnit);
@@ -1819,7 +1842,7 @@ class ExportService {
               : runningVal.toString())
           : '';
       buffer.writeln(
-        '${cell(record["Date"])},${cell(record["Category"])},${cell(record["Payment_Mode"])},$amount,${cell(record["Description"])},${cell(running)}',
+        '${cell(record["Date"])},${cell(record["Category"])},${cell(record["Payment_Mode"])},${cell(amount)},${cell(record["Description"])},${cell(running)}',
       );
     }
 
@@ -1831,7 +1854,8 @@ class ExportService {
     required List<Map<String, dynamic>> expenses,
   }) async {
     final csvString = generateCsvString(expenses: expenses);
-    final bytes = Uint8List.fromList(utf8.encode(csvString));
+    final bytes =
+        Uint8List.fromList([0xEF, 0xBB, 0xBF, ...utf8.encode(csvString)]);
     final fileName =
         'FinTrack_Transactions_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
 

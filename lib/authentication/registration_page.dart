@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fin_track/get_information/password_policy.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/authentication/login_page.dart';
@@ -34,7 +35,93 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool isConfirmPasswordVisible = false;
 
   int failedAttempts = 0;
-  Timer? _throttleTimer;
+  int lockoutSeconds = 0;
+  Timer? _lockoutTimer;
+
+  static const _prefRegLockoutKey = 'reg_lockout_epoch';
+  static const _prefRegAttemptsKey = 'reg_failed_attempts';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRegLockoutState();
+  }
+
+  Future<void> _loadRegLockoutState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lockoutEpoch = prefs.getInt(_prefRegLockoutKey);
+      final storedAttempts = prefs.getInt(_prefRegAttemptsKey) ?? 0;
+      if (lockoutEpoch != null) {
+        final until = DateTime.fromMillisecondsSinceEpoch(lockoutEpoch);
+        final remaining = until.difference(DateTime.now()).inSeconds;
+        if (remaining > 0) {
+          if (mounted) {
+            setState(() {
+              failedAttempts = storedAttempts;
+              lockoutSeconds = remaining;
+            });
+            _startLockoutTicker();
+          }
+        } else {
+          await prefs.remove(_prefRegLockoutKey);
+          await prefs.remove(_prefRegAttemptsKey);
+        }
+      } else if (mounted && storedAttempts > 0) {
+        setState(() {
+          failedAttempts = storedAttempts;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _startLockoutTicker() {
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          if (lockoutSeconds > 1) {
+            lockoutSeconds--;
+          } else {
+            lockoutSeconds = 0;
+            failedAttempts = 0;
+            timer.cancel();
+            SharedPreferences.getInstance().then((prefs) {
+              prefs.remove(_prefRegLockoutKey);
+              prefs.remove(_prefRegAttemptsKey);
+            }).catchError((_) {});
+          }
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void _recordFailedAttempt() {
+    failedAttempts++;
+    int duration = 30;
+    if (failedAttempts >= 10) {
+      duration = 300;
+    } else if (failedAttempts >= 7) {
+      duration = 120;
+    } else if (failedAttempts >= 5) {
+      duration = 60;
+    }
+
+    if (failedAttempts >= 5) {
+      final until = DateTime.now().add(Duration(seconds: duration));
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setInt(_prefRegLockoutKey, until.millisecondsSinceEpoch);
+        prefs.setInt(_prefRegAttemptsKey, failedAttempts);
+      }).catchError((_) {});
+
+      setState(() {
+        lockoutSeconds = duration;
+      });
+      _startLockoutTicker();
+    }
+  }
 
   static const Color _brandGreen = Color(0xFF8BC24A);
   static const Color _canvasBackground = Color(0xFFF8FAFC);
@@ -49,7 +136,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     phoneController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
-    _throttleTimer?.cancel();
+    _lockoutTimer?.cancel();
     super.dispose();
   }
 
@@ -64,9 +151,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
   Future<void> checkDetails() async {
     if (isLoading) return;
-    if (failedAttempts >= 5) {
+    if (lockoutSeconds > 0) {
       Fluttertoast.showToast(
-        msg: "Too many attempts. Please wait before trying again.",
+        msg:
+            "Too many attempts. Please wait $lockoutSeconds seconds before trying again.",
       );
       return;
     }
@@ -173,6 +261,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
             context.read<FriendProvider>().fetchFriends(phoneNumber);
           }
 
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.remove(_prefRegLockoutKey);
+            prefs.remove(_prefRegAttemptsKey);
+          }).catchError((_) {});
+
           Fluttertoast.showToast(
             msg: "Registration Successful! Welcome to FinTrack.",
           );
@@ -183,9 +276,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
             (route) => false,
           );
         } catch (dbError) {
+          try {
+            await user.delete();
+          } catch (_) {}
+          try {
+            await FirebaseAuth.instance.signOut();
+          } catch (_) {}
           Fluttertoast.showToast(
-            msg:
-                "Account created! Please sign in to complete profile setup.",
+            msg: "Registration setup failed. Please try again.",
           );
           if (mounted) {
             Navigator.pushReplacement(
@@ -196,13 +294,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
         }
       }
     } on FirebaseAuthException catch (e) {
-      failedAttempts++;
-      if (failedAttempts >= 5) {
-        _throttleTimer?.cancel();
-        _throttleTimer = Timer(const Duration(seconds: 30), () {
-          if (mounted) setState(() => failedAttempts = 0);
-        });
-      }
+      _recordFailedAttempt();
       if (e.code == 'email-already-in-use') {
         Fluttertoast.showToast(
           msg: "Unable to register. Try signing in or use different details.",
@@ -235,13 +327,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       Fluttertoast.showToast(
         msg: "Unable to complete setup. Please check connection and retry.",
       );
-      failedAttempts++;
-      if (failedAttempts >= 5) {
-        _throttleTimer?.cancel();
-        _throttleTimer = Timer(const Duration(seconds: 30), () {
-          if (mounted) setState(() => failedAttempts = 0);
-        });
-      }
+      _recordFailedAttempt();
     } finally {
       if (mounted) {
         setState(() {

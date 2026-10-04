@@ -218,22 +218,16 @@ class RetrySafeWriter {
           }
         } catch (_) {}
 
-        // Fallback: If WriteOperations is denied (e.g. server rules not yet updated),
-        // commit core transaction updates directly so user data is not lost.
-        try {
-          await commit(updates).timeout(acknowledgementTimeout);
-        } catch (coreErr) {
-          final errorStr = coreErr.toString().toLowerCase();
-          if (errorStr.contains('permission-denied') ||
-              errorStr.contains('permission_denied') ||
-              errorStr.contains('permission denied')) {
-            _failure =
-                'Permission denied. Please verify your account sign-in or database rules.';
-          } else {
-            _failure = null;
-          }
-          return false;
+        final errorStr = err.toString().toLowerCase();
+        if (errorStr.contains('permission-denied') ||
+            errorStr.contains('permission_denied') ||
+            errorStr.contains('permission denied')) {
+          _failure =
+              'Permission denied. Please verify your account sign-in or database rules.';
+        } else {
+          _failure = null;
         }
+        return false;
       }
       await _acknowledge(key, alias, id, intentId, payloadHash);
       return true;

@@ -60,7 +60,9 @@ class _UserMainPageState extends State<UserMainPage> {
       final phone = await SessionManager.getPhoneNumber() ?? "";
       if (mounted && phone.isNotEmpty) {
         context.read<UserProvider>().loadUserSession();
-        context.read<ExpenseProvider>().fetchExpenses(phone, force: force);
+        await context
+            .read<ExpenseProvider>()
+            .fetchExpenses(phone, force: force);
       }
     } finally {
       if (mounted) {
@@ -313,9 +315,9 @@ class _UserMainPageState extends State<UserMainPage> {
                 (r["_parsedDate"] as DateTime?) ?? DateHelper.parse(r["Date"]);
             if (date != null) {
               final amtPaise = Money.paise(r["Amount"]);
-              if (date.isAfter(sevenDaysAgo)) {
+              if (!date.isBefore(sevenDaysAgo)) {
                 last7ExpensePaise += amtPaise;
-              } else if (date.isAfter(fourteenDaysAgo)) {
+              } else if (!date.isBefore(fourteenDaysAgo)) {
                 prev7ExpensePaise += amtPaise;
               }
             }

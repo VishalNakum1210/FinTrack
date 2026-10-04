@@ -101,7 +101,7 @@ void main() {
       expect(find.text('JSON Cloud Backup'), findsOneWidget);
       expect(find.text('Google Drive Ready'), findsOneWidget);
       expect(find.text('Save to Google Drive / Share File'), findsOneWidget);
-      expect(find.text('Copy to Clipboard'), findsOneWidget);
+      expect(find.text('Copy to Clipboard'), findsNothing);
       expect(find.text('Preview Data'), findsOneWidget);
 
       // Tap preview data
@@ -109,7 +109,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('JSON Cloud Backup Preview'), findsOneWidget);
-      expect(find.text('Copy All'), findsOneWidget);
+      expect(find.text('Copy All'), findsNothing);
       expect(find.text('Close'), findsOneWidget);
     });
 
@@ -126,7 +126,7 @@ void main() {
       expect(find.text('Excel / CSV Spreadsheet'), findsNWidgets(2));
       expect(find.text('Sheets & Excel Ready'), findsOneWidget);
       expect(find.text('Save to Google Drive / Share CSV'), findsOneWidget);
-      expect(find.text('Copy to Clipboard'), findsOneWidget);
+      expect(find.text('Copy to Clipboard'), findsNothing);
     });
   });
 }

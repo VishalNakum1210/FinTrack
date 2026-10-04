@@ -72,6 +72,8 @@ FinTrack_Backup_*.json
 *.p8
 *.pem
 *.cer
+**/google-services.json
+**/GoogleService-Info.plist
 
 # OS metadata
 Thumbs.db

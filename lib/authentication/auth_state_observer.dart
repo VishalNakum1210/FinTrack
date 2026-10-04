@@ -39,14 +39,16 @@ class _AuthStateObserverState extends State<AuthStateObserver>
         context.read<ExpenseProvider>().clearExpenses();
         context.read<FriendProvider>().clearFriends();
         unawaited(SessionManager.clearSession().catchError((_) {}));
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            widget.navigatorKey.currentState?.pushAndRemoveUntil(
-              MaterialPageRoute<void>(builder: (_) => const LoginPage()),
-              (_) => false,
-            );
-          }
-        });
+        if (_uid == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              widget.navigatorKey.currentState?.pushAndRemoveUntil(
+                MaterialPageRoute<void>(builder: (_) => const LoginPage()),
+                (_) => false,
+              );
+            }
+          });
+        }
       }
     });
   }

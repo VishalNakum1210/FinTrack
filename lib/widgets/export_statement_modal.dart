@@ -324,80 +324,82 @@ class _ExportStatementModalContentState
     final periodLabel =
         "${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}";
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.9,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag Handle
-          const SizedBox(height: 12),
-          Container(
-            width: 44,
-            height: 4.5,
-            decoration: BoxDecoration(
-              color: const Color(0xFFCBD5E1),
-              borderRadius: BorderRadius.circular(3),
+    return PopScope(
+      canPop: !_isGenerating,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag Handle
+            const SizedBox(height: 12),
+            Container(
+              width: 44,
+              height: 4.5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(3),
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(12),
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.picture_as_pdf_rounded,
+                      color: _primaryGreen,
+                      size: 22,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.picture_as_pdf_rounded,
-                    color: _primaryGreen,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Export Financial Statement",
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: _textDark,
-                          letterSpacing: -0.3,
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Export Financial Statement",
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: _textDark,
+                            letterSpacing: -0.3,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        "Bank-grade A4 PDF transaction report",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _textMuted,
-                          fontWeight: FontWeight.w500,
+                        SizedBox(height: 2),
+                        Text(
+                          "Bank-grade A4 PDF transaction report",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _textMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded, color: _textMuted),
-                  tooltip: "Close",
-                ),
-              ],
+                  IconButton(
+                    onPressed: _isGenerating ? null : () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, color: _textMuted),
+                    tooltip: "Close",
+                  ),
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 12),
           const Divider(height: 1, color: _borderGrey),
 
@@ -753,8 +755,9 @@ class _ExportStatementModalContentState
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSectionHeader(String title) {
     return Text(

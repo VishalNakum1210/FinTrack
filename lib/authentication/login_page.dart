@@ -27,6 +27,7 @@ class _LoginPageState extends State<LoginPage> {
 
   bool isLoading = false;
   bool isPasswordVisible = false;
+  bool _isLockoutLoaded = false;
 
   int failedAttempts = 0;
   int lockoutSeconds = 0;
@@ -78,7 +79,14 @@ class _LoginPageState extends State<LoginPage> {
           });
         }
       }
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLockoutLoaded = true;
+        });
+      }
+    }
   }
 
   @override
@@ -90,14 +98,23 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void startLockoutTimer([int seconds = 30]) {
-    final until = DateTime.now().add(Duration(seconds: seconds));
+    int duration = seconds;
+    if (failedAttempts >= 10) {
+      duration = 300; // 5 minutes
+    } else if (failedAttempts >= 7) {
+      duration = 120; // 2 minutes
+    } else if (failedAttempts >= 5) {
+      duration = 60; // 1 minute
+    }
+
+    final until = DateTime.now().add(Duration(seconds: duration));
     SharedPreferences.getInstance().then((prefs) {
       prefs.setInt(_prefLockoutKey, until.millisecondsSinceEpoch);
       prefs.setInt(_prefAttemptsKey, failedAttempts);
     }).catchError((_) {});
 
     setState(() {
-      lockoutSeconds = seconds;
+      lockoutSeconds = duration;
     });
     _startLockoutTimerTicker();
   }
@@ -126,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> checkUserDetails() async {
-    if (isLoading) return;
+    if (isLoading || !_isLockoutLoaded) return;
     if (lockoutSeconds > 0) {
       Fluttertoast.showToast(
         msg: "Too many failed attempts. Please wait $lockoutSeconds seconds.",
@@ -562,7 +579,7 @@ class _LoginPageState extends State<LoginPage> {
                               maxLength: 128,
                               textInputAction: TextInputAction.done,
                               onSubmitted: (_) =>
-                                  (isLoading || lockoutSeconds > 0)
+                                  (isLoading || !_isLockoutLoaded || lockoutSeconds > 0)
                                   ? null
                                   : checkUserDetails(),
                               style: const TextStyle(
@@ -619,7 +636,7 @@ class _LoginPageState extends State<LoginPage> {
                               height: 52,
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: (isLoading || lockoutSeconds > 0)
+                                onPressed: (isLoading || !_isLockoutLoaded || lockoutSeconds > 0)
                                     ? null
                                     : checkUserDetails,
                                 style: ElevatedButton.styleFrom(
@@ -633,9 +650,11 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ),
                                 child: Text(
-                                  lockoutSeconds > 0
-                                      ? "Locked (${lockoutSeconds}s)"
-                                      : "Log In",
+                                  !_isLockoutLoaded
+                                      ? "Loading..."
+                                      : lockoutSeconds > 0
+                                          ? "Locked (${lockoutSeconds}s)"
+                                          : "Log In",
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,

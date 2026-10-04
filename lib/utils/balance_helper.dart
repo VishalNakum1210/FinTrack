@@ -40,11 +40,12 @@ class BalanceHelper {
     for (final item in chronological) {
       final method = (item["Payment_Mode"] ?? "").toString();
       final isIncome = ["Add CASH", "Add Online"].contains(method);
+      final isOwed = method == "Owed" || method.startsWith("Owed to ");
       final rawAmt = item["Amount"];
       final int amt = Money.paise(rawAmt);
       if (isIncome) {
         running += amt;
-      } else {
+      } else if (!isOwed) {
         running -= amt;
       }
       item["_runningBalance"] = running / 100;

@@ -488,6 +488,7 @@ class _ReportPageState extends State<Reportpage> {
       ReportPeriod.thisMonth,
       ReportPeriod.lastMonth,
       ReportPeriod.thisYear,
+      ReportPeriod.allTime,
     ];
 
     return Container(

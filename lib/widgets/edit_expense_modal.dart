@@ -4,6 +4,7 @@ import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/utils/category_theme.dart';
 import 'package:fin_track/utils/date_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -182,7 +183,15 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
     if (mounted) setState(() => _isSaving = false);
 
     if (success) {
-      Fluttertoast.showToast(msg: "Transaction updated successfully");
+      if (_originalPaymentMode.startsWith('Owed')) {
+        Fluttertoast.showToast(
+          msg:
+              "Tip: To keep friend ledgers in sync, edit split records from the Friend page.",
+          toastLength: Toast.LENGTH_LONG,
+        );
+      } else {
+        Fluttertoast.showToast(msg: "Transaction updated successfully");
+      }
       if (mounted) Navigator.pop(context, true);
     } else {
       Fluttertoast.showToast(
@@ -279,6 +288,9 @@ class _EditExpenseModalContentState extends State<EditExpenseModalContent> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+              ],
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,

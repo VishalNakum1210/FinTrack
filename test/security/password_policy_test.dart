@@ -14,5 +14,6 @@ void main() {
     const password = '  long password 123  ';
     expect(isPasswordStrong(password), isTrue);
     expect(password.length, 21);
+    expect(isPasswordStrong('          a1'), isFalse);
   });
 }

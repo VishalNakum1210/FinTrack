@@ -40,7 +40,7 @@ class _FriendPageState extends State<FriendPage> {
   Future<void> _loadFriends({bool force = false}) async {
     final phone = await SessionManager.getPhoneNumber() ?? "";
     if (mounted && phone.isNotEmpty) {
-      context.read<FriendProvider>().fetchFriends(phone, force: force);
+      await context.read<FriendProvider>().fetchFriends(phone, force: force);
     }
   }
 
@@ -169,8 +169,13 @@ class _FriendPageState extends State<FriendPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              AddFriendExpenses(friendNumber: friendNumber),
+                          builder: (_) => AddFriendExpenses(
+                            friendNumber: friendNumber,
+                            initialAmount: net.abs().toStringAsFixed(2),
+                            initialType: isOwed
+                                ? "Take Money From Friend"
+                                : "Give Money To Friend",
+                          ),
                         ),
                       );
                     },
@@ -637,6 +642,49 @@ class _FriendPageState extends State<FriendPage> {
     );
   }
 
+  Future<void> _deleteFriendWithPrompt({
+    required String friendName,
+    required String friendNumber,
+    required double net,
+  }) async {
+    final String title;
+    final String message;
+    if (net > 0) {
+      title = "Delete Friend with Unsettled Balance";
+      message =
+          "Warning: They owe you ₹${net.toStringAsFixed(2)}. Deleting $friendName will permanently erase all associated debt records from your ledger. Are you sure you want to proceed?";
+    } else if (net < 0) {
+      title = "Delete Friend with Unsettled Balance";
+      message =
+          "Warning: You owe them ₹${(-net).toStringAsFixed(2)}. Deleting $friendName will permanently erase all associated debt records from your ledger. Are you sure you want to proceed?";
+    } else {
+      title = "Delete Friend";
+      message =
+          "Are you sure you want to remove $friendName from your ledger?";
+    }
+    final confirmed = await showDeleteConfirmDialog(
+      context,
+      title: title,
+      message: message,
+    );
+    if (confirmed == true && mounted) {
+      final phone = await SessionManager.getPhoneNumber() ?? "";
+      if (phone.isNotEmpty && mounted) {
+        final provider = context.read<FriendProvider>();
+        final removed = await provider.deleteFriend(
+          userPhone: phone,
+          friendNumber: friendNumber,
+        );
+        Fluttertoast.showToast(
+          msg: removed
+              ? "Friend removed from ledger"
+              : provider.lastError ??
+                    'Unable to delete friend. Please retry.',
+        );
+      }
+    }
+  }
+
   Widget _buildFriendCard(Map<String, dynamic> friend) {
     final friendName = (friend["friend_name"] ?? "Friend").toString();
     final friendNumber = (friend["friend_number"] ?? "").toString();
@@ -663,20 +711,14 @@ class _FriendPageState extends State<FriendPage> {
       pillText = "All settled up";
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1E293B).withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
       ),
+      color: Colors.white,
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
@@ -693,49 +735,16 @@ class _FriendPageState extends State<FriendPage> {
               ),
             );
           },
-          onLongPress: () async {
-            final String title;
-            final String message;
-            if (net > 0) {
-              title = "Delete Friend with Unsettled Balance";
-              message =
-                  "Warning: They owe you ₹${net.toStringAsFixed(2)}. Deleting $friendName will permanently erase all associated debt records from your ledger. Are you sure you want to proceed?";
-            } else if (net < 0) {
-              title = "Delete Friend with Unsettled Balance";
-              message =
-                  "Warning: You owe them ₹${(-net).toStringAsFixed(2)}. Deleting $friendName will permanently erase all associated debt records from your ledger. Are you sure you want to proceed?";
-            } else {
-              title = "Delete Friend";
-              message =
-                  "Are you sure you want to remove $friendName from your ledger?";
-            }
-            final confirmed = await showDeleteConfirmDialog(
-              context,
-              title: title,
-              message: message,
-            );
-            if (confirmed == true) {
-              final phone = await SessionManager.getPhoneNumber() ?? "";
-              if (phone.isNotEmpty && mounted) {
-                final provider = context.read<FriendProvider>();
-                final removed = await provider.deleteFriend(
-                  userPhone: phone,
-                  friendNumber: friendNumber,
-                );
-                Fluttertoast.showToast(
-                  msg: removed
-                      ? "Friend removed from ledger"
-                      : provider.lastError ??
-                            'Unable to delete friend. Please retry.',
-                );
-              }
-            }
-          },
+          onLongPress: () => _deleteFriendWithPrompt(
+            friendName: friendName,
+            friendNumber: friendNumber,
+            net: net,
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Top Row: Circular Avatar with Initials + Friend Name & Phone
+                // Top Row: Circular Avatar with Initials + Friend Name & Phone + Popup Menu
                 Row(
                   children: [
                     Container(
@@ -782,6 +791,51 @@ class _FriendPageState extends State<FriendPage> {
                           ),
                         ],
                       ),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      tooltip: "Friend options",
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                      onSelected: (value) async {
+                        if (value == "delete") {
+                          await _deleteFriendWithPrompt(
+                            friendName: friendName,
+                            friendNumber: friendNumber,
+                            net: net,
+                          );
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: "delete",
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete_outline_rounded,
+                                color: Colors.red,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                "Delete Friend",
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

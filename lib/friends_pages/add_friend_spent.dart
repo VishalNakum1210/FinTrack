@@ -206,7 +206,9 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
     );
     final friendName = (friendData["friend_name"] ?? "Friend").toString();
 
-    return Scaffold(
+    return PopScope(
+      canPop: !isLoading,
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
@@ -813,7 +815,8 @@ class _AddFriendExpensesState extends State<AddFriendExpenses> {
             ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _quickAddChip(String label, VoidCallback onTap) {

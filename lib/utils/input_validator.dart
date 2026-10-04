@@ -37,7 +37,7 @@ class InputValidator {
 
   static String normalizedDate(String value) {
     final parsed = DateHelper.parse(value);
-    if (parsed == null) throw ArgumentError('Invalid date');
+    if (parsed == null) throw FormatException('Invalid date: $value');
     return '${parsed.day}/${parsed.month}/${parsed.year}';
   }
 
@@ -45,7 +45,7 @@ class InputValidator {
   /// server time, without trusting a separate client timestamp.
   static Map<String, Object> dateFields(String value) {
     final parsed = DateHelper.parse(value);
-    if (parsed == null) throw ArgumentError('Invalid date');
+    if (parsed == null) throw FormatException('Invalid date: $value');
     return {
       'date_year': parsed.year,
       'date_month': parsed.month,

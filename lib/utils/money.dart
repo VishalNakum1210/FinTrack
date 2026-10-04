@@ -18,6 +18,7 @@ class Money {
     if (value is num && !value.isFinite) return null;
     final String text;
     if (value is num) {
+      if ((value * 100 - (value * 100).round()).abs() > 1e-6) return null;
       text = value.toStringAsFixed(2);
     } else {
       text = value?.toString().replaceAll(',', '').trim() ?? '';

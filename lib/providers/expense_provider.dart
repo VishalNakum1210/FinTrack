@@ -8,12 +8,17 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class ExpenseProvider extends ChangeNotifier {
+  ExpenseProvider() {
+    _initConnectivity();
+  }
+
   bool _isLoading = false;
   bool _hasError = false;
+  bool _isOffline = false;
   String _errorMessage = "";
   String? lastError;
   String _currentPhoneNumber = "";
-  StreamSubscription<DatabaseEvent>? _subscription;
+  StreamSubscription<DatabaseEvent>? _subscription, _connectivitySub;
 
   final List<Map<String, dynamic>> _records = [];
 
@@ -29,6 +34,7 @@ class ExpenseProvider extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
   bool get hasError => _hasError;
+  bool get isOffline => _isOffline;
   String get errorMessage => _errorMessage;
   List<Map<String, dynamic>> get records => List.unmodifiable(_records);
   double get spentCash => _spentCash / 100;
@@ -130,7 +136,9 @@ class ExpenseProvider extends ChangeNotifier {
     _errorMessage = "";
     notifyListeners();
 
-    await _subscription?.cancel();
+    final oldSub = _subscription;
+    _subscription = null;
+    await oldSub?.cancel();
 
     try {
       final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber");
@@ -539,9 +547,34 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _initConnectivity() {
+    if (_connectivitySub != null) return;
+    try {
+      _connectivitySub = FirebaseDatabase.instance
+          .ref('.info/connected')
+          .onValue
+          .listen(
+            (event) {
+              final offline = event.snapshot.value != true;
+              if (_isOffline != offline) {
+                _isOffline = offline;
+                notifyListeners();
+              }
+            },
+            onError: (_) {
+              if (!_isOffline) {
+                _isOffline = true;
+                notifyListeners();
+              }
+            },
+          );
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();
+    _connectivitySub?.cancel();
     super.dispose();
   }
 }

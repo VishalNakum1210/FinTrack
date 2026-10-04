@@ -196,9 +196,12 @@ class _SplashPageState extends State<SplashPage> {
         // Clear stale local session on verified auth mismatch
         await SessionManager.clearSession();
         await FirebaseAuth.instance.signOut();
+      } else if (hasValidSession && currentUser == null) {
+        // Auth session revoked or deleted on backend
+        await SessionManager.clearSession();
       }
     } catch (_) {
-      await SessionManager.clearSession();
+      // Do not wipe valid user session on unexpected transient errors
     }
 
     if (!mounted) return;
@@ -377,6 +380,10 @@ class VersionCheckFailureDialog extends StatelessWidget {
       title: Text(failure.title),
       content: Text(failure.description),
       actions: [
+        TextButton(
+          onPressed: () => SystemNavigator.pop(),
+          child: const Text('Exit App'),
+        ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Retry'),

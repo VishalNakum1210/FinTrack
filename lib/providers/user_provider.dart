@@ -71,6 +71,7 @@ class UserProvider extends ChangeNotifier {
             data['owner_uid'] != SessionManager.authenticatedUid) {
           return;
         }
+        _loadedUid = SessionManager.authenticatedUid;
         final cName = (data['name'] ?? '').toString().trim();
         if (cName.isNotEmpty && cName != 'User' && cName != _name) {
           _name = cName;
@@ -135,13 +136,13 @@ class UserProvider extends ChangeNotifier {
       final uid = SessionManager.authenticatedUid;
 
       if (phone != null && phone.isNotEmpty && uid != null) {
-        _phoneNumber = phone;
-        _loadedUid = uid;
         final details = await getUserInformation(phone);
         if (phone != SessionManager.authenticatedPhone ||
             uid != SessionManager.authenticatedUid) {
           return;
         }
+        _phoneNumber = phone;
+        _loadedUid = uid;
 
         // Flexible key resolution for name
         String? remoteName;
@@ -315,10 +316,12 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  void clearUser() {
+  void clearUser([String? explicitUid]) {
+    final effectiveUid =
+        explicitUid ?? _loadedUid ?? SessionManager.authenticatedUid;
     final oldCacheKey = _cacheKey;
     final uidCacheKey =
-        _loadedUid != null ? 'cached_user_profile_$_loadedUid' : null;
+        effectiveUid != null ? 'cached_user_profile_$effectiveUid' : null;
     final phoneKey = 'cached_user_profile_$_phoneNumber';
     _loadedUid = null;
     _name = "User";

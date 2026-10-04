@@ -5,7 +5,6 @@ import 'package:fin_track/providers/user_provider.dart';
 import 'package:fin_track/services/export_service.dart';
 import 'package:fin_track/widgets/export_statement_modal.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 
@@ -83,11 +82,6 @@ class _DataBackupPageState extends State<DataBackupPage> {
             if (mounted) setState(() => _isExporting = false);
           }
         },
-        onCopy: () async {
-          Navigator.pop(context);
-          await Clipboard.setData(ClipboardData(text: jsonString));
-          Fluttertoast.showToast(msg: "JSON Backup copied to clipboard!");
-        },
         rawContent: jsonString,
       );
     } catch (e) {
@@ -129,11 +123,6 @@ class _DataBackupPageState extends State<DataBackupPage> {
           } finally {
             if (mounted) setState(() => _isExporting = false);
           }
-        },
-        onCopy: () async {
-          Navigator.pop(context);
-          await Clipboard.setData(ClipboardData(text: csvString));
-          Fluttertoast.showToast(msg: "CSV Spreadsheet copied to clipboard!");
         },
         rawContent: csvString,
       );
@@ -568,7 +557,6 @@ class _DataBackupPageState extends State<DataBackupPage> {
     required String shareLabel,
     required IconData shareIcon,
     required VoidCallback onShare,
-    required VoidCallback onCopy,
     required String rawContent,
   }) {
     showModalBottomSheet(
@@ -630,7 +618,7 @@ class _DataBackupPageState extends State<DataBackupPage> {
               ),
               const SizedBox(height: 8),
               const Text(
-                "Export your financial records securely. You can share the file, copy data to clipboard, or preview it directly.",
+                "Export your financial records securely. You can share the file or preview it directly.",
                 style: TextStyle(
                   fontSize: 12.5,
                   color: _textMuted,
@@ -734,28 +722,7 @@ class _DataBackupPageState extends State<DataBackupPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              // Secondary Copy to Clipboard Button
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: OutlinedButton.icon(
-                  onPressed: onCopy,
-                  icon: const Icon(Icons.copy_rounded, size: 18),
-                  label: const Text(
-                    "Copy to Clipboard",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _textDark,
-                    side: const BorderSide(color: _borderGrey),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              // Tertiary Preview Button
+              // Secondary Preview Button
               Center(
                 child: TextButton.icon(
                   onPressed: () {
@@ -822,19 +789,6 @@ class _DataBackupPageState extends State<DataBackupPage> {
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
             child: const Text("Close"),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: content));
-              if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-              Fluttertoast.showToast(msg: "Copied to clipboard!");
-            },
-            icon: const Icon(Icons.copy_rounded, size: 16),
-            label: const Text("Copy All"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _darkGreen,
-              foregroundColor: Colors.white,
-            ),
           ),
         ],
       ),

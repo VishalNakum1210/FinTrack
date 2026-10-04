@@ -890,10 +890,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
       allParticipants: participants,
     );
 
-    final totalTripAmount = tripExpenses.fold<double>(
-      0.0,
-      (sum, e) => sum + e.amount,
-    );
+    final totalTripAmount = Money.sum(tripExpenses.map((e) => e.amount));
     final totalTripStr = totalTripAmount.toINR();
     final formattedDate = DateFormat('d/M/yyyy').format(DateTime.now());
 
@@ -1106,27 +1103,58 @@ class _SplitBillPageState extends State<SplitBillPage> {
       allParticipants: tripParticipants,
     );
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 10),
+    return PopScope(
+      canPop: !isLoading && tripExpenses.isEmpty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (isLoading) return;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Discard Trip?'),
+            content: const Text(
+              'You have unsaved trip expenses. Are you sure you want to discard this trip?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Discard',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirm == true && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 10),
 
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Color(0xFF1E293B),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.maybePop(context),
+                          icon: const Icon(
+                            Icons.arrow_back_rounded,
+                            color: Color(0xFF1E293B),
+                          ),
                         ),
-                      ),
                       const SizedBox(width: 4),
                       const Expanded(
                         child: Text(
@@ -1271,8 +1299,9 @@ class _SplitBillPageState extends State<SplitBillPage> {
             ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ────────────────────────────────────────────────────────────
   // SINGLE BILL SPLIT WIDGETS
@@ -1720,7 +1749,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
                       color: Color(0xFF1E293B),
                     ),
                   ),
-                  if (friends.isNotEmpty)
+                  if (friends.isNotEmpty && singleBillPayerPhone == "me")
                     TextButton(
                       onPressed: () {
                         setState(() {
@@ -1775,20 +1804,28 @@ class _SplitBillPageState extends State<SplitBillPage> {
                     final name = (f["friend_name"] ?? f["name"] ?? phone)
                         .toString();
                     final isChecked = selectedFriendNumbers.contains(phone);
+                    final isPayerMe = singleBillPayerPhone == "me";
+                    final isSelectable =
+                        isPayerMe || phone == singleBillPayerPhone;
 
                     return Material(
                       color: Colors.transparent,
                       child: CheckboxListTile(
                         value: isChecked,
-                        onChanged: (val) {
-                          setState(() {
-                            if (val == true) {
-                              selectedFriendNumbers.add(phone);
-                            } else {
-                              selectedFriendNumbers.remove(phone);
-                            }
-                          });
-                        },
+                        onChanged: isSelectable
+                            ? (val) {
+                                setState(() {
+                                  if (val == true) {
+                                    if (!isPayerMe) {
+                                      selectedFriendNumbers.clear();
+                                    }
+                                    selectedFriendNumbers.add(phone);
+                                  } else {
+                                    selectedFriendNumbers.remove(phone);
+                                  }
+                                });
+                              }
+                            : null,
                         title: Text(
                           name,
                           style: const TextStyle(
@@ -1797,10 +1834,14 @@ class _SplitBillPageState extends State<SplitBillPage> {
                           ),
                         ),
                         subtitle: Text(
-                          phone,
-                          style: const TextStyle(
+                          !isPayerMe && !isSelectable
+                              ? "Only the paying friend can be selected"
+                              : phone,
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF94A3B8),
+                            color: !isPayerMe && !isSelectable
+                                ? Colors.red.shade400
+                                : const Color(0xFF94A3B8),
                           ),
                         ),
                         activeColor: const Color(0xFF8BC24A),
@@ -1927,10 +1968,7 @@ class _SplitBillPageState extends State<SplitBillPage> {
     List<SplitParticipant> participants,
     List<PersonSettlement> settlements,
   ) {
-    final totalTripSpent = tripExpenses.fold<double>(
-      0.0,
-      (sum, e) => sum + e.amount,
-    );
+    final totalTripSpent = Money.sum(tripExpenses.map((e) => e.amount));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -61,7 +61,9 @@ class FriendProvider extends ChangeNotifier {
         !_hasError) {
       return;
     }
-    await _subscription?.cancel();
+    final oldSub = _subscription;
+    _subscription = null;
+    await oldSub?.cancel();
     if (_currentPhone != phoneNumber) {
       _friends.clear();
       _getPaise = 0;
@@ -406,6 +408,7 @@ class FriendProvider extends ChangeNotifier {
     required String date,
     required String category,
     required String paymentMode,
+    String categoryType = 'Give Money To Friend',
     String? intentId,
   }) async {
     _lastError = null;
@@ -425,7 +428,7 @@ class FriendProvider extends ChangeNotifier {
       friendNumbers: [friendNumber],
       amountPerFriend: friendShareAmount,
       friendDescription: 'Split: $description (Total ₹$totalAmount)',
-      categoryType: 'Give Money To Friend',
+      categoryType: categoryType,
       intentId: intentId,
     );
   }
@@ -466,14 +469,17 @@ class FriendProvider extends ChangeNotifier {
       ],
       (id) => {
         for (var i = 0; i < numbers.length; i++)
-          'Friends/$userPhone/${numbers[i]}/Records/${id}_$i': _record(
-            '${id}_$i',
-            amountPerFriend,
-            description,
-            paymentMode,
-            date,
-            categoryType,
-          ),
+          'Friends/$userPhone/${numbers[i]}/Records/${id}_$i': {
+            ..._record(
+              '${id}_$i',
+              amountPerFriend,
+              description,
+              paymentMode,
+              date,
+              categoryType,
+            ),
+            'split_id': id,
+          },
       },
     );
     if (!success) {

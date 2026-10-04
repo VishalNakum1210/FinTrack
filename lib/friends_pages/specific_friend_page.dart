@@ -321,9 +321,8 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      final netDebtPaise = net.abs();
-                      final initialAmt = netDebtPaise > 0
-                          ? (netDebtPaise / 100.0).toStringAsFixed(2)
+                      final initialAmt = net.abs() > 0
+                          ? net.abs().toStringAsFixed(2)
                           : null;
                       final initialType = isOwed
                           ? "Take Money From Friend"
@@ -809,7 +808,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                   color: Color(0xFF64748B),
                 ),
                 padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 onPressed: () => _editRecord(record),
                 tooltip: "Edit",
               ),
@@ -822,7 +821,7 @@ class _SpecificfriendpageState extends State<Specificfriendpage> {
                   color: Color(0xFFEF4444),
                 ),
                 padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 onPressed: () async {
                   final confirmed = await showDeleteConfirmDialog(
                     context,
@@ -972,8 +971,8 @@ class _EditRecordBottomSheetState extends State<_EditRecordBottomSheet> {
               onPressed: () {
                 final amt = _amountCtrl.text.replaceAll(',', '').trim();
                 final desc = _descCtrl.text.trim();
-                final parsedAmt = double.tryParse(amt);
-                if (amt.isEmpty || parsedAmt == null || parsedAmt <= 0) {
+                final parsedPaise = Money.tryPaise(amt);
+                if (amt.isEmpty || parsedPaise == null || parsedPaise <= 0) {
                   Fluttertoast.showToast(msg: 'Please enter a valid amount');
                   return;
                 }

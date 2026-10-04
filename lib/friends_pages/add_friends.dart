@@ -27,6 +27,17 @@ class _AddFriendsState extends State<AddFriends> {
   static const Color _borderColor = Color(0xFFE2E8F0);
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final phone = await SessionManager.getPhoneNumber();
+      if (phone != null && phone.isNotEmpty && mounted) {
+        context.read<FriendProvider>().fetchFriends(phone);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     nameController.dispose();
     phoneController.dispose();
@@ -44,8 +55,10 @@ class _AddFriendsState extends State<AddFriends> {
       return;
     }
 
-    if (phoneNumber.length != 10 || int.tryParse(phoneNumber) == null) {
-      Fluttertoast.showToast(msg: "Please enter a valid 10-digit phone number");
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phoneNumber)) {
+      Fluttertoast.showToast(
+        msg: "Please enter a valid 10-digit mobile number starting with 6-9",
+      );
       return;
     }
 
@@ -78,7 +91,12 @@ class _AddFriendsState extends State<AddFriends> {
     }
 
     if (!mounted) return;
-    final existingFriends = context.read<FriendProvider>().friends;
+    final friendProvider = context.read<FriendProvider>();
+    if (friendProvider.friends.isEmpty) {
+      await friendProvider.fetchFriends(userPhoneNumber);
+    }
+    if (!mounted) return;
+    final existingFriends = friendProvider.friends;
     final isDuplicate = existingFriends.any(
       (f) => (f["friend_number"] ?? "").toString().trim() == phoneNumber,
     );
@@ -180,9 +198,11 @@ class _AddFriendsState extends State<AddFriends> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _canvasBg,
-      appBar: AppBar(
+    return PopScope(
+      canPop: !isLoading,
+      child: Scaffold(
+        backgroundColor: _canvasBg,
+        appBar: AppBar(
         title: const Text(
           "Add Friend",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
@@ -340,6 +360,7 @@ class _AddFriendsState extends State<AddFriends> {
             ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

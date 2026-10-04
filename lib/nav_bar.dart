@@ -4,6 +4,7 @@ import 'package:fin_track/user_pages/main_page.dart';
 import 'package:fin_track/user_pages/passbook_page.dart';
 import 'package:fin_track/user_pages/profile.dart';
 import 'package:fin_track/providers/friend_provider.dart';
+import 'package:fin_track/providers/expense_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -75,9 +76,10 @@ class _NavPageSelectorState extends State<NavPageSelector> {
         }
       },
       child: Scaffold(
-        body: Consumer<FriendProvider>(
-          builder: (context, friendProvider, child) {
-            final isOffline = friendProvider.isOffline;
+        body: Consumer2<FriendProvider, ExpenseProvider>(
+          builder: (context, friendProvider, expenseProvider, child) {
+            final isOffline =
+                friendProvider.isOffline || expenseProvider.isOffline;
             return Column(
               children: [
                 AnimatedContainer(

@@ -151,6 +151,9 @@ class SessionManager {
       await _storage.delete(key: key);
     }
     await _clearLegacyPreferences();
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
   }
 
   static Future<String?> getPhoneNumber() async => authenticatedPhone;
