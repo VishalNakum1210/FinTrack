@@ -111,3 +111,9 @@ if (deviceQa) {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    rootProject.findProject(":integration_test")?.let {
+        implementation(it)
+    }
+}
