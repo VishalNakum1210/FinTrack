@@ -3,6 +3,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+const qaPassword =
+    'Qa1!xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+const qaChangedPassword =
+    'Qa2!yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy';
+
 Future<void> initializeDeviceBackend() async {
   final info = await PackageInfo.fromPlatform();
   if (info.packageName != 'com.vishalnakum.fintrack.qa') {

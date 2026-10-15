@@ -49,16 +49,20 @@ class SessionManager {
     if (!RegExp(r'^\d{10}$').hasMatch(phoneNumber)) {
       throw ArgumentError('Invalid phone');
     }
+    final uid = authenticatedUid;
     final previous = await _profile();
+    if (uid != authenticatedUid ||
+        (uid != null && authenticatedPhone != phoneNumber)) {
+      return;
+    }
     final sameUser =
-        previous?['phone'] == phoneNumber &&
-        previous?['uid'] == authenticatedUid;
+        previous?['phone'] == phoneNumber && previous?['uid'] == uid;
     final name = username.trim();
     await _storage.write(
       key: _profileKey,
       value: jsonEncode({
         'phone': phoneNumber,
-        'uid': authenticatedUid,
+        'uid': uid,
         'name': (name.isEmpty || name == 'User') && sameUser
             ? previous!['name']
             : (name.isEmpty ? 'User' : name),
@@ -160,9 +164,10 @@ class SessionManager {
   static Future<String?> getUsername() async {
     final profile = await _profile();
     if (profile == null ||
-        (authenticatedPhone != null &&
-            (profile['phone'] != authenticatedPhone ||
-                profile['uid'] != authenticatedUid))) {
+        authenticatedUid == null ||
+        authenticatedPhone == null ||
+        profile['phone'] != authenticatedPhone ||
+        profile['uid'] != authenticatedUid) {
       return null;
     }
     return profile['name']?.toString();
@@ -171,9 +176,10 @@ class SessionManager {
   static Future<String?> getEmail() async {
     final profile = await _profile();
     if (profile == null ||
-        (authenticatedPhone != null &&
-            (profile['phone'] != authenticatedPhone ||
-                profile['uid'] != authenticatedUid))) {
+        authenticatedUid == null ||
+        authenticatedPhone == null ||
+        profile['phone'] != authenticatedPhone ||
+        profile['uid'] != authenticatedUid) {
       return null;
     }
     return profile['email']?.toString();

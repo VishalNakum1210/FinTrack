@@ -15,6 +15,8 @@ class UserProvider extends ChangeNotifier {
   String _phoneNumber = "";
   String _address = "";
   String? _loadedUid;
+  int _generation = 0;
+  bool _disposed = false;
 
   static const _storage = FlutterSecureStorage();
   String get _cacheKey =>
@@ -60,9 +62,17 @@ class UserProvider extends ChangeNotifier {
   String get address => _address;
 
   Future<void> _hydrateFromLocalStorage() async {
+    final generation = _generation;
+    final uid = SessionManager.authenticatedUid;
+    if (uid == null || _disposed) return;
     bool hasUpdated = false;
     try {
       final cached = await _storage.read(key: _cacheKey);
+      if (_disposed ||
+          generation != _generation ||
+          uid != SessionManager.authenticatedUid) {
+        return;
+      }
       if (cached != null &&
           cached.isNotEmpty &&
           SessionManager.authenticatedPhone != null) {
@@ -96,6 +106,11 @@ class UserProvider extends ChangeNotifier {
     if (_name == 'User') {
       try {
         final sessionUsername = await SessionManager.getUsername();
+        if (_disposed ||
+            generation != _generation ||
+            uid != SessionManager.authenticatedUid) {
+          return;
+        }
         if (sessionUsername != null &&
             sessionUsername.trim().isNotEmpty &&
             sessionUsername.trim() != 'User') {
@@ -123,12 +138,15 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<void> loadUserSession() async {
+    if (_disposed) return;
     if (_isLoading) return;
+    final generation = _generation;
     _isLoading = true;
     _hasError = false;
 
     // Fast local hydration so UI immediately displays cached username
     await _hydrateFromLocalStorage();
+    if (_disposed || generation != _generation) return;
     notifyListeners();
 
     try {
@@ -137,7 +155,9 @@ class UserProvider extends ChangeNotifier {
 
       if (phone != null && phone.isNotEmpty && uid != null) {
         final details = await getUserInformation(phone);
-        if (phone != SessionManager.authenticatedPhone ||
+        if (_disposed ||
+            generation != _generation ||
+            phone != SessionManager.authenticatedPhone ||
             uid != SessionManager.authenticatedUid) {
           return;
         }
@@ -181,6 +201,11 @@ class UserProvider extends ChangeNotifier {
           } catch (_) {}
         }
 
+        if (_disposed ||
+            generation != _generation ||
+            uid != SessionManager.authenticatedUid) {
+          return;
+        }
         final remoteEmail = (details["email"] ?? details["Email"] ?? "").trim();
         if (remoteEmail.isNotEmpty) {
           _email = remoteEmail;
@@ -196,6 +221,7 @@ class UserProvider extends ChangeNotifier {
         try {
           final currentUser = FirebaseAuth.instance.currentUser;
           if (currentUser != null &&
+              currentUser.uid == uid &&
               _name != 'User' &&
               (currentUser.displayName == null ||
                   currentUser.displayName != _name)) {
@@ -203,7 +229,11 @@ class UserProvider extends ChangeNotifier {
           }
         } catch (_) {}
 
-        if (uid != SessionManager.authenticatedUid) return;
+        if (_disposed ||
+            generation != _generation ||
+            uid != SessionManager.authenticatedUid) {
+          return;
+        }
         // Persist to SessionManager
         await SessionManager.saveSession(
           phoneNumber: _phoneNumber,
@@ -213,7 +243,11 @@ class UserProvider extends ChangeNotifier {
 
         // Update offline cache
         try {
-          if (uid != SessionManager.authenticatedUid) return;
+          if (_disposed ||
+              generation != _generation ||
+              uid != SessionManager.authenticatedUid) {
+            return;
+          }
           await _storage.write(
             key: 'cached_user_profile_$uid',
             value: jsonEncode({
@@ -227,9 +261,11 @@ class UserProvider extends ChangeNotifier {
         } catch (_) {}
       }
     } catch (_) {
+      if (_disposed || generation != _generation) return;
       // Offline fallback: restore from cached profile if available
       try {
         final cached = await _storage.read(key: _cacheKey);
+        if (_disposed || generation != _generation) return;
         if (cached != null &&
             cached.isNotEmpty &&
             SessionManager.authenticatedPhone != null) {
@@ -252,8 +288,10 @@ class UserProvider extends ChangeNotifier {
         if (_phoneNumber.isEmpty) _hasError = true;
       }
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed && generation == _generation) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -263,6 +301,7 @@ class UserProvider extends ChangeNotifier {
     required String email,
     required String address,
   }) async {
+    final generation = _generation;
     final uid = SessionManager.authenticatedUid;
     if (_phoneNumber != SessionManager.authenticatedPhone ||
         uid == null ||
@@ -277,7 +316,11 @@ class UserProvider extends ChangeNotifier {
     try {
       final ref = FirebaseDatabase.instance.ref("user_details/$_phoneNumber");
       await ref.update({"name": name, "email": email, "address": address});
-      if (uid != SessionManager.authenticatedUid) return false;
+      if (_disposed ||
+          generation != _generation ||
+          uid != SessionManager.authenticatedUid) {
+        return false;
+      }
 
       _name = name;
       _email = email;
@@ -288,7 +331,11 @@ class UserProvider extends ChangeNotifier {
         await FirebaseAuth.instance.currentUser?.updateDisplayName(name);
       } catch (_) {}
 
-      if (uid != SessionManager.authenticatedUid) return false;
+      if (_disposed ||
+          generation != _generation ||
+          uid != SessionManager.authenticatedUid) {
+        return false;
+      }
       await SessionManager.saveSession(
         phoneNumber: _phoneNumber,
         username: name,
@@ -296,7 +343,11 @@ class UserProvider extends ChangeNotifier {
       );
 
       try {
-        if (uid != SessionManager.authenticatedUid) return false;
+        if (_disposed ||
+            generation != _generation ||
+            uid != SessionManager.authenticatedUid) {
+          return false;
+        }
         await _storage.write(
           key: 'cached_user_profile_$uid',
           value: jsonEncode({
@@ -309,6 +360,7 @@ class UserProvider extends ChangeNotifier {
         );
       } catch (_) {}
 
+      if (_disposed || generation != _generation) return false;
       notifyListeners();
       return true;
     } catch (_) {
@@ -317,11 +369,14 @@ class UserProvider extends ChangeNotifier {
   }
 
   void clearUser([String? explicitUid]) {
+    _generation++;
+    _isLoading = false;
     final effectiveUid =
         explicitUid ?? _loadedUid ?? SessionManager.authenticatedUid;
     final oldCacheKey = _cacheKey;
-    final uidCacheKey =
-        effectiveUid != null ? 'cached_user_profile_$effectiveUid' : null;
+    final uidCacheKey = effectiveUid != null
+        ? 'cached_user_profile_$effectiveUid'
+        : null;
     final phoneKey = 'cached_user_profile_$_phoneNumber';
     _loadedUid = null;
     _name = "User";
@@ -329,12 +384,21 @@ class UserProvider extends ChangeNotifier {
     _phoneNumber = "";
     _address = "";
     _hasError = false;
-    _storage.delete(key: oldCacheKey).catchError((_) {});
+    if (explicitUid == null || oldCacheKey == uidCacheKey) {
+      _storage.delete(key: oldCacheKey).catchError((_) {});
+    }
     if (uidCacheKey != null) {
       _storage.delete(key: uidCacheKey).catchError((_) {});
     }
     _storage.delete(key: phoneKey).catchError((_) {});
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _generation++;
+    super.dispose();
   }
 
   @visibleForTesting

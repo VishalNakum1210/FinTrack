@@ -57,6 +57,12 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    if (deviceQa) {
+        // The phone reaches the local test backend through adb reverse.
+        // Keep its HTTP loopback allowance out of production builds.
+        sourceSets.getByName("debug").res.srcDir("src/qa/res")
+    }
+
     defaultConfig {
         applicationId = "com.vishalnakum.fintrack"
         if (deviceQa) applicationIdSuffix = ".qa"
@@ -113,7 +119,9 @@ flutter {
 }
 
 dependencies {
-    rootProject.findProject(":integration_test")?.let {
-        implementation(it)
+    if (deviceQa) {
+        rootProject.findProject(":integration_test")?.let {
+            implementation(it)
+        }
     }
 }

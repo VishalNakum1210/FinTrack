@@ -7,7 +7,6 @@ import 'package:fin_track/splash/splash_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 
@@ -122,7 +121,7 @@ class MyApp extends StatelessWidget {
           navigatorKey: _navigatorKey,
           title: "FinTrack",
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(fontFamily: GoogleFonts.poppins().fontFamily),
+          theme: ThemeData(fontFamily: 'Poppins'),
           home: const SplashPage(),
         ),
       ),

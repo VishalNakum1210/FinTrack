@@ -26,11 +26,6 @@ import 'support/device_backend.dart';
 import 'support/device_flow.dart';
 import 'support/device_recovery_flow.dart';
 
-const qaPassword =
-    'Qa1!xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
-const qaChangedPassword =
-    'Qa2!yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy';
-
 Future<Map<String, dynamic>> readMap(String path) async {
   final snapshot = await FirebaseDatabase.instance
       .ref(path)

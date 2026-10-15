@@ -11,11 +11,17 @@ import 'package:flutter/material.dart';
 enum AddFriendResult { added, updated, failed }
 
 class FriendProvider extends ChangeNotifier {
-  FriendProvider() {
+  FriendProvider({Stream<DatabaseEvent> Function(String)? friendEvents})
+    : _friendEvents =
+          friendEvents ??
+          ((phone) => FirebaseDatabase.instance.ref('Friends/$phone').onValue) {
     _initConnectivity();
   }
+  final Stream<DatabaseEvent> Function(String) _friendEvents;
   bool _isLoading = false, _hasError = false, _isOffline = false;
   String _errorMessage = '', _currentPhone = '';
+  int _generation = 0;
+  bool _disposed = false;
   String? _lastError;
   StreamSubscription<DatabaseEvent>? _subscription, _connectivitySub;
   final List<Map<String, dynamic>> _friends = [];
@@ -37,6 +43,7 @@ class FriendProvider extends ChangeNotifier {
           .onValue
           .listen(
             (event) {
+              if (_disposed) return;
               final offline = event.snapshot.value != true;
               if (_isOffline != offline) {
                 _isOffline = offline;
@@ -44,6 +51,7 @@ class FriendProvider extends ChangeNotifier {
               }
             },
             onError: (_) {
+              if (_disposed) return;
               _isOffline = true;
               notifyListeners();
             },
@@ -61,9 +69,11 @@ class FriendProvider extends ChangeNotifier {
         !_hasError) {
       return;
     }
+    final generation = ++_generation;
     final oldSub = _subscription;
     _subscription = null;
     await oldSub?.cancel();
+    if (_disposed || generation != _generation) return;
     if (_currentPhone != phoneNumber) {
       _friends.clear();
       _getPaise = 0;
@@ -76,47 +86,47 @@ class FriendProvider extends ChangeNotifier {
     notifyListeners();
     _initConnectivity();
     try {
-      _subscription = FirebaseDatabase.instance
-          .ref('Friends/$phoneNumber')
-          .onValue
-          .listen(
-            (event) {
-              final raw = event.snapshot.value;
-              _friends.clear();
-              if (raw is Map) {
-                for (final entry in raw.entries) {
-                  if (entry.value is Map) {
-                    _friends.add(
-                      LedgerTotals.normalize({
-                        ...Map<String, dynamic>.from(entry.value as Map),
-                        'friend_number': entry.key.toString(),
-                      }),
-                    );
-                  }
-                }
+      _subscription = _friendEvents(phoneNumber).listen(
+        (event) {
+          if (_disposed || generation != _generation) return;
+          final raw = event.snapshot.value;
+          _friends.clear();
+          if (raw is Map) {
+            for (final entry in raw.entries) {
+              if (entry.value is Map) {
+                _friends.add(
+                  LedgerTotals.normalize({
+                    ...Map<String, dynamic>.from(entry.value as Map),
+                    'friend_number': entry.key.toString(),
+                  }),
+                );
               }
-              _getPaise = _friends.fold(
-                0,
-                (sum, f) => sum + (f['_getPaise'] as int),
-              );
-              _givePaise = _friends.fold(
-                0,
-                (sum, f) => sum + (f['_givePaise'] as int),
-              );
-              _isLoading = false;
-              _hasError = false;
-              _errorMessage = '';
-              notifyListeners();
-            },
-            onError: (_) {
-              _isLoading = false;
-              _hasError = true;
-              _errorMessage =
-                  'Unable to sync friends ledger. Check your connection.';
-              notifyListeners();
-            },
+            }
+          }
+          _getPaise = _friends.fold(
+            0,
+            (sum, f) => sum + (f['_getPaise'] as int),
           );
+          _givePaise = _friends.fold(
+            0,
+            (sum, f) => sum + (f['_givePaise'] as int),
+          );
+          _isLoading = false;
+          _hasError = false;
+          _errorMessage = '';
+          notifyListeners();
+        },
+        onError: (_) {
+          if (_disposed || generation != _generation) return;
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage =
+              'Unable to sync friends ledger. Check your connection.';
+          notifyListeners();
+        },
+      );
     } catch (_) {
+      if (_disposed || generation != _generation) return;
       _isLoading = false;
       _hasError = true;
       _errorMessage = 'Unable to connect to the ledger.';
@@ -545,7 +555,9 @@ class FriendProvider extends ChangeNotifier {
     // assigned to the current user; no value is created or lost.
     if (categoryType == 'Give Money To Friend'
         ? mine + friend * friendNumbers.length != total
-        : (friendNumbers.length != 1 || mine + friend != total || mine > total)) {
+        : (friendNumbers.length != 1 ||
+              mine + friend != total ||
+              mine > total)) {
       _lastError = 'Split shares do not balance with total bill';
       return false;
     }
@@ -720,6 +732,7 @@ class FriendProvider extends ChangeNotifier {
   }
 
   void clearFriends() {
+    _generation++;
     _subscription?.cancel();
     _subscription = null;
     _connectivitySub?.cancel();
@@ -759,6 +772,8 @@ class FriendProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _generation++;
     _subscription?.cancel();
     _connectivitySub?.cancel();
     super.dispose();

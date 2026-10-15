@@ -12,8 +12,8 @@
   <h3>Smart Expense Tracking • Friend Ledger • Financial Insights • Bill Splitting</h3>
 
   <p>
-    <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.24+-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" /></a>
-    <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" /></a>
+    <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.47.7-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" /></a>
+    <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.13.5-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" /></a>
     <a href="https://firebase.google.com"><img src="https://img.shields.io/badge/Firebase-Realtime%20Database-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase" /></a>
     <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
     <img src="https://img.shields.io/badge/Tests-Automated%20QA-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Automated QA" />
@@ -431,7 +431,7 @@ account/
 
 | Technology / Package | Version | Purpose in FinTrack |
 |---|---|---|
-| **[Flutter SDK](https://flutter.dev)** | `3.44.6` in CI | Cross-platform UI development framework |
+| **[Flutter SDK](https://flutter.dev)** | `3.47.7` in CI | Cross-platform UI development framework |
 | **[Dart SDK](https://dart.dev)** | `^3.11.4` | Modern, null-safe client-optimized programming language |
 | **[Firebase Database](https://pub.dev/packages/firebase_database)** | `^12.0.0` | Real-time cloud synchronization & supported native disk persistence |
 | **[Firebase Core](https://pub.dev/packages/firebase_core)** | `^4.0.0` | Core Firebase app initialization and configuration |
@@ -450,10 +450,13 @@ account/
 
 ### Prerequisites
 Before running FinTrack, ensure you have:
-1. **[Flutter SDK](https://docs.flutter.dev/get-started/install)** (v3.24.0 or later).
+1. **[Flutter SDK](https://docs.flutter.dev/get-started/install)** v3.47.7 (Dart 3.13.5), matching CI and the lockfile.
 2. **Android Studio** or **VS Code** with Flutter and Dart extensions installed.
 3. An active Android Device or Android Virtual Device (AVD) running API level 24+.
 4. A Google Firebase project with **Realtime Database** enabled.
+5. **JDK 21** for Android release builds. On Windows, run `./tool/build_release.ps1 -JdkHome 'C:/path/to/jdk-21'` with the release signing properties configured.
+
+See [RELEASE_AUDIT.md](RELEASE_AUDIT.md) for the latest findings, fixes, validation results, and remaining release gates.
 
 ---
 

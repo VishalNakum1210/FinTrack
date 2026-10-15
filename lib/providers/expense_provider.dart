@@ -8,9 +8,14 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class ExpenseProvider extends ChangeNotifier {
-  ExpenseProvider() {
+  ExpenseProvider({Stream<DatabaseEvent> Function(String)? expenseEvents})
+    : _expenseEvents =
+          expenseEvents ??
+          ((phone) =>
+              FirebaseDatabase.instance.ref('Expenses/$phone').onValue) {
     _initConnectivity();
   }
+  final Stream<DatabaseEvent> Function(String) _expenseEvents;
 
   bool _isLoading = false;
   bool _hasError = false;
@@ -18,6 +23,8 @@ class ExpenseProvider extends ChangeNotifier {
   String _errorMessage = "";
   String? lastError;
   String _currentPhoneNumber = "";
+  int _generation = 0;
+  bool _disposed = false;
   StreamSubscription<DatabaseEvent>? _subscription, _connectivitySub;
 
   final List<Map<String, dynamic>> _records = [];
@@ -130,6 +137,7 @@ class ExpenseProvider extends ChangeNotifier {
       _records.clear();
       _recalculateDerivedTotals();
     }
+    final generation = ++_generation;
     _currentPhoneNumber = phoneNumber;
     _isLoading = true;
     _hasError = false;
@@ -139,12 +147,12 @@ class ExpenseProvider extends ChangeNotifier {
     final oldSub = _subscription;
     _subscription = null;
     await oldSub?.cancel();
+    if (_disposed || generation != _generation) return;
 
     try {
-      final ref = FirebaseDatabase.instance.ref("Expenses/$phoneNumber");
-
-      _subscription = ref.onValue.listen(
+      _subscription = _expenseEvents(phoneNumber).listen(
         (event) {
+          if (_disposed || generation != _generation) return;
           _processSnapshot(event.snapshot);
           _isLoading = false;
           _hasError = false;
@@ -152,6 +160,7 @@ class ExpenseProvider extends ChangeNotifier {
           notifyListeners();
         },
         onError: (error) {
+          if (_disposed || generation != _generation) return;
           _isLoading = false;
           _hasError = true;
           _errorMessage =
@@ -160,6 +169,7 @@ class ExpenseProvider extends ChangeNotifier {
         },
       );
     } catch (e) {
+      if (_disposed || generation != _generation) return;
       _isLoading = false;
       _hasError = true;
       _errorMessage = "Connection error. Please try again.";
@@ -349,16 +359,19 @@ class ExpenseProvider extends ChangeNotifier {
       return false;
     }
 
+    final generation = _generation;
     // ── FIX H3: Optimistic UI update with full rollback on Firebase failure ──
     Map<String, dynamic>? backup;
     int removedIdx = -1;
 
     try {
       final splitPaths = await SplitIntegrity.load(phoneNumber, key);
+      if (_disposed || generation != _generation) return false;
       if (splitPaths.isNotEmpty) {
         await FirebaseDatabase.instance.ref().update({
           for (final path in splitPaths) path: null,
         });
+        if (_disposed || generation != _generation) return true;
         _records.removeWhere(
           (r) =>
               splitPaths.contains('Expenses/$phoneNumber/${r['key']}') ||
@@ -382,7 +395,10 @@ class ExpenseProvider extends ChangeNotifier {
       return true;
     } catch (_) {
       // Firebase failed — roll back the optimistic removal
-      if (backup != null && removedIdx != -1) {
+      if (!_disposed &&
+          generation == _generation &&
+          backup != null &&
+          removedIdx != -1) {
         if (!_records.any((r) => r['key'] == key)) {
           _records.insert(removedIdx.clamp(0, _records.length), backup);
         }
@@ -456,7 +472,9 @@ class ExpenseProvider extends ChangeNotifier {
       await FirebaseDatabase.instance.ref('Expenses/$phoneNumber/$key').update({
         'Amount': Money.decimal(Money.paise(amount)),
         'Category': category,
-        'Payment_Mode': paymentMode,
+        'Payment_Mode': splitPaths.isNotEmpty
+            ? record['Payment_Mode']
+            : paymentMode,
         'Description': description,
         'Date': InputValidator.normalizedDate(date),
         ...InputValidator.dateFields(date),
@@ -519,6 +537,8 @@ class ExpenseProvider extends ChangeNotifier {
 
   /// Clears expenses on logout
   void clearExpenses() {
+    _generation++;
+    lastError = null;
     _owed = 0;
     _subscription?.cancel();
     _subscription = null;
@@ -555,6 +575,7 @@ class ExpenseProvider extends ChangeNotifier {
           .onValue
           .listen(
             (event) {
+              if (_disposed) return;
               final offline = event.snapshot.value != true;
               if (_isOffline != offline) {
                 _isOffline = offline;
@@ -562,6 +583,7 @@ class ExpenseProvider extends ChangeNotifier {
               }
             },
             onError: (_) {
+              if (_disposed) return;
               if (!_isOffline) {
                 _isOffline = true;
                 notifyListeners();
@@ -573,6 +595,8 @@ class ExpenseProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _generation++;
     _subscription?.cancel();
     _connectivitySub?.cancel();
     super.dispose();

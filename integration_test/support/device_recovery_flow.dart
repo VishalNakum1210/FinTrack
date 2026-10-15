@@ -85,15 +85,39 @@ Future<void> verifyProcessRecovery(
   );
   recordCheck(tester, 'native SDK rejects another account ledger read');
 
+  await verifyNativeExportsAndDeletion(
+    tester,
+    expectedPhone: expectedPhone,
+    password: password,
+  );
+}
+
+Future<void> verifyNativeExportsAndDeletion(
+  WidgetTester tester, {
+  required String expectedPhone,
+  required String password,
+}) async {
+  expect(SessionManager.authenticatedPhone, expectedPhone);
+  final snapshot = await FirebaseDatabase.instance
+      .ref('Expenses/$expectedPhone')
+      .get();
+  final expenses = Map<String, dynamic>.from(snapshot.value as Map);
+  expect(expenses.length, 4);
+  final recovered = expenses.values.where(
+    (record) => (record as Map)['Description'] == 'QA restart draft',
+  );
+  expect(recovered, hasLength(1));
+  expect(Money.paise((recovered.single as Map)['Amount']), 789);
+
   final records = expenses.values
       .map((value) => Map<String, dynamic>.from(value as Map))
       .toList();
-  // The host observes the native Android chooser and dismisses it with Back;
-  // no recipient is selected and no data is sent outside the QA emulator.
+  // Cancel each system chooser with Back; never select a recipient or printer.
+  // Some devices require manual Back because adb input injection is disabled.
   debugPrint('QA SHARE START: CSV');
   await ExportService.exportCsvSpreadsheet(
     expenses: records,
-  ).timeout(const Duration(seconds: 60));
+  ).timeout(const Duration(seconds: 120));
   recordCheck(tester, 'native CSV share chooser opens and can be cancelled');
   debugPrint('QA SHARE START: JSON');
   await ExportService.exportJsonBackup(
@@ -101,8 +125,37 @@ Future<void> verifyProcessRecovery(
     phoneNumber: expectedPhone,
     expenses: records,
     friends: const [],
-  ).timeout(const Duration(seconds: 60));
+  ).timeout(const Duration(seconds: 120));
   recordCheck(tester, 'native JSON share chooser opens and can be cancelled');
+
+  final cashSpent = Money.sum(
+    records
+        .where((record) => record['Payment_Mode'] == 'Spent Cash')
+        .map((record) => record['Amount']),
+  );
+  final onlineSpent = Money.sum(
+    records
+        .where((record) => record['Payment_Mode'] == 'Spent Online')
+        .map((record) => record['Amount']),
+  );
+  final totalSpent = Money.sum([cashSpent, onlineSpent]);
+  debugPrint('QA PRINT START: PDF');
+  await ExportService.exportPassbookPdf(
+    userName: 'QA Emulator User',
+    phoneNumber: expectedPhone,
+    records: records,
+    totalIncome: 0,
+    totalExpense: totalSpent,
+    currentBalance: -totalSpent,
+    addCash: 0,
+    spentCash: cashSpent,
+    addOnline: 0,
+    spentOnline: onlineSpent,
+  ).timeout(const Duration(seconds: 120));
+  recordCheck(
+    tester,
+    'native PDF statement print preview opens and can be cancelled',
+  );
 
   await tapVisible(tester, find.text('Profile').last);
   await tapVisible(tester, find.text('Delete Account').last);

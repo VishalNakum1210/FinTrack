@@ -1,0 +1,18 @@
+{
+  "project_info": {
+    "project_number": "123456789",
+    "firebase_url": "http://127.0.0.1:61813/?ns=demo-fintrack-audit-default-rtdb",
+    "project_id": "demo-fintrack-audit",
+    "storage_bucket": "demo-fintrack-audit.appspot.com"
+  },
+  "client": [{
+    "client_info": {
+      "mobilesdk_app_id": "1:123456789:android:0000000000000000",
+      "android_client_info": {"package_name": "com.vishalnakum.fintrack.qa"}
+    },
+    "oauth_client": [],
+    "api_key": [{"current_key": "fake-api-key"}],
+    "services": {"appinvite_service": {"other_platform_oauth_client": []}}
+  }],
+  "configuration_version": "1"
+}

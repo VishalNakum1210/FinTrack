@@ -3,6 +3,26 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../integration_test/support/device_flow.dart';
 
 void main() {
+  testWidgets('QA input helper waits for a delayed field', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FutureBuilder<void>(
+            future: Future<void>.delayed(const Duration(milliseconds: 250)),
+            builder: (context, state) =>
+                state.connectionState == ConnectionState.done
+                ? TextField(controller: controller)
+                : const SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+    await enter(tester, find.byType(TextField), 'ready');
+    expect(controller.text, 'ready');
+  });
+
   testWidgets('QA input helper reopens the same field after unfocusing', (
     tester,
   ) async {

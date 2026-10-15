@@ -34,6 +34,7 @@ Future<void> waitFor(
 }
 
 Future<void> tapVisible(WidgetTester tester, Finder finder) async {
+  await waitFor(tester, finder, seconds: 20);
   tester.binding.focusedEditable = null;
   FocusManager.instance.primaryFocus?.unfocus();
   await tester.pump(const Duration(milliseconds: 300));
@@ -44,6 +45,7 @@ Future<void> tapVisible(WidgetTester tester, Finder finder) async {
 }
 
 Future<void> enter(WidgetTester tester, Finder finder, String value) async {
+  await waitFor(tester, finder, seconds: 20);
   await tester.ensureVisible(finder.first);
   // showKeyboard caches this target; after unfocus the same field must request
   // a fresh input connection before the next simulated text event is sent.
@@ -60,7 +62,7 @@ Future<void> enter(WidgetTester tester, Finder finder, String value) async {
 Future<void> openPage(WidgetTester tester, Widget page) async {
   final navigator = Navigator.of(tester.element(find.byType(NavPageSelector)));
   navigator.push(MaterialPageRoute<void>(builder: (_) => page));
-  await tester.pump(const Duration(milliseconds: 500));
+  await waitFor(tester, find.byWidget(page), seconds: 20);
 }
 
 Future<void> startSignedInApp(WidgetTester tester) async {

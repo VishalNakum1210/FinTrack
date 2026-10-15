@@ -49,6 +49,11 @@ try {
     $protectedIdentity = Get-ProtectedAppIdentity
     # Building is safe; do not let Flutter install anything before inspecting it.
     if (!$SkipBuild) {
+        $qaGoogleConfig = Join-Path $projectDirectory 'android/app/src/qa/google-services.json'
+        if (!(Test-Path -LiteralPath $qaGoogleConfig)) {
+            New-Item -ItemType Directory -Path (Split-Path $qaGoogleConfig -Parent) -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'firebase_qa_config.json') -Destination $qaGoogleConfig
+        }
         $defineArguments = @($DartDefines | ForEach-Object { "--dart-define=$_" })
         & flutter build apk --debug --target $qaTarget @defineArguments
         if ($LASTEXITCODE -ne 0) { throw 'QA build failed; nothing was installed.' }

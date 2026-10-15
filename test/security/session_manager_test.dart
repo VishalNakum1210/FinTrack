@@ -27,8 +27,8 @@ void main() {
 
         expect(phone, isNull);
         expect(await SessionManager.isSessionValid(), isFalse);
-        expect(username, equals('Vishal'));
-        expect(email, equals('vishal@test.com'));
+        expect(username, isNull);
+        expect(email, isNull);
       },
     );
 
@@ -74,7 +74,7 @@ void main() {
     });
 
     test(
-      'preserves existing valid username when subsequent save passes "User"',
+      'signed-out cached username remains private after repeated saves',
       () async {
         await SessionManager.saveSession(
           phoneNumber: '9876543210',
@@ -90,7 +90,7 @@ void main() {
         );
 
         final username = await SessionManager.getUsername();
-        expect(username, equals('Vishal'));
+        expect(username, isNull);
       },
     );
 
