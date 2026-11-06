@@ -1,5 +1,7 @@
 # Release audit — 15 October 2026
 
+For the newer **2.2.2+10 direct APK release**, see `DIRECT_RELEASE.md` and `DIRECT_RELEASE_VERIFICATION.md` (22 October 2026). This report retains the earlier audit and bundle evidence; its artifact hash is historical.
+
 This report covers the repository changes made during this audit. Passing automated checks does not establish that an application has no bugs or security vulnerabilities. Production deployment, Firebase console settings, and physical-device behavior require separate verification.
 
 **Release status:** the application passes the checks below, a signed Android bundle has been built, and 29 checks passed on the connected Android phone using an isolated QA package. Production release remains gated by the recovery/identity decision and production/store configuration verification described below. See `MOBILE_TEST_REPORT.md` for device evidence and limits.

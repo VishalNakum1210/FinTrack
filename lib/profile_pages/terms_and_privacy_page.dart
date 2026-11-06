@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:fin_track/widgets/creator_credit.dart';
+import 'package:fin_track/authentication/account_access_help.dart';
 
 class TermsAndPrivacyPage extends StatefulWidget {
   final int initialTabIndex;
@@ -64,6 +66,8 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
 
                     // Trust Pill
                     _buildTrustBadge(),
+
+                    const CreatorCredit(),
 
                     const SizedBox(height: 36),
                   ],
@@ -209,7 +213,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: _darkGreen,
           title: "1. Acceptance of Terms",
           content:
-              "By creating an account, registering your mobile number, or using the FinTrack mobile application, you agree to be bound by these Terms of Service. If you do not agree to these terms, you must discontinue use and delete your account.",
+              "FinTrack is created by Vishal Nakum. By creating an account or using the application, you agree to these terms and acknowledge the Privacy Policy. If you do not agree, do not create an account or use the service. Existing users can export their records and request account deletion.",
         ),
         const SizedBox(height: 12),
         _buildSectionCard(
@@ -227,7 +231,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: const Color(0xFFD97706),
           title: "3. User Account & Authentication",
           content:
-              "You are responsible for maintaining the confidentiality of your login credentials. Each account is bound to a single 10-digit mobile number. You agree to notify us immediately of any unauthorized use of your account.",
+              "You are responsible for keeping your password safe. Your 10-digit phone number is an account identifier, not proof of phone ownership; this version does not verify it by SMS. Profile email is contact information and cannot reset your password. Administrator-assisted recovery requires independent ownership verification and is not guaranteed.",
         ),
         const SizedBox(height: 12),
         _buildSectionCard(
@@ -252,9 +256,9 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           icon: Icons.warning_amber_rounded,
           iconBg: const Color(0xFFFFF1F2),
           iconColor: const Color(0xFFE11D48),
-          title: "6. Accidental Deletion & No Fault / Liability Disclaimer",
+          title: "6. Service Availability & Your Rights",
           content:
-              "FinTrack is provided strictly on an 'AS-IS' and 'AS-AVAILABLE' basis. If any transaction, expense record, friend ledger history, or account is deleted accidentally—whether through user mistake, accidental button press, device loss, factory reset, clearing app storage, uninstallation, or technical failure—FinTrack and its developers shall NOT be held responsible, liable, or at fault for any lost data or associated financial disputes. Users are strongly advised to regularly export and save PDF statements as personal offline backups.",
+              "We aim to keep FinTrack reliable, but availability, uninterrupted synchronization and recovery of lost records cannot be guaranteed. Check important amounts against original records and export private copies before deleting data. Nothing in these terms excludes rights or liabilities that applicable law does not allow to be excluded. Material changes to these terms will be disclosed through an app update or notice.",
         ),
       ],
     );
@@ -272,7 +276,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: _darkGreen,
           title: "1. Information We Collect",
           content:
-              "We collect information necessary to deliver core application functionality:\n• 10-digit Phone Number (used as your unique account identifier)\n• Display Name & Optional Email Address\n• Self-reported expense and income records (amounts, dates, categories, descriptions)\n• Friend names & phone numbers added to your shared ledger.",
+              "FinTrack, created by Vishal Nakum, collects data you enter to operate your account and ledger: your name, phone account ID, email, optional profile address, income/expense records, friend names and numbers, split/trip records, and feedback (message, rating, type and contact email). Registration currently requires an email, but it is not verified or used for password recovery. Friend details are entered manually; the app does not read your phone contacts. Enter only information you have permission to use.",
         ),
         const SizedBox(height: 12),
         _buildSectionCard(
@@ -281,7 +285,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: const Color(0xFF0284C7),
           title: "2. Cloud Storage & Data Security",
           content:
-              "User data is stored securely using Google Firebase Realtime Database and Firebase Authentication. Communication between your device and our database is encrypted in transit using industry-standard TLS/SSL encryption.",
+              "Google Firebase Authentication processes account credentials and manages authentication. Firebase Realtime Database stores profile, ledger, trip and feedback records so you can access and synchronize them. Firebase also processes technical connection information needed to provide these services. App-to-Firebase traffic uses TLS. UID-based database rules restrict account access; this is not end-to-end encryption. The developer and authorized service operators may access data for support, security and service operation.",
         ),
         const SizedBox(height: 12),
         _buildSectionCard(
@@ -308,7 +312,25 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: const Color(0xFF16A34A),
           title: "5. Data Portability (PDF Statements)",
           content:
-              "You maintain full ownership of your financial records. You can export complete, un-redacted monthly statements and friend ledgers in PDF format at any time directly from the app.",
+              "You can export available records as PDF, CSV or JSON using the system print/share tools. Exports are unencrypted files; share them only with intended recipients. JSON is an archive, not an in-app restore feature. Deleting an account cannot recall exports you have already saved or shared.",
+        ),
+        const SizedBox(height: 12),
+        _buildSectionCard(
+          icon: Icons.history_rounded,
+          iconBg: const Color(0xFFF1F5F9),
+          iconColor: _darkGreen,
+          title: '6. Retention & Account Deletion',
+          content:
+              'Account records are retained while the account is in use. Profile > Delete Account removes your financial roots, feedback and profile contact details before deleting Firebase Authentication credentials. A minimal phone account ID, UID and deletion marker remain for security and safe deletion retries, with no automatic expiry currently implemented; the marker can be replaced after clean re-registration. If deletion fails, reconnect and retry or contact support. Your local exports and records entered independently by other users are not erased by deleting your account. Provider backup/log retention is subject to the configured Firebase services; contact support with a specific retention or deletion request.',
+        ),
+        const SizedBox(height: 12),
+        _buildSectionCard(
+          icon: Icons.mail_outline,
+          iconBg: const Color(0xFFE8F5E9),
+          iconColor: _darkGreen,
+          title: '7. Contact & Privacy Choices',
+          content:
+              'For access, correction, account deletion or privacy questions, email ${AccountAccessHelp.supportEmail}. You can edit profile details, export available records and delete your account in Profile. The current app has no advertising SDK or analytics product integrated. We do not sell financial data. System share destinations receive only the files you choose to share. Privacy changes will be disclosed through an app update or notice.',
         ),
       ],
     );
@@ -353,7 +375,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: const Color(0xFFE11D48),
           title: "4. No Liability for Lost Data or User Deletion Errors",
           content:
-              "The developer and FinTrack assume zero liability for any accidental loss or deletion of transactions, ledger entries, or account credentials. You acknowledge that you are solely responsible for verifying your records and backing up necessary financial statements.",
+              "Check important records and keep private exports before account deletion, device changes or clearing storage. Service or device failures may cause unavailable or lost records. These limitations do not remove rights or liabilities that cannot legally be excluded.",
         ),
         const SizedBox(height: 12),
         _buildSectionCard(
@@ -362,7 +384,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           iconColor: _darkGreen,
           title: "5. Contact & Legal Inquiries",
           content:
-              "For inquiries regarding these terms, privacy practices, or data deletion verification, please contact our support team at support@fintrack.app or submit a ticket through the in-app Feedback screen.",
+              "For questions about privacy, account access, or data deletion: ${AccountAccessHelp.contactInstructions}",
         ),
       ],
     );
@@ -452,7 +474,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> {
           SizedBox(width: 6),
           Flexible(
             child: Text(
-              "FinTrack v2.2.0 • Privacy-First Architecture • Updated Sep 2026",
+              "FinTrack • Terms & Privacy • Updated 31 Oct 2026",
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:fin_track/authentication/account_access_help.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/authentication/registration_page.dart';
 import 'package:fin_track/nav_bar.dart';
@@ -108,10 +109,12 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     final until = DateTime.now().add(Duration(seconds: duration));
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setInt(_prefLockoutKey, until.millisecondsSinceEpoch);
-      prefs.setInt(_prefAttemptsKey, failedAttempts);
-    }).catchError((_) {});
+    SharedPreferences.getInstance()
+        .then((prefs) {
+          prefs.setInt(_prefLockoutKey, until.millisecondsSinceEpoch);
+          prefs.setInt(_prefAttemptsKey, failedAttempts);
+        })
+        .catchError((_) {});
 
     setState(() {
       lockoutSeconds = duration;
@@ -130,10 +133,12 @@ class _LoginPageState extends State<LoginPage> {
             lockoutSeconds = 0;
             failedAttempts = 0;
             timer.cancel();
-            SharedPreferences.getInstance().then((prefs) {
-              prefs.remove(_prefLockoutKey);
-              prefs.remove(_prefAttemptsKey);
-            }).catchError((_) {});
+            SharedPreferences.getInstance()
+                .then((prefs) {
+                  prefs.remove(_prefLockoutKey);
+                  prefs.remove(_prefAttemptsKey);
+                })
+                .catchError((_) {});
           }
         });
       } else {
@@ -181,7 +186,7 @@ class _LoginPageState extends State<LoginPage> {
         final myRef = FirebaseDatabase.instance.ref(
           "user_details/$phoneNumber",
         );
-        var event = await myRef.once().timeout(const Duration(seconds: 8));
+        var event = await myRef.once().timeout(const Duration(seconds: 20));
 
         if (!event.snapshot.exists ||
             (event.snapshot.value is Map &&
@@ -199,7 +204,7 @@ class _LoginPageState extends State<LoginPage> {
             'email': '',
             'created_at': ServerValue.timestamp,
           });
-          event = await myRef.once().timeout(const Duration(seconds: 8));
+          event = await myRef.once().timeout(const Duration(seconds: 20));
         } else if (event.snapshot.value is Map &&
             (event.snapshot.value as Map)['owner_uid'] == null) {
           try {
@@ -286,10 +291,12 @@ class _LoginPageState extends State<LoginPage> {
         failedAttempts = 0;
         lockoutSeconds = 0;
         lockoutTimer?.cancel();
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.remove(_prefLockoutKey);
-          prefs.remove(_prefAttemptsKey);
-        }).catchError((_) {});
+        SharedPreferences.getInstance()
+            .then((prefs) {
+              prefs.remove(_prefLockoutKey);
+              prefs.remove(_prefAttemptsKey);
+            })
+            .catchError((_) {});
 
         Fluttertoast.showToast(msg: "Login successful");
         if (!mounted) return;
@@ -301,9 +308,11 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on FirebaseAuthException catch (e) {
       failedAttempts++;
-      SharedPreferences.getInstance().then((prefs) {
-        prefs.setInt(_prefAttemptsKey, failedAttempts);
-      }).catchError((_) {});
+      SharedPreferences.getInstance()
+          .then((prefs) {
+            prefs.setInt(_prefAttemptsKey, failedAttempts);
+          })
+          .catchError((_) {});
       if (failedAttempts >= 5) {
         startLockoutTimer();
         Fluttertoast.showToast(
@@ -579,7 +588,9 @@ class _LoginPageState extends State<LoginPage> {
                               maxLength: 128,
                               textInputAction: TextInputAction.done,
                               onSubmitted: (_) =>
-                                  (isLoading || !_isLockoutLoaded || lockoutSeconds > 0)
+                                  (isLoading ||
+                                      !_isLockoutLoaded ||
+                                      lockoutSeconds > 0)
                                   ? null
                                   : checkUserDetails(),
                               style: const TextStyle(
@@ -613,10 +624,7 @@ class _LoginPageState extends State<LoginPage> {
                               alignment: Alignment.centerRight,
                               child: GestureDetector(
                                 onTap: () {
-                                  Fluttertoast.showToast(
-                                    msg:
-                                        "Please contact support or admin to reset your credentials.",
-                                  );
+                                  AccountAccessHelp.showPasswordHelp(context);
                                 },
                                 child: const Text(
                                   "Forgot Password?",
@@ -636,7 +644,10 @@ class _LoginPageState extends State<LoginPage> {
                               height: 52,
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: (isLoading || !_isLockoutLoaded || lockoutSeconds > 0)
+                                onPressed:
+                                    (isLoading ||
+                                        !_isLockoutLoaded ||
+                                        lockoutSeconds > 0)
                                     ? null
                                     : checkUserDetails,
                                 style: ElevatedButton.styleFrom(
@@ -653,8 +664,8 @@ class _LoginPageState extends State<LoginPage> {
                                   !_isLockoutLoaded
                                       ? "Loading..."
                                       : lockoutSeconds > 0
-                                          ? "Locked (${lockoutSeconds}s)"
-                                          : "Log In",
+                                      ? "Locked (${lockoutSeconds}s)"
+                                      : "Log In",
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,

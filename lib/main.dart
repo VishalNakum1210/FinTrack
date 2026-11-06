@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'app_licenses.dart';
 import 'package:fin_track/authentication/auth_state_observer.dart';
 import 'package:fin_track/providers/expense_provider.dart';
 import 'package:fin_track/providers/friend_provider.dart';
@@ -12,13 +13,16 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerAppLicenses();
   runApp(const BootstrapApp());
 }
 
 Future<void> initializeServices() async {
   try {
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
     }
   } on FirebaseException catch (e) {
     if (e.code != 'duplicate-app') {

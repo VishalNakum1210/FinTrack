@@ -50,21 +50,21 @@ class ExportService {
     }
   }
 
-  /// Safely loads a Unicode-compatible font theme supporting Indic and standard scripts.
-  static Future<pw.ThemeData?> _loadPdfTheme() async {
-    try {
-      final baseFont = await PdfGoogleFonts.notoSansDevanagariRegular();
-      final boldFont = await PdfGoogleFonts.notoSansDevanagariBold();
-      return pw.ThemeData.withFont(base: baseFont, bold: boldFont);
-    } catch (_) {
-      try {
-        final baseFont = await PdfGoogleFonts.notoSansRegular();
-        final boldFont = await PdfGoogleFonts.notoSansBold();
-        return pw.ThemeData.withFont(base: baseFont, bold: boldFont);
-      } catch (_) {
-        return null;
-      }
-    }
+  /// Bundled Poppins covers Latin and Devanagari without a font download.
+  /// Load fresh Font objects for each document; PDF font state is document-bound.
+  static Future<pw.ThemeData> _loadPdfTheme() async {
+    final base = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/Poppins-Regular.ttf'),
+    );
+    final bold = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/Poppins-Bold.ttf'),
+    );
+    return pw.ThemeData.withFont(
+      base: base,
+      bold: bold,
+      italic: base,
+      boldItalic: bold,
+    );
   }
 
   // ===========================================================================
@@ -148,8 +148,9 @@ class ExportService {
         }
       }
     }
-    final Map<String, double> catTotals =
-        catTotalsPaise.map((k, v) => MapEntry(k, v / 100.0));
+    final Map<String, double> catTotals = catTotalsPaise.map(
+      (k, v) => MapEntry(k, v / 100.0),
+    );
 
     final logoImage = await _loadAppLogo();
 
@@ -1817,7 +1818,8 @@ class ExportService {
       "Date,Category,Payment Mode,Amount,Description,Running Balance",
     );
 
-    final recordsToProcess = expenses.any((e) => e.containsKey('_runningBalance'))
+    final recordsToProcess =
+        expenses.any((e) => e.containsKey('_runningBalance'))
         ? expenses
         : BalanceHelper.computeRunningBalances(expenses);
 
@@ -1838,8 +1840,8 @@ class ExportService {
       final runningVal = record['_runningBalance'];
       final running = runningVal != null
           ? (runningVal is num
-              ? Money.decimal(Money.paise(runningVal))
-              : runningVal.toString())
+                ? Money.decimal(Money.paise(runningVal))
+                : runningVal.toString())
           : '';
       buffer.writeln(
         '${cell(record["Date"])},${cell(record["Category"])},${cell(record["Payment_Mode"])},${cell(amount)},${cell(record["Description"])},${cell(running)}',
@@ -1854,8 +1856,12 @@ class ExportService {
     required List<Map<String, dynamic>> expenses,
   }) async {
     final csvString = generateCsvString(expenses: expenses);
-    final bytes =
-        Uint8List.fromList([0xEF, 0xBB, 0xBF, ...utf8.encode(csvString)]);
+    final bytes = Uint8List.fromList([
+      0xEF,
+      0xBB,
+      0xBF,
+      ...utf8.encode(csvString),
+    ]);
     final fileName =
         'FinTrack_Transactions_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
 

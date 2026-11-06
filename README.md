@@ -184,7 +184,7 @@ FinTrack combines friend and group ledgers, atomic bill-splitting writes, financ
 ### 6. Multi-Format Data Export & Backup Engine
 - **📄 Vector PDF Statements**: Clean, professional printable statements generated via `pdf` and `printing` with summary banners, categorized tables, and balance metrics.
 - **📊 CSV Spreadsheet Export**: Standard tabular export compatible with Microsoft Excel, Apple Numbers, and Google Sheets for audit and tax purposes.
-- **💾 JSON Cloud Snapshot**: Full hierarchical backup of all user accounts, transactions, and friend ledgers for safe archiving and migration.
+- **💾 JSON Export**: An archive of the signed-in user's displayed transactions and friend ledgers, with their name and account ID. Save it through the system share sheet; this release has no in-app import/restore feature.
 
 ### 7. Authentication, Privacy & Offline Architecture
 - **Firebase Authentication**: Password verification is handled by Firebase; the app caches profile metadata in secure storage.
@@ -547,21 +547,25 @@ change log for the temporary local test workaround and verification limits.
 
 ## 📦 Production APK Downloads
 
-Pre-built, signed production APKs are located under `build/app/outputs/flutter-apk/`:
+Current Play preparation: **2.2.3+11**. See [Play release checklist](PLAY_STORE_RELEASE.md)
+and [verification](PLAY_STORE_VERIFICATION.md). Signed candidates do not establish
+Play approval; public policy hosting and Console/testing tasks remain. The older
+direct-release artifact below is retained as historical evidence.
 
-| Package | Target Architecture | Typical Size | Compatibility |
-|---|---|---|---|
-| **`app-arm64-v8a-release.apk`** | 64-bit ARM | **~21 MB** | **Recommended.** Optimized for 99% of modern Android phones. |
-| **`app-armeabi-v7a-release.apk`** | 32-bit ARM | **~19 MB** | For older legacy Android hardware. |
-| **`app-release.apk`** | Universal | **~57 MB** | Contains all binaries for any Android architecture. |
+The direct-install release is **2.2.2+10**. Use the verified distribution folder
+`build/direct-release/2.2.2+10/`, containing the universal signed APK,
+`SHA256SUMS.txt`, `verification.json`, and installation notes. No Play Store
+account is required to share this APK. See [direct-release instructions and
+limits](DIRECT_RELEASE.md) and [current verification](DIRECT_RELEASE_VERIFICATION.md).
+
+Older split APKs in `build/app/outputs/flutter-apk/` may predate the audit fixes;
+do not distribute them. Install updates over the existing app without clearing
+data, and keep the same signing key.
 
 ### How to Build From Source:
-```bash
-# Build split architecture APKs (optimized size)
-flutter build apk --release --split-per-abi
-
-# Build universal APK
-flutter build apk --release
+```powershell
+# Runs checks, builds the signed universal APK, verifies it, and exports checksums.
+./tool/build_release.ps1 -JdkHome 'D:/path/to/jdk-21' -AndroidSdk 'C:/path/to/Android/sdk'
 ```
 
 ---

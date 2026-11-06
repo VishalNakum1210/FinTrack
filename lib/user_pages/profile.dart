@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:fin_track/widgets/creator_credit.dart';
 import 'package:fin_track/authentication/login_page.dart';
 import 'package:fin_track/get_information/session_manager.dart';
 import 'package:fin_track/profile_pages/change_password_page.dart';
@@ -368,6 +369,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
                         // 5. DELETE ACCOUNT DANGER BUTTON
                         _buildDeleteAccountTile(),
+
+                        const CreatorCredit(),
 
                         const SizedBox(height: 32),
                       ],

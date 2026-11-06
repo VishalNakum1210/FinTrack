@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:fin_track/authentication/account_access_help.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fin_track/get_information/password_policy.dart';
 import 'package:fin_track/get_information/session_manager.dart';
@@ -86,10 +87,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
             lockoutSeconds = 0;
             failedAttempts = 0;
             timer.cancel();
-            SharedPreferences.getInstance().then((prefs) {
-              prefs.remove(_prefRegLockoutKey);
-              prefs.remove(_prefRegAttemptsKey);
-            }).catchError((_) {});
+            SharedPreferences.getInstance()
+                .then((prefs) {
+                  prefs.remove(_prefRegLockoutKey);
+                  prefs.remove(_prefRegAttemptsKey);
+                })
+                .catchError((_) {});
           }
         });
       } else {
@@ -111,10 +114,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
     if (failedAttempts >= 5) {
       final until = DateTime.now().add(Duration(seconds: duration));
-      SharedPreferences.getInstance().then((prefs) {
-        prefs.setInt(_prefRegLockoutKey, until.millisecondsSinceEpoch);
-        prefs.setInt(_prefRegAttemptsKey, failedAttempts);
-      }).catchError((_) {});
+      SharedPreferences.getInstance()
+          .then((prefs) {
+            prefs.setInt(_prefRegLockoutKey, until.millisecondsSinceEpoch);
+            prefs.setInt(_prefRegAttemptsKey, failedAttempts);
+          })
+          .catchError((_) {});
 
       setState(() {
         lockoutSeconds = duration;
@@ -221,28 +226,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
           DatabaseReference ref = FirebaseDatabase.instance.ref(
             "user_details/$phoneNumber",
           );
-          final snapshot = await ref.get().timeout(const Duration(seconds: 8));
-          if (snapshot.exists &&
-              snapshot.value is Map &&
-              (snapshot.value as Map)['deletion_pending'] != true) {
-            final existing = Map<String, dynamic>.from(snapshot.value as Map);
-            await ref.update({
-              "name": name,
-              "phone_number": phoneNumber,
-              "email": email.isNotEmpty ? email : (existing["email"] ?? ""),
-              "address": existing["address"] ?? "Not Entered",
-              if (existing["owner_uid"] == null) "owner_uid": user.uid,
-            });
-          } else {
-            await ref.set({
-              "owner_uid": user.uid,
-              "name": name,
-              "phone_number": phoneNumber,
-              "email": email,
-              "address": "Not Entered",
-              "created_at": ServerValue.timestamp,
-            });
-          }
+          await ref.set({
+            "owner_uid": user.uid,
+            "name": name,
+            "phone_number": phoneNumber,
+            "email": email,
+            "address": "Not Entered",
+            "created_at": ServerValue.timestamp,
+          }).timeout(const Duration(seconds: 20));
 
           try {
             await SessionManager.saveSession(
@@ -261,10 +252,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
             context.read<FriendProvider>().fetchFriends(phoneNumber);
           }
 
-          SharedPreferences.getInstance().then((prefs) {
-            prefs.remove(_prefRegLockoutKey);
-            prefs.remove(_prefRegAttemptsKey);
-          }).catchError((_) {});
+          SharedPreferences.getInstance()
+              .then((prefs) {
+                prefs.remove(_prefRegLockoutKey);
+                prefs.remove(_prefRegAttemptsKey);
+              })
+              .catchError((_) {});
 
           Fluttertoast.showToast(
             msg: "Registration Successful! Welcome to FinTrack.",
@@ -275,20 +268,55 @@ class _RegistrationPageState extends State<RegistrationPage> {
             MaterialPageRoute(builder: (context) => const NavPageSelector()),
             (route) => false,
           );
-        } catch (dbError) {
-          try {
-            await user.delete();
-          } catch (_) {}
-          try {
-            await FirebaseAuth.instance.signOut();
-          } catch (_) {}
+        } on TimeoutException {
+          debugPrint('Registration database setup timed out for $phoneNumber');
           Fluttertoast.showToast(
-            msg: "Registration setup failed. Please try again.",
+            msg: "Account created, but setup timed out. Please sign in to continue.",
           );
           if (mounted) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const LoginPage()),
+              MaterialPageRoute(
+                builder: (context) => LoginPage(initialPhoneNumber: phoneNumber),
+              ),
+            );
+          }
+        } on FirebaseException catch (dbError) {
+          debugPrint('Registration database FirebaseException: $dbError');
+          if (dbError.code == 'permission-denied') {
+            try {
+              await user.delete();
+            } catch (_) {}
+            try {
+              await FirebaseAuth.instance.signOut();
+            } catch (_) {}
+            Fluttertoast.showToast(
+              msg: "This phone number cannot be registered. Try signing in or contact support.",
+            );
+          } else {
+            Fluttertoast.showToast(
+              msg: "Registration setup failed. Please try signing in.",
+            );
+          }
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LoginPage(initialPhoneNumber: phoneNumber),
+              ),
+            );
+          }
+        } catch (dbError) {
+          debugPrint('Registration setup unexpected error: $dbError');
+          Fluttertoast.showToast(
+            msg: "Registration setup failed. Please try signing in.",
+          );
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LoginPage(initialPhoneNumber: phoneNumber),
+              ),
             );
           }
         }
@@ -765,6 +793,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               ),
                             ),
 
+                            const SizedBox(height: 14),
+
+                            const Text(
+                              AccountAccessHelp.registrationNotice,
+                              style: TextStyle(fontSize: 12, color: _mutedText),
+                            ),
                             const SizedBox(height: 14),
 
                             // Terms and Privacy Note
